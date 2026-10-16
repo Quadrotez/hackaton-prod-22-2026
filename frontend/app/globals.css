@@ -6,8 +6,6 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-heading);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -50,7 +48,7 @@
   --background: #f7f7e8;
   --foreground: #2b2d1f;
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: #2b2d1f;
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
   --primary: #dfe16d;
@@ -80,17 +78,42 @@
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 
-  --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
-  --text-h1: clamp(1.5rem, 1.2rem + 1.5vw, 2.5rem);
-  --text-h2: clamp(1.375rem, 1.1rem + 1.2vw, 2rem);
-  --text-h3: clamp(1.125rem, 0.9rem + 1.125vw, 1.5rem);
-  --text-h4: clamp(1rem, 0.875rem + 0.625vw, 1.25rem);
-  --text-h5: clamp(0.875rem, 0.75rem + 0.625vw, 1.125rem);
-  --text-h6: clamp(0.75rem, 0.625rem + 0.625vw, 1rem);
+  --text-base: clamp(0.9375rem, 0.9rem + 0.15vw, 1rem);
+  /* Заголовок страницы */
+  --text-h1: clamp(1.75rem, 1.45rem + 1.25vw, 2.5rem);
+  /* Заголовок карточки или секции */
+  --text-h2: clamp(1.0625rem, 1rem + 0.3vw, 1.25rem);
+  --text-h3: 1rem;
+  --text-h4: 1rem;
+  --text-h5: 0.9375rem;
+  --text-h6: 0.875rem;
 
-  --leading-heading: 1.15;
+  --leading-heading: 1.1;
   --leading-subheading: 1.3;
-  --leading-body: 1.6;
+  --leading-body: 1.55;
+}
+
+/* Базовая нейтральная палитра shadcn — для элементов, которые не должны
+   брать фирменные цвета (например, удаление и его подтверждение) */
+.theme-shadcn {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
 }
 
 @layer base {
@@ -100,44 +123,53 @@
   body {
     @apply bg-background text-foreground;
     font-size: var(--text-base);
+    font-weight: 400;
     line-height: var(--leading-body);
+    font-optical-sizing: auto;
+    text-rendering: optimizeLegibility;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    text-wrap: balance;
   }
   h1 {
-    @apply font-heading;
     font-size: var(--text-h1);
+    font-weight: 700;
     line-height: var(--leading-heading);
-    letter-spacing: -0.02em;
-    text-wrap: balance;
+    letter-spacing: -0.025em;
   }
   h2 {
-    @apply font-heading;
     font-size: var(--text-h2);
-    line-height: var(--leading-heading);
+    font-weight: 650;
+    line-height: var(--leading-subheading);
     letter-spacing: -0.015em;
-    text-wrap: balance;
   }
   h3 {
     font-size: var(--text-h3);
-    font-weight: 500;
+    font-weight: 600;
     line-height: var(--leading-subheading);
-    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  h4,
+  h5,
+  h6 {
+    font-weight: 600;
+    line-height: var(--leading-subheading);
   }
   h4 {
     font-size: var(--text-h4);
-    font-weight: 500;
-    line-height: var(--leading-subheading);
   }
   h5 {
     font-size: var(--text-h5);
-    line-height: var(--leading-subheading);
   }
   h6 {
     font-size: var(--text-h6);
-    line-height: var(--leading-subheading);
   }
   p {
-    font-size: var(--text-base);
-    line-height: var(--leading-body);
     text-wrap: pretty;
   }
 }

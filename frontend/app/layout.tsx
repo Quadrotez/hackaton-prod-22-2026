@@ -1,17 +1,12 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Ledger, Inter } from "next/font/google";
-
-const heading = Ledger({
-  subsets: ["latin"],
-  variable: "--font-heading",
-  weight: "400",
-});
+import { Inter } from "next/font/google";
+import { Toaster } from "@/components/ui/sonner";
 
 const sans = Inter({
   subsets: ["cyrillic", "latin"],
   variable: "--font-sans",
-  weight: "500",
+  axes: ["opsz"],
 });
 
 export const metadata: Metadata = {
@@ -22,9 +17,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="ru"
-      className={`${heading.variable} ${sans.variable} h-full antialiased`}
+      className={`${sans.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">
+        {children}
+        <Toaster position="top-center" />
+      </body>
     </html>
   );
 }

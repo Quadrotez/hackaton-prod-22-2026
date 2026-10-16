@@ -15,14 +15,16 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
   if (authorization) headers["authorization"] = authorization;
 
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
+  // Forward raw bytes so multipart uploads (photos) keep their boundary and binary data.
   const upstream = await fetch(target, {
     method: request.method,
     headers,
-    body: hasBody ? await request.text() : undefined,
+    body: hasBody ? await request.arrayBuffer() : undefined,
     cache: "no-store",
   });
 
-  return new Response(await upstream.arrayBuffer(), {
+  const body = await upstream.arrayBuffer();
+  return new Response(body.byteLength > 0 ? body : null, {
     status: upstream.status,
     headers: { "content-type": upstream.headers.get("content-type") ?? "application/json" },
   });
