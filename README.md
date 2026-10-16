@@ -63,9 +63,15 @@ Pipeline (`.gitlab-ci.yml`):
 
 - `test:backend` runs pytest on every branch and merge request.
 - `build:backend` and `build:frontend` build images with Kaniko and push them to `registry.spirit.t-education.com/hack-led-22/{backend,frontend}:<short-sha>`.
-- `deploy` runs only on `master`. It copies `docker-compose.yml` to `/opt/petcare` via Teleport (`tsh scp`) and runs `docker compose pull && up -d` with `TAG=<short-sha>`. `migrate` runs `alembic upgrade head` before `api` starts.
+- `deploy` runs only on `master`. It copies `docker-compose.yml` to `/opt/petcare` over SSH and runs `docker compose pull && up -d` with `TAG=<short-sha>`. `migrate` runs `alembic upgrade head` before `api` starts.
+- `prepare:docker` is manual and runs only on `master`. It logs the VM in to the Registry (`dp auth configure-docker`).
 
-CI/CD variables (Spirit): `SPIRIT_DOCKER_SA_KEY` (File), `DEPLOY_VM`, `DEPLOY_SSH_USER`.
+CI/CD variables (Spirit):
+
+- `SPIRIT_DOCKER_SA_KEY`: File, service-account key.
+- `DEPLOY_HOST`: VM address.
+- `DEPLOY_USER`: SSH user on the VM.
+- `DEPLOY_KEY`: File, private SSH key for `DEPLOY_USER`. Its public key must be in `~/.ssh/authorized_keys` on the VM.
 
 One-time setup on the VM:
 

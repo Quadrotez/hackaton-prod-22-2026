@@ -1,6 +1,6 @@
 # NOTE: Shared job templates come from pipelines/pipelines (Spirit).
 # Required CI/CD variables (see README "Deploy"):
-#   SPIRIT_DOCKER_SA_KEY (File), DEPLOY_VM, DEPLOY_SSH_USER
+#   SPIRIT_DOCKER_SA_KEY (File), DEPLOY_HOST, DEPLOY_USER, DEPLOY_KEY (File)
 
 stages:
   - prepare
@@ -15,11 +15,14 @@ include:
       - /jobs/build.yaml
       - /jobs/docker.yaml
       - /jobs/rules.yaml
-      - /jobs/teleport.yaml
-      - /jobs/configure-docker.yaml
 
 variables:
   REGISTRY: registry.spirit.t-education.com/hack-led-22
+  DP_CLI_VERSION: 14.1.0
+  SSH_USER: $DEPLOY_USER
+  SSH_HOST: $DEPLOY_HOST
+  SSH_PRIVATE_KEY: $DEPLOY_KEY
+  SSH_ADDRESS: $DEPLOY_USER@$DEPLOY_HOST
 
 test:backend:
   stage: test
@@ -55,19 +58,19 @@ build:frontend:
 
 deploy:
   stage: deploy
-  image: registry.spirit.t-education.com/cicd-images/tsh-18:latest
   extends:
-    - .teleport_auth
+    - .ssh
     - .rules-master
   variables:
     TAG: ${CI_COMMIT_SHORT_SHA}
   script:
-    - tsh scp docker-compose.yml "${DEPLOY_SSH_USER}@${DEPLOY_VM}:/opt/petcare/docker-compose.yml"
-    - tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "cd /opt/petcare && TAG=${TAG} docker compose pull && TAG=${TAG} docker compose up -d --remove-orphans"
+    - scp -o StrictHostKeyChecking=no docker-compose.yml "${SSH_ADDRESS}:/opt/petcare/docker-compose.yml"
+    - ssh $SSH_ADDRESS "cd /opt/petcare && TAG=${TAG} docker compose pull && TAG=${TAG} docker compose up -d --remove-orphans"
 
 prepare:docker:
   stage: prepare
-  extends: .configure_docker
+  extends:
+    - .ssh
   rules:
     - if: $CI_COMMIT_REF_NAME == "master"
       when: manual
@@ -77,7 +80,7 @@ prepare:docker:
   script:
     - |
       KEY_B64=$(base64 -w0 "$SPIRIT_DOCKER_SA_KEY")
-      tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "
+      ssh $SSH_ADDRESS "
         set -e
         umask 077
         mkdir -p \$HOME/bin
