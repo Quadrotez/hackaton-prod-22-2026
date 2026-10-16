@@ -1,6 +1,6 @@
 # PetCare
 
-Backend-only hackathon project for pet owners, built with Python and FastAPI.
+Hackathon project for pet owners, built with Python and FastAPI.
 
 ## Requirements
 
@@ -12,7 +12,11 @@ Backend-only hackathon project for pet owners, built with Python and FastAPI.
 ```bash
 cd backend
 uv sync
+cp ../.env.example .env
+uv run alembic upgrade head
 ```
+
+Configure `DATABASE_URL`, `JWT_SECRET_KEY`, and `ACCESS_TOKEN_EXPIRE_MINUTES` in `.env` before running migrations. PostgreSQL must be running and the configured database must exist.
 
 This creates `backend/.venv` and installs dependencies pinned in `backend/uv.lock`.
 
@@ -31,6 +35,12 @@ The API is available at http://127.0.0.1:8000, interactive docs at http://127.0.
 curl http://127.0.0.1:8000/api/v1/health
 # {"status":"ok"}
 ```
+
+Authentication endpoints:
+
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `GET /api/v1/auth/me`
 
 ## Dependencies
 
