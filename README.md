@@ -46,5 +46,20 @@ Authentication endpoints:
 
 Dependencies are declared in `backend/pyproject.toml`. Use `uv add <package>` to add one; this updates `backend/uv.lock`.
 
-# Deploy
-`docker-compose.yml` for Nginx Proxy Manager
+## Deploy
+
+Pipeline (`.gitlab-ci.yml`):
+
+- `test:backend` runs pytest on every branch and merge request.
+- `build:backend` and `build:frontend` build images with Kaniko and push them to `registry.spirit.t-education.com/hack-led-22/{backend,frontend}:<short-sha>`.
+- `deploy` runs only on `master`. It copies `docker-compose.yml` to `/opt/petcare` via Teleport (`tsh scp`) and runs `docker compose pull && up -d` with `TAG=<short-sha>`. `migrate` runs `alembic upgrade head` before `api` starts.
+
+CI/CD variables (Spirit): `SPIRIT_DOCKER_SA_KEY` (File), `DEPLOY_VM`, `DEPLOY_SSH_USER`.
+
+One-time setup on the VM:
+
+1. `/opt/petcare/.env` with `JWT_SECRET_KEY`, `ACCESS_TOKEN_EXPIRE_MINUTES`, and `DB_PASSWORD` (used by `db` and `api`).
+2. Run the `prepare:docker` job once to log in to the Registry on the VM.
+3. In Nginx Proxy Manager (port 8081): Proxy Host `petcare.quadrotez.com` -> `petcare-site:3000`, with a Let's Encrypt certificate.
+
+`docker-compose.yml` joins the external `proxy_network`, which NPM already uses.

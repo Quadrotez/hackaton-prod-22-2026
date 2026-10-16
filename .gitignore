@@ -45,3 +45,6 @@ temp/
 
 # Roo Code local settings
 .roo/
+
+# Opencode settings
+opencode.json
