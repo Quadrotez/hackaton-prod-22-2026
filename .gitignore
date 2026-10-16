@@ -1,0 +1,53 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Python tools
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Next.js
+node_modules/
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+
+# Logs
+*.log
+logs/
+
+# IDEs and editors
+.vscode/
+.idea/
+.DS_Store
+
+# Testing
+coverage/
+
+# Temporary and uploaded media files
+tmp/
+temp/
+media/
+backend/media/
+backend/test-media/
+
+
+# Roo Code local settings
+.roo/
+
+# Opencode settings
+opencode.json

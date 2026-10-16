@@ -1,0 +1,27 @@
+[project]
+name = "petcare-backend"
+version = "0.1.0"
+description = "PetCare backend API"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.20.0",
+    "email-validator>=2.3.0",
+    "fastapi>=0.115",
+    "psycopg[binary]>=3.3.6",
+    "pwdlib[argon2]>=0.3.1",
+    "pydantic-settings>=2.16.0",
+    "pyjwt>=2.15.1",
+    "python-multipart>=0.0.20",
+    "pillow>=11.0.0",
+    "sqlalchemy>=2.1.4",
+    "uvicorn[standard]>=0.30",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+]
