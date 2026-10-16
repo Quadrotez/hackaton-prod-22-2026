@@ -1,6 +1,6 @@
 # NOTE: Shared job templates come from pipelines/pipelines (Spirit).
 # Required CI/CD variables (see README "Deploy"):
-#   SPIRIT_DOCKER_SA_KEY (File), DEPLOY_HOST, DEPLOY_USER, DEPLOY_KEY (File)
+#   SPIRIT_DOCKER_SA_KEY (File), DEPLOY_HOST, DEPLOY_USER, DEPLOY_KEY_B64 (base64 of private key)
 
 stages:
   - prepare
@@ -19,9 +19,6 @@ include:
 variables:
   REGISTRY: registry.spirit.t-education.com/hack-led-22
   DP_CLI_VERSION: 14.1.0
-  SSH_USER: $DEPLOY_USER
-  SSH_HOST: $DEPLOY_HOST
-  SSH_PRIVATE_KEY: $DEPLOY_KEY
   SSH_ADDRESS: $DEPLOY_USER@$DEPLOY_HOST
 
 test:backend:
@@ -59,24 +56,31 @@ build:frontend:
 deploy:
   stage: deploy
   extends:
-    - .ssh
     - .rules-master
   variables:
     TAG: ${CI_COMMIT_SHORT_SHA}
+  before_script:
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - echo "$DEPLOY_KEY_B64" | base64 -d > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+    - printf 'Host *\n  StrictHostKeyChecking no\n  IdentityFile ~/.ssh/id_deploy\n' > ~/.ssh/config && chmod 600 ~/.ssh/config
+    - ssh-keygen -y -f ~/.ssh/id_deploy >/dev/null
   script:
     - scp -o StrictHostKeyChecking=no docker-compose.yml "${SSH_ADDRESS}:/opt/petcare/docker-compose.yml"
     - ssh $SSH_ADDRESS "cd /opt/petcare && TAG=${TAG} docker compose pull && TAG=${TAG} docker compose up -d --remove-orphans"
 
 prepare:docker:
   stage: prepare
-  extends:
-    - .ssh
   rules:
     - if: $CI_COMMIT_REF_NAME == "master"
       when: manual
       allow_failure: true
   variables:
     DP_CLI_VERSION: 14.1.0
+  before_script:
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - echo "$DEPLOY_KEY_B64" | base64 -d > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+    - printf 'Host *\n  StrictHostKeyChecking no\n  IdentityFile ~/.ssh/id_deploy\n' > ~/.ssh/config && chmod 600 ~/.ssh/config
+    - ssh-keygen -y -f ~/.ssh/id_deploy >/dev/null
   script:
     - |
       KEY_B64=$(base64 -w0 "$SPIRIT_DOCKER_SA_KEY")
