@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: petcare-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: petcare
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: petcare_db
+    volumes:
+      - ./database/data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U petcare"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  site:
+    build: ./site
+    container_name: petcare-site
+    restart: unless-stopped
+    environment:
+      - DB_HOST=db
+      - DB_USER=petcare
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=petcare_db
+    expose:
+      - "3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+      - proxy_network
+
+networks:
+  internal:
+  proxy_network:
+    external: true

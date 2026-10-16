@@ -45,3 +45,6 @@ Authentication endpoints:
 ## Dependencies
 
 Dependencies are declared in `backend/pyproject.toml`. Use `uv add <package>` to add one; this updates `backend/uv.lock`.
+
+# Deploy
+`docker-compose.yml` for Nginx Proxy Manager
