@@ -21,7 +21,7 @@ const loginSchema = z.object({
     .email("Введите корректный email"),
   password: z
     .string()
-    .min(8, "Минимум 8 символов"),
+    .min(1, "Введите пароль"),
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
@@ -114,7 +114,7 @@ export function LoginForm() {
             {errors.password ? (
               <FieldError>{errors.password}</FieldError>
             ) : (
-              <FieldDescription>Пароль должен содержать не менее 8 символов</FieldDescription>
+              <FieldDescription>Новый аккаунт создаётся автоматически</FieldDescription>
             )}
           </Field>
 

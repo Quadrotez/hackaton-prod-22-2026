@@ -26,6 +26,7 @@ def create_pet(client: TestClient, headers: dict[str, str], name: str = "Milo"):
         json={
             "name": name,
             "species": "cat",
+            "sex": "boy",
             "breed": "British Shorthair",
             "birth_date": "2022-05-10",
             "weight_g": 4500,
@@ -51,6 +52,7 @@ def test_create_and_list_only_current_users_pets(client: TestClient) -> None:
         "id": created.json()["id"],
         "name": "Milo",
         "species": "cat",
+        "sex": "boy",
         "breed": "British Shorthair",
         "birth_date": "2022-05-10",
         "approximate_age_years": None,
@@ -138,6 +140,7 @@ def test_validation_rejects_blank_fields_invalid_dates_and_empty_patch(client: T
         json={
             "name": "   ",
             "species": "cat",
+            "sex": "boy",
             "birth_date": "not-a-date",
             "weight_g": 4500,
         },
@@ -151,7 +154,7 @@ def test_validation_rejects_blank_fields_invalid_dates_and_empty_patch(client: T
 
 def test_create_pet_age_variants(client: TestClient) -> None:
     headers = auth_headers(client, "age-variants@example.com")
-    base_payload = {"name": "Milo", "species": "cat", "weight_g": 4500}
+    base_payload = {"name": "Milo", "species": "cat", "sex": "boy", "weight_g": 4500}
 
     exact = client.post(
         "/api/v1/pets/",
@@ -183,7 +186,7 @@ def test_create_pet_age_variants(client: TestClient) -> None:
 
 def test_create_rejects_conflicting_or_out_of_range_age(client: TestClient) -> None:
     headers = auth_headers(client, "invalid-age@example.com")
-    base_payload = {"name": "Milo", "species": "cat", "weight_g": 4500}
+    base_payload = {"name": "Milo", "species": "cat", "sex": "boy", "weight_g": 4500}
 
     conflict = client.post(
         "/api/v1/pets/",
@@ -215,6 +218,7 @@ def test_create_accepts_age_boundaries(client: TestClient) -> None:
             json={
                 "name": f"Pet {age}",
                 "species": "cat",
+                "sex": "girl",
                 "approximate_age_years": age,
                 "weight_g": 4500,
             },
@@ -225,7 +229,7 @@ def test_create_accepts_age_boundaries(client: TestClient) -> None:
 
 def test_create_requires_positive_weight(client: TestClient) -> None:
     headers = auth_headers(client, "weight-validation@example.com")
-    base_payload = {"name": "Milo", "species": "cat"}
+    base_payload = {"name": "Milo", "species": "cat", "sex": "boy"}
 
     assert client.post("/api/v1/pets/", headers=headers, json=base_payload).status_code == 422
     for weight in (0, -1):
@@ -243,6 +247,44 @@ def test_create_requires_positive_weight(client: TestClient) -> None:
     )
     assert created.status_code == 201
     assert created.json()["weight_g"] == 1
+
+
+def test_create_requires_valid_sex_and_patch_updates_it(client: TestClient) -> None:
+    headers = auth_headers(client, "sex-validation@example.com")
+    base_payload = {"name": "Milo", "species": "cat", "weight_g": 4500}
+
+    missing = client.post("/api/v1/pets/", headers=headers, json=base_payload)
+    assert missing.status_code == 422
+
+    invalid = client.post(
+        "/api/v1/pets/", headers=headers, json={**base_payload, "sex": "unknown"}
+    )
+    assert invalid.status_code == 422
+
+    boy = client.post(
+        "/api/v1/pets/", headers=headers, json={**base_payload, "sex": "boy"}
+    )
+    assert boy.status_code == 201
+    assert boy.json()["sex"] == "boy"
+
+    updated = client.patch(
+        f"/api/v1/pets/{boy.json()['id']}", headers=headers, json={"sex": "girl"}
+    )
+    assert updated.status_code == 200
+    assert updated.json()["sex"] == "girl"
+
+    assert (
+        client.patch(
+            f"/api/v1/pets/{boy.json()['id']}", headers=headers, json={"sex": None}
+        ).status_code
+        == 422
+    )
+    assert (
+        client.patch(
+            f"/api/v1/pets/{boy.json()['id']}", headers=headers, json={"sex": "male"}
+        ).status_code
+        == 422
+    )
 
 
 def test_patch_preserves_and_clears_age_fields(client: TestClient) -> None:

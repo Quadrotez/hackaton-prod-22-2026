@@ -2,7 +2,7 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 
 from app.core.config import get_settings
 
@@ -44,4 +44,55 @@ def test_feeding_records_migration_upgrade_and_downgrade(
         assert "feeding_records" not in downgraded_inspector.get_table_names()
         assert "pets" in downgraded_inspector.get_table_names()
     finally:
+        get_settings.cache_clear()
+
+
+def test_pet_sex_migration_backfills_existing_rows_and_enforces_choices(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    database_path = tmp_path / "pet-sex-migration.sqlite"
+    database_url = f"sqlite+pysqlite:///{database_path}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+
+    config = Config("alembic.ini")
+    engine = create_engine(database_url)
+    try:
+        command.upgrade(config, "20261016_0004")
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO users (email, password_hash, created_at) "
+                    "VALUES ('existing@example.com', 'hash', CURRENT_TIMESTAMP)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO pets (user_id, name, species, weight_g) "
+                    "VALUES (1, 'Milo', 'cat', 4500)"
+                )
+            )
+
+        command.upgrade(config, "head")
+        inspector = inspect(engine)
+        columns = {column["name"]: column for column in inspector.get_columns("pets")}
+        assert columns["sex"]["nullable"] is False
+
+        with engine.connect() as connection:
+            assert connection.execute(text("SELECT sex FROM pets")).scalar_one() == "boy"
+
+        check_sql = " ".join(
+            constraint.get("sqltext", "")
+            for constraint in inspector.get_check_constraints("pets")
+        )
+        assert "boy" in check_sql
+        assert "girl" in check_sql
+
+        command.downgrade(config, "20261016_0004")
+        downgraded_columns = {
+            column["name"] for column in inspect(engine).get_columns("pets")
+        }
+        assert "sex" not in downgraded_columns
+    finally:
+        engine.dispose()
         get_settings.cache_clear()
