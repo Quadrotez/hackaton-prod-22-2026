@@ -55,6 +55,7 @@ build:frontend:
 
 deploy:
   stage: deploy
+  image: kroniak/ssh-client:3.19
   extends:
     - .rules-master
   variables:
@@ -70,6 +71,7 @@ deploy:
 
 prepare:docker:
   stage: prepare
+  image: kroniak/ssh-client:3.19
   rules:
     - if: $CI_COMMIT_REF_NAME == "master"
       when: manual
