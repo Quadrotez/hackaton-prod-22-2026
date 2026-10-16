@@ -3,6 +3,7 @@
 #   SPIRIT_DOCKER_SA_KEY (File), DEPLOY_VM, DEPLOY_SSH_USER
 
 stages:
+  - prepare
   - test
   - build
   - deploy
@@ -54,6 +55,7 @@ build:frontend:
 
 deploy:
   stage: deploy
+  image: registry.spirit.t-education.com/cicd-images/tsh-18:latest
   extends:
     - .teleport_auth
     - .rules-master
@@ -66,7 +68,12 @@ deploy:
     - tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "cd /opt/petcare && TAG=${TAG} docker compose pull && TAG=${TAG} docker compose up -d --remove-orphans"
 
 prepare:docker:
+  stage: prepare
   extends: .configure_docker
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "master"
+      when: manual
+      allow_failure: true
   variables:
     DEPLOY_SSH_USER: $DEPLOY_SSH_USER
     DEPLOY_VM: $DEPLOY_VM
