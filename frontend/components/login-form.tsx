@@ -53,8 +53,25 @@ export function LoginForm() {
     setErrors({});
     setPending(true);
     try {
-      console.log(result.data);
-      // await fetch("/api/login", { method: "POST", body: JSON.stringify(result.data) });
+      const response = await fetch("/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(result.data),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const message =
+          body?.detail && typeof body.detail === "string"
+            ? body.detail
+            : "Неверный email или пароль";
+        setErrors({ password: message });
+        return;
+      }
+      const token = (await response.json()) as { access_token: string };
+      window.localStorage.setItem("access_token", token.access_token);
+      window.location.assign("/");
+    } catch {
+      setErrors({ password: "Нет связи с сервером, попробуйте позже" });
     } finally {
       setPending(false);
     }
