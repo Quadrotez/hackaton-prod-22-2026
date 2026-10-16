@@ -11,7 +11,7 @@ const heading = Ledger({
 const sans = Inter({
   subsets: ["cyrillic", "latin"],
   variable: "--font-sans",
-  weight: "500",
+  axes: ["opsz"],
 });
 
 export const metadata: Metadata = {

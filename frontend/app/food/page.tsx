@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { FoodCatalog } from "@/components/food-catalog";
 import type { Food } from "@/lib/card";
 
@@ -48,8 +49,16 @@ const foods: Food[] = [
 
 export default function FoodPage() {
   return (
-    <main className="flex min-h-dvh w-full min-w-0 flex-col gap-6 bg-background px-4 py-6 lg:px-12 lg:py-10">
-      <FoodCatalog foods={foods} />
+    <main className="relative flex min-h-dvh min-w-0 flex-col items-center bg-secondary px-6 pb-28 pt-20 font-normal leading-[1.55] [font-optical-sizing:auto]">
+      <Link
+        href="/me"
+        className="absolute left-6 top-6 rounded-sm text-lg font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+      >
+        PetCare
+      </Link>
+      <div className="flex w-full max-w-sm flex-col gap-6">
+        <FoodCatalog foods={foods} />
+      </div>
     </main>
   );
 }

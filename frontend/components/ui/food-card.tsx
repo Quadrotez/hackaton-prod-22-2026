@@ -1,8 +1,17 @@
+import { CookieIcon, SoupIcon, WheatIcon } from "lucide-react";
+import { cardVariants } from "@/components/ui/card";
 import type { FoodCardProps } from "@/lib/card";
+import { cn } from "@/lib/utils";
 
 const numberFormat = new Intl.NumberFormat("ru-RU", {
   maximumFractionDigits: 2,
 });
+
+const foodIcons = {
+  dry: WheatIcon,
+  wet: SoupIcon,
+  treat: CookieIcon,
+};
 
 function formatWeight(grams: number) {
   return grams >= 1000
@@ -11,6 +20,7 @@ function formatWeight(grams: number) {
 }
 
 export default function FoodCard({ food }: FoodCardProps) {
+  const Icon = foodIcons[food.type];
   const remainingPercent = food.totalGrams > 0
     ? Math.min(100, Math.max(0, Math.round(food.remainingGrams / food.totalGrams * 100)))
     : 0;
@@ -25,23 +35,23 @@ export default function FoodCard({ food }: FoodCardProps) {
   return (
     <article
       aria-labelledby={`food-${food.id}`}
-      className="flex min-w-0 flex-col gap-3.5 rounded-2xl border border-border bg-white p-[18px]"
+      className={cn(cardVariants(), "flex min-w-0 flex-col gap-4 text-foreground")}
     >
-      <div className="flex items-center gap-3.5">
+      <div className="flex items-center gap-4">
         <div
           aria-hidden="true"
-          className="flex size-[88px] shrink-0 items-center justify-center rounded-xl bg-secondary text-xs text-muted-foreground"
+          className="flex size-12 shrink-0 items-center justify-center rounded-full bg-secondary"
         >
-          фото
+          <Icon className="size-5" strokeWidth={1.5} />
         </div>
         <div className="min-w-0">
           <h2
             id={`food-${food.id}`}
-            className="break-words font-sans text-lg font-semibold leading-[1.3] tracking-normal"
+            className="break-words font-sans text-[clamp(1.0625rem,1rem+0.3vw,1.25rem)] font-[650] leading-[1.3] tracking-[-0.015em]"
           >
             {food.name}
           </h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
+          <p className="mt-0.5 text-sm leading-[1.55] text-muted-foreground">
             {food.description}
           </p>
         </div>
@@ -51,15 +61,15 @@ export default function FoodCard({ food }: FoodCardProps) {
         {nutrients.map(({ label, value }) => (
           <div key={label}>
             <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className="text-base font-semibold">{value}</dd>
+            <dd className="text-base font-semibold tabular-nums">{value}</dd>
           </div>
         ))}
       </dl>
 
       <div className="mt-auto flex flex-col gap-1.5">
-        <div className="flex flex-wrap justify-between gap-x-2 text-sm">
-          <span>Осталось</span>
-          <span className="font-semibold">{stockDescription}</span>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm">
+          <span className="text-muted-foreground">Осталось</span>
+          <span className="font-semibold tabular-nums">{stockDescription}</span>
         </div>
         <div
           role="progressbar"
@@ -68,10 +78,10 @@ export default function FoodCard({ food }: FoodCardProps) {
           aria-valuemax={100}
           aria-valuenow={remainingPercent}
           aria-valuetext={stockDescription}
-          className="h-2 overflow-hidden rounded-full bg-secondary"
+          className="h-1.5 overflow-hidden rounded-full bg-secondary"
         >
           <div
-            className="h-full border-r-2 border-foreground bg-primary transition-[width] motion-reduce:transition-none"
+            className="h-full rounded-full bg-primary transition-[width] motion-reduce:transition-none"
             style={{ width: `${remainingPercent}%` }}
           />
         </div>

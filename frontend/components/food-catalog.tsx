@@ -20,12 +20,12 @@ export function FoodCatalog({ foods }: FoodCatalogProps) {
 
   return (
     <>
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      <header className="flex flex-col gap-5">
         <div>
-          <h1 className="font-sans text-[32px] font-bold leading-[1.15] tracking-normal">
+          <h1 className="font-sans text-[clamp(1.75rem,1.45rem+1.25vw,2.5rem)] font-bold leading-[1.1] tracking-[-0.025em]">
             Корма
           </h1>
-          <p className="mt-1 text-[15px] text-muted-foreground">
+          <p className="mt-1 text-[clamp(0.9375rem,0.9rem+0.15vw,1rem)] leading-[1.55] text-muted-foreground">
             Состав питания и остатки на складе
           </p>
         </div>
@@ -42,7 +42,7 @@ export function FoodCatalog({ foods }: FoodCatalogProps) {
               aria-pressed={filter === value}
               aria-controls="food-list"
               onClick={() => setFilter(value)}
-              className="h-10 rounded-full bg-white px-4 aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:text-background aria-pressed:hover:bg-foreground/90"
+              className="h-8 rounded-full bg-card px-3 text-xs aria-pressed:border-transparent aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/80"
             >
               {label}
             </Button>
@@ -56,11 +56,11 @@ export function FoodCatalog({ foods }: FoodCatalogProps) {
       <section
         id="food-list"
         aria-label="Список кормов"
-        className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,300px),1fr))] gap-5"
+        className="flex flex-col gap-3"
       >
         {filteredFoods.map((food) => <FoodCard key={food.id} food={food} />)}
         {filteredFoods.length === 0 && (
-          <p className="col-span-full py-10 text-center text-muted-foreground">
+          <p className="rounded-2xl border bg-card p-5 text-center text-sm text-muted-foreground">
             Кормов этого типа пока нет
           </p>
         )}
