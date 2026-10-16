@@ -1,49 +1,61 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { z } from "zod";
+import { ApiError } from "@/lib/api";
+import { loginAndStore, registerAndLogin } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
-  FieldLegend,
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "./ui/spinner";
 
-const loginSchema = z.object({
+const credentialsSchema = z.object({
   email: z
     .string()
-    .min(1, "Введите email")
+    .min(1, "Это обязательное поле")
     .email("Введите корректный email"),
   password: z
     .string()
-    .min(8, "Минимум 8 символов"),
+    .min(8, "Пароль должен содержать минимум 8 символов"),
 });
 
-type LoginValues = z.infer<typeof loginSchema>;
-type LoginErrors = Partial<Record<keyof LoginValues, string>>;
+type CredentialsValues = z.infer<typeof credentialsSchema>;
+type FormErrors = Partial<Record<keyof CredentialsValues | "form", string>>;
+type Mode = "login" | "register";
 
 export function LoginForm() {
-  const [errors, setErrors] = useState<LoginErrors>({});
+  const router = useRouter();
+  const [mode, setMode] = useState<Mode>("login");
+  const [errors, setErrors] = useState<FormErrors>({});
   const [pending, setPending] = useState(false);
+
+  const isRegister = mode === "register";
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setErrors({});
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     const formData = new FormData(e.currentTarget);
-    const result = loginSchema.safeParse({
+    const result = credentialsSchema.safeParse({
       email: formData.get("email"),
       password: formData.get("password"),
     });
 
     if (!result.success) {
-      const fieldErrors: LoginErrors = {};
+      const fieldErrors: FormErrors = {};
       for (const issue of result.error.issues) {
-        const key = issue.path[0] as keyof LoginValues;
+        const key = issue.path[0] as keyof CredentialsValues;
         if (!fieldErrors[key]) fieldErrors[key] = issue.message;
       }
       setErrors(fieldErrors);
@@ -53,8 +65,19 @@ export function LoginForm() {
     setErrors({});
     setPending(true);
     try {
-      console.log(result.data);
-      // await fetch("/api/login", { method: "POST", body: JSON.stringify(result.data) });
+      if (isRegister) {
+        await registerAndLogin(result.data);
+      } else {
+        await loginAndStore(result.data);
+      }
+      router.push("/me");
+    } catch (error) {
+      const fallback = isRegister
+        ? "Не удалось зарегистрироваться"
+        : "Не удалось войти";
+      const message =
+        error instanceof ApiError ? error.detail : fallback;
+      setErrors({ form: message });
     } finally {
       setPending(false);
     }
@@ -64,13 +87,17 @@ export function LoginForm() {
     <form
       onSubmit={handleSubmit}
       noValidate
-      className="w-full max-w-sm rounded-xl bg-secondary px-6 py-4"
+      className="w-full max-w-sm rounded-xl bg-white/90 p-6"
     >
       <FieldSet>
-        <FieldLegend><h3>Вход</h3></FieldLegend>
-        <FieldDescription>
-          Войдите, чтобы управлять профилем питомца.
-        </FieldDescription>
+        <div className="flex flex-col gap-1">
+          <h4>{isRegister ? "Регистрация" : "Вход"}</h4>
+          <p className="text-muted-foreground">
+            {isRegister
+              ? "Создайте аккаунт, чтобы управлять профилем питомца"
+              : "Войдите, чтобы управлять профилем питомца"}
+          </p>
+        </div>
         <FieldGroup>
           <Field data-invalid={!!errors.email}>
             <FieldLabel htmlFor="email">Email</FieldLabel>
@@ -79,7 +106,6 @@ export function LoginForm() {
               name="email"
               type="email"
               placeholder="name@example.com"
-              autoComplete="email"
               aria-invalid={!!errors.email}
             />
             {errors.email && <FieldError>{errors.email}</FieldError>}
@@ -91,21 +117,51 @@ export function LoginForm() {
               id="password"
               name="password"
               type="password"
-              autoComplete="current-password"
               aria-invalid={!!errors.password}
             />
-            {errors.password ? (
+            {errors.password && (
               <FieldError>{errors.password}</FieldError>
-            ) : (
-              <FieldDescription>Пароль должен содержать не менее 8 символов</FieldDescription>
             )}
           </Field>
 
+          {errors.form && <FieldError>{errors.form}</FieldError>}
+
           <Field>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Входим…" : "Войти"}
+            <Button
+              className="bg-secondary md:bg-primary"
+              type="submit"
+              disabled={pending}
+            >
+              {pending && <Spinner />}
+              {isRegister ? "Зарегистрироваться" : "Войти"}
             </Button>
           </Field>
+
+          <p className="text-center text-sm text-muted-foreground">
+            {isRegister ? (
+              <>
+                Уже есть аккаунт?{" "}
+                <button
+                  type="button"
+                  className="underline underline-offset-2"
+                  onClick={() => switchMode("login")}
+                >
+                  Войти
+                </button>
+              </>
+            ) : (
+              <>
+                Нет аккаунта?{" "}
+                <button
+                  type="button"
+                  className="underline underline-offset-2"
+                  onClick={() => switchMode("register")}
+                >
+                  Зарегистрироваться
+                </button>
+              </>
+            )}
+          </p>
         </FieldGroup>
       </FieldSet>
     </form>
