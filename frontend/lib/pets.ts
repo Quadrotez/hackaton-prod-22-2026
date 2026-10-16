@@ -105,7 +105,7 @@ export function formatWeight(weightG: number): string {
 }
 
 export async function listPets(): Promise<Pet[]> {
-  return apiFetch<Pet[]>("/api/v1/pets/", {
+  return apiFetch<Pet[]>("/api/v1/pets", {
     method: "GET",
     auth: true,
   });
@@ -119,7 +119,7 @@ export async function getPet(petId: number): Promise<Pet> {
 }
 
 export async function createPet(data: PetCreate): Promise<Pet> {
-  return apiFetch<Pet>("/api/v1/pets/", {
+  return apiFetch<Pet>("/api/v1/pets", {
     method: "POST",
     body: data,
     auth: true,
