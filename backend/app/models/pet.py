@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import Date, ForeignKey, Index, String
+from sqlalchemy import Date, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -18,6 +18,11 @@ class Pet(Base):
     species: Mapped[str] = mapped_column(String(100), nullable=False)
     breed: Mapped[str | None] = mapped_column(String(255), nullable=True)
     birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    approximate_age_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    weight_g: Mapped[int | None] = mapped_column(Integer, nullable=True)
     photo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     user = relationship("User", back_populates="pets")
+    feeding_records = relationship(
+        "FeedingRecord", back_populates="pet", cascade="all, delete-orphan"
+    )
