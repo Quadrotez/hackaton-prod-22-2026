@@ -11,10 +11,16 @@ import {
   type UserPublic,
 } from "@/lib/auth";
 import { listPets, type Pet } from "@/lib/pets";
-import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { PetCard } from "@/components/pet-card";
+import { Menu } from "@/components/menu";
 
 export default function MePage() {
+  const mockPets: Pet[] = [
+    {"id": 1, "name": "Дусяр", "breed": "Сибирская", "species": "Кошка", "photo_url": "/cat.png", "birth_date": "2016-10-08"},
+    {"id": 2, "name": "Дусяр", "breed": "Сибирская", "species": "Кошка", "photo_url": "/cat.png", "birth_date": "2016-10-08"}
+  ]
+
   const router = useRouter();
   const [user, setUser] = useState<UserPublic | null>(null);
   const [pets, setPets] = useState<Pet[] | null>(null);
@@ -34,7 +40,7 @@ export default function MePage() {
       .then(([userData, petsData]) => {
         if (cancelled) return;
         setUser(userData);
-        setPets(petsData);
+        setPets(mockPets);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -58,11 +64,6 @@ export default function MePage() {
     };
   }, [router]);
 
-  function handleLogout() {
-    clearAccessToken();
-    router.push("/");
-  }
-
   if (loading) {
     return (
       <main className="flex min-h-dvh items-center justify-center bg-background">
@@ -85,12 +86,13 @@ export default function MePage() {
   if (!user) return null;
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background px-6">
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-secondary px-6">
       {pets?.map((pet) => (
         <div key={pet.id}>
-          <h2>{pet.name}</h2>
+          <PetCard pet={pet} />
         </div>
       ))}
+      <Menu />
     </div>
   );
 }

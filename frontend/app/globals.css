@@ -110,8 +110,7 @@
     text-wrap: balance;
   }
   h2 {
-    @apply font-heading;
-    font-size: var(--text-h2);
+    font-size: var(--text-base);
     line-height: var(--leading-heading);
     letter-spacing: -0.015em;
     text-wrap: balance;
