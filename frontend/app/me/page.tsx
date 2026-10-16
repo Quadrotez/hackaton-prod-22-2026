@@ -91,6 +91,18 @@ export default function MePage() {
           <h2>{pet.name}</h2>
         </div>
       ))}
+      {pets?.length === 0 && (
+        <p className="text-muted-foreground">У вас пока нет питомцев</p>
+      )}
+      <Link
+        href="/pet/create"
+        className="inline-flex h-8 items-center justify-center rounded-lg bg-primary px-2.5 text-sm font-medium transition-colors hover:bg-primary/80 focus-visible:outline-2 focus-visible:outline-offset-2"
+      >
+        Добавить питомца
+      </Link>
+      <Button variant="outline" onClick={handleLogout}>
+        Выйти
+      </Button>
     </div>
   );
 }
