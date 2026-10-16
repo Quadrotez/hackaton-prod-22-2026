@@ -1,108 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ApiError } from "@/lib/api";
-import {
-  clearAccessToken,
-  getAccessToken,
-  getMe,
-  type UserPublic,
-} from "@/lib/auth";
-import { listPets, type Pet } from "@/lib/pets";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
+import { useProtectedData } from "@/hooks/use-auth";
+import { listPets } from "@/lib/pets";
+import { cardVariants } from "@/components/ui/card";
+import { PetCard } from "@/components/pet-card";
+import { PageShell } from "@/components/page-shell";
+import { PageHeader } from "@/components/page-header";
+import { PageError, PageLoading } from "@/components/page-state";
+import { cn } from "cn";
+import { ChevronRightIcon, PlusIcon } from "lucide-react";
 
 export default function MePage() {
-  const router = useRouter();
-  const [user, setUser] = useState<UserPublic | null>(null);
-  const [pets, setPets] = useState<Pet[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const token = getAccessToken();
-    if (!token) {
-      router.replace("/");
-      return;
-    }
-
-    let cancelled = false;
-
-    Promise.all([getMe(token), listPets(token)])
-      .then(([userData, petsData]) => {
-        if (cancelled) return;
-        setUser(userData);
-        setPets(petsData);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        if (err instanceof ApiError && err.status === 401) {
-          clearAccessToken();
-          router.replace("/");
-          return;
-        }
-        setError(
-          err instanceof ApiError
-            ? err.detail
-            : "Не удалось загрузить профиль",
-        );
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
-
-  function handleLogout() {
-    clearAccessToken();
-    router.push("/");
-  }
-
-  if (loading) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center bg-background">
-        <Spinner />
-      </main>
-    );
-  }
-
-  if (error) {
-    return (
-      <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background px-6">
-        <p className="text-destructive">{error}</p>
-        <Link href="/" className="underline underline-offset-2">
-          На главную
-        </Link>
-      </main>
-    );
-  }
-
-  if (!user) return null;
+  const pets = useProtectedData(listPets, "Не удалось загрузить питомцев");
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background px-6">
-      {pets?.map((pet) => (
-        <div key={pet.id}>
-          <h2>{pet.name}</h2>
-        </div>
-      ))}
-      {pets?.length === 0 && (
-        <p className="text-muted-foreground">У вас пока нет питомцев</p>
-      )}
-      <Link
-        href="/pet/create"
-        className="inline-flex h-8 items-center justify-center rounded-lg bg-primary px-2.5 text-sm font-medium transition-colors hover:bg-primary/80 focus-visible:outline-2 focus-visible:outline-offset-2"
-      >
-        Добавить питомца
-      </Link>
-      <Button variant="outline" onClick={handleLogout}>
-        Выйти
-      </Button>
-    </div>
+    <PageShell>
+      <PageHeader title="Мои питомцы" />
+      {pets.status === "loading" && <PageLoading />}
+      {pets.status === "error" && <PageError message={pets.error} onRetry={pets.retry} />}
+      {pets.status === "ready" &&
+        <ul aria-label="Мои питомцы" className="flex flex-col gap-3">
+          {pets.data.map((pet) => (
+            <li key={pet.id}>
+              <PetCard pet={pet} />
+            </li>
+          ))}
+          <Link
+            href="/pet/create"
+            className={cn(
+              cardVariants(),
+              "flex items-center gap-4 outline-none transition-colors hover:bg-card/70 focus-visible:ring-2 focus-visible:ring-foreground",
+            )}
+          >
+            <PlusIcon />
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <h3>Добавить нового питомца</h3>
+            </div>
+            <ChevronRightIcon aria-hidden="true" className="size-5 shrink-0 text-muted-foreground" />
+          </Link>
+        </ul>
+      }
+    </PageShell>
   );
 }

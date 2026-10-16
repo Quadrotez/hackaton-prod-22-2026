@@ -55,6 +55,17 @@ def update_pet(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="At least one field is required",
         )
+
+    resulting_birth_date = changes.get("birth_date", pet.birth_date)
+    resulting_approximate_age = changes.get(
+        "approximate_age_years", pet.approximate_age_years
+    )
+    if resulting_birth_date is not None and resulting_approximate_age is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="birth_date and approximate_age_years cannot both be provided",
+        )
+
     for field, value in changes.items():
         setattr(pet, field, value)
     db.commit()

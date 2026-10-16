@@ -28,6 +28,7 @@ def create_pet(client: TestClient, headers: dict[str, str], name: str = "Milo"):
             "species": "cat",
             "breed": "British Shorthair",
             "birth_date": "2022-05-10",
+            "weight_g": 4500,
         },
     )
 
@@ -52,6 +53,8 @@ def test_create_and_list_only_current_users_pets(client: TestClient) -> None:
         "species": "cat",
         "breed": "British Shorthair",
         "birth_date": "2022-05-10",
+        "approximate_age_years": None,
+        "weight_g": 4500,
         "photo_url": None,
     }
     listed = client.get("/api/v1/pets/", headers=owner_headers)
@@ -132,13 +135,172 @@ def test_validation_rejects_blank_fields_invalid_dates_and_empty_patch(client: T
     invalid = client.post(
         "/api/v1/pets/",
         headers=headers,
-        json={"name": "   ", "species": "cat", "birth_date": "not-a-date"},
+        json={
+            "name": "   ",
+            "species": "cat",
+            "birth_date": "not-a-date",
+            "weight_g": 4500,
+        },
     )
     assert invalid.status_code == 422
 
     pet_id = create_pet(client, headers).json()["id"]
     empty_patch = client.patch(f"/api/v1/pets/{pet_id}", headers=headers, json={})
     assert empty_patch.status_code == 422
+
+
+def test_create_pet_age_variants(client: TestClient) -> None:
+    headers = auth_headers(client, "age-variants@example.com")
+    base_payload = {"name": "Milo", "species": "cat", "weight_g": 4500}
+
+    exact = client.post(
+        "/api/v1/pets/",
+        headers=headers,
+        json={**base_payload, "birth_date": "2022-05-10"},
+    )
+    assert exact.status_code == 201
+    assert exact.json()["birth_date"] == "2022-05-10"
+    assert exact.json()["approximate_age_years"] is None
+
+    approximate = client.post(
+        "/api/v1/pets/",
+        headers=headers,
+        json={**base_payload, "name": "Luna", "approximate_age_years": 3},
+    )
+    assert approximate.status_code == 201
+    assert approximate.json()["birth_date"] is None
+    assert approximate.json()["approximate_age_years"] == 3
+
+    unknown = client.post(
+        "/api/v1/pets/",
+        headers=headers,
+        json={**base_payload, "name": "Nova"},
+    )
+    assert unknown.status_code == 201
+    assert unknown.json()["birth_date"] is None
+    assert unknown.json()["approximate_age_years"] is None
+
+
+def test_create_rejects_conflicting_or_out_of_range_age(client: TestClient) -> None:
+    headers = auth_headers(client, "invalid-age@example.com")
+    base_payload = {"name": "Milo", "species": "cat", "weight_g": 4500}
+
+    conflict = client.post(
+        "/api/v1/pets/",
+        headers=headers,
+        json={
+            **base_payload,
+            "birth_date": "2022-05-10",
+            "approximate_age_years": 2,
+        },
+    )
+    assert conflict.status_code == 422
+    assert "cannot both be provided" in conflict.text
+
+    for age in (-1, 101):
+        response = client.post(
+            "/api/v1/pets/",
+            headers=headers,
+            json={**base_payload, "approximate_age_years": age},
+        )
+        assert response.status_code == 422
+
+
+def test_create_accepts_age_boundaries(client: TestClient) -> None:
+    headers = auth_headers(client, "age-boundaries@example.com")
+    for age in (0, 100):
+        response = client.post(
+            "/api/v1/pets/",
+            headers=headers,
+            json={
+                "name": f"Pet {age}",
+                "species": "cat",
+                "approximate_age_years": age,
+                "weight_g": 4500,
+            },
+        )
+        assert response.status_code == 201
+        assert response.json()["approximate_age_years"] == age
+
+
+def test_create_requires_positive_weight(client: TestClient) -> None:
+    headers = auth_headers(client, "weight-validation@example.com")
+    base_payload = {"name": "Milo", "species": "cat"}
+
+    assert client.post("/api/v1/pets/", headers=headers, json=base_payload).status_code == 422
+    for weight in (0, -1):
+        response = client.post(
+            "/api/v1/pets/",
+            headers=headers,
+            json={**base_payload, "weight_g": weight},
+        )
+        assert response.status_code == 422
+
+    created = client.post(
+        "/api/v1/pets/",
+        headers=headers,
+        json={**base_payload, "weight_g": 1},
+    )
+    assert created.status_code == 201
+    assert created.json()["weight_g"] == 1
+
+
+def test_patch_preserves_and_clears_age_fields(client: TestClient) -> None:
+    headers = auth_headers(client, "patch-age@example.com")
+    pet_id = create_pet(client, headers).json()["id"]
+
+    unchanged = client.patch(
+        f"/api/v1/pets/{pet_id}", headers=headers, json={"weight_g": 4600}
+    )
+    assert unchanged.status_code == 200
+    assert unchanged.json()["birth_date"] == "2022-05-10"
+    assert unchanged.json()["approximate_age_years"] is None
+
+    cleared = client.patch(
+        f"/api/v1/pets/{pet_id}", headers=headers, json={"birth_date": None}
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["birth_date"] is None
+
+
+def test_patch_validates_resulting_age_state_and_allows_explicit_transitions(
+    client: TestClient,
+) -> None:
+    headers = auth_headers(client, "patch-transition@example.com")
+    pet_id = create_pet(client, headers).json()["id"]
+
+    conflict = client.patch(
+        f"/api/v1/pets/{pet_id}",
+        headers=headers,
+        json={"approximate_age_years": 2},
+    )
+    assert conflict.status_code == 422
+    assert "cannot both be provided" in conflict.text
+
+    to_approximate = client.patch(
+        f"/api/v1/pets/{pet_id}",
+        headers=headers,
+        json={"birth_date": None, "approximate_age_years": 2},
+    )
+    assert to_approximate.status_code == 200
+    assert to_approximate.json()["birth_date"] is None
+    assert to_approximate.json()["approximate_age_years"] == 2
+
+    reverse_conflict = client.patch(
+        f"/api/v1/pets/{pet_id}",
+        headers=headers,
+        json={"birth_date": "2023-05-12"},
+    )
+    assert reverse_conflict.status_code == 422
+
+    to_exact = client.patch(
+        f"/api/v1/pets/{pet_id}",
+        headers=headers,
+        json={"approximate_age_years": None, "birth_date": "2023-05-12"},
+    )
+    assert to_exact.status_code == 200
+    assert to_exact.json()["birth_date"] == "2023-05-12"
+    assert to_exact.json()["approximate_age_years"] is None
 
 
 def test_reject_invalid_and_oversized_uploads(client: TestClient, monkeypatch) -> None:

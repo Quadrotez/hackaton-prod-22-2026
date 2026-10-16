@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
-import { ApiError } from "@/lib/api";
-import { loginAndStore, registerAndLogin } from "@/lib/auth";
+import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/api";
+import { login, registerAndLogin } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import { cardVariants } from "@/components/ui/card";
 import {
   Field,
   FieldError,
@@ -14,7 +16,7 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Spinner } from "./ui/spinner";
+import { Spinner } from "@/components/ui/spinner";
 
 const credentialsSchema = z.object({
   email: z
@@ -27,8 +29,11 @@ const credentialsSchema = z.object({
 });
 
 type CredentialsValues = z.infer<typeof credentialsSchema>;
-type FormErrors = Partial<Record<keyof CredentialsValues | "form", string>>;
+type FormErrors = Partial<Record<keyof CredentialsValues, string>>;
 type Mode = "login" | "register";
+
+// Ссылка-кнопка внутри строки текста: без высоты и отступов кнопки, цвет текста, а не primary
+const switchModeClass = "h-auto p-0 text-sm text-foreground underline underline-offset-4";
 
 export function LoginForm() {
   const router = useRouter();
@@ -68,16 +73,14 @@ export function LoginForm() {
       if (isRegister) {
         await registerAndLogin(result.data);
       } else {
-        await loginAndStore(result.data);
+        await login(result.data);
       }
       router.push("/me");
     } catch (error) {
       const fallback = isRegister
         ? "Не удалось зарегистрироваться"
         : "Не удалось войти";
-      const message =
-        error instanceof ApiError ? error.detail : fallback;
-      setErrors({ form: message });
+      toast.error(getErrorMessage(error, fallback));
     } finally {
       setPending(false);
     }
@@ -87,11 +90,11 @@ export function LoginForm() {
     <form
       onSubmit={handleSubmit}
       noValidate
-      className="w-full max-w-sm rounded-xl bg-white/90 p-6"
+      className={cardVariants({ className: "w-full max-w-sm" })}
     >
       <FieldSet>
         <div className="flex flex-col gap-1">
-          <h4>{isRegister ? "Регистрация" : "Вход"}</h4>
+          <h2>{isRegister ? "Регистрация" : "Вход"}</h2>
           <p className="text-muted-foreground">
             {isRegister
               ? "Создайте аккаунт, чтобы управлять профилем питомца"
@@ -124,8 +127,6 @@ export function LoginForm() {
             )}
           </Field>
 
-          {errors.form && <FieldError>{errors.form}</FieldError>}
-
           <Field>
             <Button
               className="bg-secondary md:bg-primary"
@@ -141,24 +142,16 @@ export function LoginForm() {
             {isRegister ? (
               <>
                 Уже есть аккаунт?{" "}
-                <button
-                  type="button"
-                  className="underline underline-offset-2"
-                  onClick={() => switchMode("login")}
-                >
+                <Button type="button" variant="link" className={switchModeClass} onClick={() => switchMode("login")}>
                   Войти
-                </button>
+                </Button>
               </>
             ) : (
               <>
                 Нет аккаунта?{" "}
-                <button
-                  type="button"
-                  className="underline underline-offset-2"
-                  onClick={() => switchMode("register")}
-                >
+                <Button type="button" variant="link" className={switchModeClass} onClick={() => switchMode("register")}>
                   Зарегистрироваться
-                </button>
+                </Button>
               </>
             )}
           </p>
