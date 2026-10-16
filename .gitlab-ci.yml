@@ -97,6 +97,6 @@ prepare:docker:
         fi
         echo $KEY_B64 | base64 -d > \$HOME/sa-key.json
         \$HOME/bin/dp auth service-acc --key-file \$HOME/sa-key.json
-        \$HOME/bin/dp auth configure-docker
+        \$HOME/bin/dp auth configure-kaniko
         rm -f \$HOME/sa-key.json
       "
