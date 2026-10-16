@@ -60,6 +60,10 @@ services:
     image: registry.spirit.t-education.com/hack-led-22/frontend:${TAG}
     container_name: petcare-site
     restart: unless-stopped
+    environment:
+      API_URL: http://api:8000
+    depends_on:
+      - api
     expose:
       - "3000"
     networks:
