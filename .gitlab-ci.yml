@@ -77,3 +77,21 @@ prepare:docker:
   variables:
     DEPLOY_SSH_USER: $DEPLOY_SSH_USER
     DEPLOY_VM: $DEPLOY_VM
+    DP_CLI_VERSION: 14.1.0
+  script:
+    - |
+      KEY_B64=$(base64 -w0 "$SPIRIT_DOCKER_SA_KEY")
+      tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "
+        set -e
+        umask 077
+        mkdir -p \$HOME/bin
+        if ! command -v dp >/dev/null 2>&1 && [ ! -x \$HOME/bin/dp ]; then
+          curl -fsSL https://spirit.t-education.com/cli/prod/${DP_CLI_VERSION}/linux/dp -o \$HOME/bin/dp
+          chmod +x \$HOME/bin/dp
+        fi
+        export PATH=\$HOME/bin:\$PATH
+        echo $KEY_B64 | base64 -d > \$HOME/sa-key.json
+        dp auth service-acc --key-file \$HOME/sa-key.json
+        dp auth configure-docker
+        rm -f \$HOME/sa-key.json
+      "
