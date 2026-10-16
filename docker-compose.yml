@@ -1,3 +1,10 @@
+name: petcare
+
+# Deployed to /opt/petcare on the VM by CI. Secrets live in /opt/petcare/.env
+# (not in this repo). TAG is the image tag, set by CI at deploy time.
+
+x-backend-image: &backend-image registry.spirit.t-education.com/hack-led-22/backend:${TAG:?TAG is required}
+
 services:
   db:
     image: postgres:16-alpine
@@ -5,35 +12,59 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: petcare
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       POSTGRES_DB: petcare_db
     volumes:
-      - ./database/data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     networks:
       - internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U petcare"]
+      test: ["CMD-SHELL", "pg_isready -U petcare -d petcare_db"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
-  site:
-    build: ./site
-    container_name: petcare-site
-    restart: unless-stopped
+  migrate:
+    image: *backend-image
+    container_name: petcare-migrate
+    restart: "no"
+    env_file: .env
     environment:
-      - DB_HOST=db
-      - DB_USER=petcare
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=petcare_db
-    expose:
-      - "3000"
+      DATABASE_URL: postgresql+psycopg://petcare:${DB_PASSWORD}@db:5432/petcare_db
+    command: ["alembic", "upgrade", "head"]
     depends_on:
       db:
         condition: service_healthy
     networks:
       - internal
+
+  api:
+    image: *backend-image
+    container_name: petcare-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://petcare:${DB_PASSWORD}@db:5432/petcare_db
+    expose:
+      - "8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - internal
+
+  site:
+    image: registry.spirit.t-education.com/hack-led-22/frontend:${TAG}
+    container_name: petcare-site
+    restart: unless-stopped
+    expose:
+      - "3000"
+    networks:
+      - internal
       - proxy_network
+
+volumes:
+  pgdata:
 
 networks:
   internal:
