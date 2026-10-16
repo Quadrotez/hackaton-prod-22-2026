@@ -23,3 +23,6 @@ class Pet(Base):
     photo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     user = relationship("User", back_populates="pets")
+    feeding_records = relationship(
+        "FeedingRecord", back_populates="pet", cascade="all, delete-orphan"
+    )
