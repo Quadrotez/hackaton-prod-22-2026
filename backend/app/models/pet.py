@@ -1,9 +1,15 @@
 from datetime import date
+from enum import StrEnum
 
-from sqlalchemy import Date, ForeignKey, Index, Integer, String
+from sqlalchemy import Date, Enum, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+
+class PetSex(StrEnum):
+    BOY = "boy"
+    GIRL = "girl"
 
 
 class Pet(Base):
@@ -16,6 +22,17 @@ class Pet(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     species: Mapped[str] = mapped_column(String(100), nullable=False)
+    sex: Mapped[PetSex] = mapped_column(
+        Enum(
+            PetSex,
+            name="pet_sex",
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=lambda enum_class: [member.value for member in enum_class],
+        ),
+        nullable=False,
+    )
     breed: Mapped[str | None] = mapped_column(String(255), nullable=True)
     birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     approximate_age_years: Mapped[int | None] = mapped_column(Integer, nullable=True)

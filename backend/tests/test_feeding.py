@@ -25,7 +25,7 @@ def create_pet(client: TestClient, headers: dict[str, str], name: str = "Milo") 
     response = client.post(
         "/api/v1/pets/",
         headers=headers,
-        json={"name": name, "species": "cat", "weight_g": 4500},
+        json={"name": name, "species": "cat", "sex": "boy", "weight_g": 4500},
     )
     assert response.status_code == 201
     return response.json()["id"]
