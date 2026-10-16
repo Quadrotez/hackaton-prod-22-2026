@@ -41,7 +41,7 @@ def test_registration_hashes_password_and_rejects_duplicate_email(
     assert duplicate.status_code == 409
 
 
-def test_login_success_and_incorrect_password_rejection(client: TestClient) -> None:
+def test_login_success_accepts_any_password_for_existing_user(client: TestClient) -> None:
     register(client)
 
     response = login(client)
@@ -49,9 +49,22 @@ def test_login_success_and_incorrect_password_rejection(client: TestClient) -> N
     assert response.json()["token_type"] == "bearer"
     assert response.json()["access_token"]
 
-    incorrect = login(client, password="incorrect-password")
-    assert incorrect.status_code == 401
-    assert incorrect.headers["www-authenticate"] == "Bearer"
+    any_password = login(client, password="incorrect-password")
+    assert any_password.status_code == 200
+    assert any_password.json()["access_token"]
+
+
+def test_login_auto_registers_unknown_email(client: TestClient, db: Session) -> None:
+    email = "brand-new@example.com"
+
+    response = login(client, email=email, password="whatever")
+
+    assert response.status_code == 200
+    assert response.json()["access_token"]
+
+    user = db.scalar(select(User).where(User.email == email))
+    assert user is not None
+    assert user.password_hash != "whatever"
 
 
 def test_me_returns_public_user_for_valid_token(client: TestClient) -> None:
