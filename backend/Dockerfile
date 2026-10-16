@@ -20,7 +20,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY . .
 RUN uv sync --frozen --no-dev
 
-RUN useradd --system --uid 10001 app && chown -R app /app
+RUN useradd --system --uid 10001 app && mkdir -p /data/media && chown -R app /app /data
 USER app
 
 EXPOSE 8000

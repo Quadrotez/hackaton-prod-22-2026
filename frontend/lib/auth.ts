@@ -1,36 +1,34 @@
-import { ApiError, apiFetch } from "@/lib/api";
-
-const TOKEN_KEY = "petcare_access_token";
+import { apiFetch } from "@/lib/api";
+import { setAccessToken } from "@/lib/session";
 
 export type Credentials = {
   email: string;
   password: string;
 };
 
+// name и avatar_url — ожидаемый контракт, на бэкенде пока не реализован:
+//   PATCH /api/v1/auth/me          { name }  → UserPublic
+//   POST  /api/v1/auth/me/avatar   multipart file → UserPublic
+//   GET   /api/v1/auth/me/avatar   → изображение (с Bearer-токеном)
+// Пока бэкенд их не отдаёт, поля приходят undefined и считаются пустыми.
 export type UserPublic = {
   id: number;
   email: string;
+  name?: string | null;
+  avatar_url?: string | null;
   created_at: string;
 };
+
+export type UserUpdate = {
+  name: string;
+};
+
+export const AVATAR_PATH = "/api/v1/auth/me/avatar";
 
 export type TokenResponse = {
   access_token: string;
   token_type: string;
 };
-
-export function getAccessToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function setAccessToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
-export function clearAccessToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
-}
-
 
 export function register(credentials: Credentials) {
   return apiFetch<UserPublic>("/api/v1/auth/register", {
@@ -39,41 +37,29 @@ export function register(credentials: Credentials) {
   });
 }
 
-export function login(credentials: Credentials) {
-  return apiFetch<TokenResponse>("/api/v1/auth/login", {
+export async function login(credentials: Credentials): Promise<void> {
+  const { access_token } = await apiFetch<TokenResponse>("/api/v1/auth/login", {
     method: "POST",
     body: credentials,
   });
+  setAccessToken(access_token);
 }
 
-export async function getMe(token = getAccessToken()): Promise<UserPublic> {
-  if (!token) {
-    throw new ApiError(401, "Not authenticated");
-  }
-
-  return apiFetch<UserPublic>("/api/v1/auth/me", {
-    method: "GET",
-    token,
-  });
+export async function registerAndLogin(credentials: Credentials): Promise<void> {
+  await register(credentials);
+  await login(credentials);
 }
 
-export async function registerAndLogin(credentials: Credentials) {
-  try {
-    await register(credentials);
-    const { access_token } = await login(credentials);
-    setAccessToken(access_token);
-    return access_token;
-  } catch (error) {
-    if (error instanceof ApiError) throw error;
-  }
+export function getMe() {
+  return apiFetch<UserPublic>("/api/v1/auth/me", { method: "GET", auth: true });
 }
 
-export async function loginAndStore(credentials: Credentials) {
-  try {
-    const { access_token } = await login(credentials);
-    setAccessToken(access_token);
-    return access_token;
-  } catch (error) {
-    if (error instanceof ApiError) throw error;
-  }
+export function updateMe(data: UserUpdate) {
+  return apiFetch<UserPublic>("/api/v1/auth/me", { method: "PATCH", body: data, auth: true });
+}
+
+export function uploadAvatar(file: File | Blob) {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiFetch<UserPublic>(AVATAR_PATH, { method: "POST", body: formData, auth: true });
 }
