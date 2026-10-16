@@ -15,11 +15,13 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
   if (authorization) headers["authorization"] = authorization;
 
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
-  // Forward raw bytes so multipart uploads (photos) keep their boundary and binary data.
+  // Forward raw bytes so multipart uploads (photos) keep their boundary and binary
+  // data. Copy into a Buffer: passing the request ArrayBuffer straight to fetch
+  // fails because the runtime detaches it ("detached ArrayBuffer").
   const upstream = await fetch(target, {
     method: request.method,
     headers,
-    body: hasBody ? await request.arrayBuffer() : undefined,
+    body: hasBody ? Buffer.from(await request.arrayBuffer()) : undefined,
     cache: "no-store",
   });
 
