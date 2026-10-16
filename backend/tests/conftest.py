@@ -1,5 +1,7 @@
 import os
+import shutil
 from collections.abc import Generator
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,6 +12,8 @@ from sqlalchemy.pool import StaticPool
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["JWT_SECRET_KEY"] = "test-only-secret-key-with-sufficient-length"
 os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"] = "30"
+os.environ["MEDIA_DIR"] = str(Path(__file__).resolve().parent / "test-media")
+os.environ["MAX_UPLOAD_SIZE_BYTES"] = str(5 * 1024 * 1024)
 
 from app.db.base import Base
 from app.db.session import get_db
@@ -39,7 +43,9 @@ app.dependency_overrides[get_db] = override_get_db
 def reset_database() -> Generator[None, None, None]:
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    shutil.rmtree(os.environ["MEDIA_DIR"], ignore_errors=True)
     yield
+    shutil.rmtree(os.environ["MEDIA_DIR"], ignore_errors=True)
 
 
 @pytest.fixture

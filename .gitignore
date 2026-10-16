@@ -38,9 +38,12 @@ logs/
 # Testing
 coverage/
 
-# Temporary files
+# Temporary and uploaded media files
 tmp/
 temp/
+media/
+backend/media/
+backend/test-media/
 
 
 # Roo Code local settings

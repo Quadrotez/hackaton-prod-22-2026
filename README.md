@@ -16,7 +16,7 @@ cp ../.env.example .env
 uv run alembic upgrade head
 ```
 
-Configure `DATABASE_URL`, `JWT_SECRET_KEY`, and `ACCESS_TOKEN_EXPIRE_MINUTES` in `.env` before running migrations. PostgreSQL must be running and the configured database must exist.
+Configure `DATABASE_URL`, `JWT_SECRET_KEY`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `MEDIA_DIR`, and `MAX_UPLOAD_SIZE_BYTES` in `.env` before running migrations. PostgreSQL must be running and the configured database must exist. `MEDIA_DIR` is resolved from the backend process working directory and should point outside `backend/app`; the default `media` directory is Git-ignored.
 
 This creates `backend/.venv` and installs dependencies pinned in `backend/uv.lock`.
 
@@ -41,6 +41,17 @@ Authentication endpoints:
 - `POST /api/v1/auth/register`
 - `POST /api/v1/auth/login`
 - `GET /api/v1/auth/me`
+
+Authenticated pet endpoints:
+
+- `POST /api/v1/pets/`
+- `GET /api/v1/pets/`
+- `GET /api/v1/pets/{pet_id}`
+- `PATCH /api/v1/pets/{pet_id}`
+- `DELETE /api/v1/pets/{pet_id}`
+- `POST /api/v1/pets/{pet_id}/photo` using multipart field `file`
+
+Uploaded PNG, JPEG, GIF, and WebP images are stored under `MEDIA_DIR/pets` with server-generated names. The API returns a path such as `/media/pets/<generated-name>.png`; the FastAPI application serves that path directly, so a frontend can resolve it against the API origin (for example, `http://127.0.0.1:8000/media/pets/<generated-name>.png`).
 
 ## Dependencies
 

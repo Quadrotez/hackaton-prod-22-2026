@@ -1,14 +1,27 @@
 from functools import lru_cache
+from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/petcare"
     jwt_secret_key: str
     access_token_expire_minutes: int = 30
+    media_dir: Path = PROJECT_ROOT / "media"
+    max_upload_size_bytes: int = 5 * 1024 * 1024
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=PROJECT_ROOT / ".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
+    @field_validator("media_dir", mode="after")
+    @classmethod
+    def resolve_media_dir(cls, value: Path) -> Path:
+        return value if value.is_absolute() else PROJECT_ROOT / value
 
 
 @lru_cache
