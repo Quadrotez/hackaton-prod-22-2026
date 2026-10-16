@@ -42,3 +42,6 @@ coverage/
 tmp/
 temp/
 
+
+# Roo Code local settings
+.roo/
