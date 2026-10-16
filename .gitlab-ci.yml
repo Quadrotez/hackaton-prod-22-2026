@@ -60,8 +60,6 @@ deploy:
     - .teleport_auth
     - .rules-master
   variables:
-    DEPLOY_SSH_USER: $DEPLOY_SSH_USER
-    DEPLOY_VM: $DEPLOY_VM
     TAG: ${CI_COMMIT_SHORT_SHA}
   script:
     - tsh scp docker-compose.yml "${DEPLOY_SSH_USER}@${DEPLOY_VM}:/opt/petcare/docker-compose.yml"
@@ -75,8 +73,6 @@ prepare:docker:
       when: manual
       allow_failure: true
   variables:
-    DEPLOY_SSH_USER: $DEPLOY_SSH_USER
-    DEPLOY_VM: $DEPLOY_VM
     DP_CLI_VERSION: 14.1.0
   script:
     - |
