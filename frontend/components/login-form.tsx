@@ -1,49 +1,66 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { z } from "zod";
+import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/api";
+import { login, registerAndLogin } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import { cardVariants } from "@/components/ui/card";
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
-  FieldLegend,
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 
-const loginSchema = z.object({
+const credentialsSchema = z.object({
   email: z
     .string()
-    .min(1, "Введите email")
+    .min(1, "Это обязательное поле")
     .email("Введите корректный email"),
   password: z
     .string()
     .min(1, "Введите пароль"),
 });
 
-type LoginValues = z.infer<typeof loginSchema>;
-type LoginErrors = Partial<Record<keyof LoginValues, string>>;
+type CredentialsValues = z.infer<typeof credentialsSchema>;
+type FormErrors = Partial<Record<keyof CredentialsValues, string>>;
+type Mode = "login" | "register";
+
+// Ссылка-кнопка внутри строки текста: без высоты и отступов кнопки, цвет текста, а не primary
+const switchModeClass = "h-auto p-0 text-sm text-foreground underline underline-offset-4";
 
 export function LoginForm() {
-  const [errors, setErrors] = useState<LoginErrors>({});
+  const router = useRouter();
+  const [mode, setMode] = useState<Mode>("login");
+  const [errors, setErrors] = useState<FormErrors>({});
   const [pending, setPending] = useState(false);
+
+  const isRegister = mode === "register";
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setErrors({});
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     const formData = new FormData(e.currentTarget);
-    const result = loginSchema.safeParse({
+    const result = credentialsSchema.safeParse({
       email: formData.get("email"),
       password: formData.get("password"),
     });
 
     if (!result.success) {
-      const fieldErrors: LoginErrors = {};
+      const fieldErrors: FormErrors = {};
       for (const issue of result.error.issues) {
-        const key = issue.path[0] as keyof LoginValues;
+        const key = issue.path[0] as keyof CredentialsValues;
         if (!fieldErrors[key]) fieldErrors[key] = issue.message;
       }
       setErrors(fieldErrors);
@@ -53,25 +70,17 @@ export function LoginForm() {
     setErrors({});
     setPending(true);
     try {
-      const response = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(result.data),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        const message =
-          body?.detail && typeof body.detail === "string"
-            ? body.detail
-            : "Неверный email или пароль";
-        setErrors({ password: message });
-        return;
+      if (isRegister) {
+        await registerAndLogin(result.data);
+      } else {
+        await login(result.data);
       }
-      const token = (await response.json()) as { access_token: string };
-      window.localStorage.setItem("access_token", token.access_token);
-      window.location.assign("/");
-    } catch {
-      setErrors({ password: "Нет связи с сервером, попробуйте позже" });
+      router.push("/me");
+    } catch (error) {
+      const fallback = isRegister
+        ? "Не удалось зарегистрироваться"
+        : "Не удалось войти";
+      toast.error(getErrorMessage(error, fallback));
     } finally {
       setPending(false);
     }
@@ -81,13 +90,17 @@ export function LoginForm() {
     <form
       onSubmit={handleSubmit}
       noValidate
-      className="w-full max-w-sm rounded-xl bg-secondary px-6 py-4"
+      className={cardVariants({ className: "w-full max-w-sm" })}
     >
       <FieldSet>
-        <FieldLegend><h3>Вход</h3></FieldLegend>
-        <FieldDescription>
-          Войдите, чтобы управлять профилем питомца.
-        </FieldDescription>
+        <div className="flex flex-col gap-1">
+          <h2>{isRegister ? "Регистрация" : "Вход"}</h2>
+          <p className="text-muted-foreground">
+            {isRegister
+              ? "Создайте аккаунт, чтобы управлять профилем питомца"
+              : "Войдите, чтобы управлять профилем питомца"}
+          </p>
+        </div>
         <FieldGroup>
           <Field data-invalid={!!errors.email}>
             <FieldLabel htmlFor="email">Email</FieldLabel>
@@ -96,7 +109,6 @@ export function LoginForm() {
               name="email"
               type="email"
               placeholder="name@example.com"
-              autoComplete="email"
               aria-invalid={!!errors.email}
             />
             {errors.email && <FieldError>{errors.email}</FieldError>}
@@ -108,21 +120,41 @@ export function LoginForm() {
               id="password"
               name="password"
               type="password"
-              autoComplete="current-password"
               aria-invalid={!!errors.password}
             />
-            {errors.password ? (
+            {errors.password && (
               <FieldError>{errors.password}</FieldError>
-            ) : (
-              <FieldDescription>Новый аккаунт создаётся автоматически</FieldDescription>
             )}
           </Field>
 
           <Field>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Входим…" : "Войти"}
+            <Button
+              className="bg-secondary md:bg-primary"
+              type="submit"
+              disabled={pending}
+            >
+              {pending && <Spinner />}
+              {isRegister ? "Зарегистрироваться" : "Войти"}
             </Button>
           </Field>
+
+          <p className="text-center text-sm text-muted-foreground">
+            {isRegister ? (
+              <>
+                Уже есть аккаунт?{" "}
+                <Button type="button" variant="link" className={switchModeClass} onClick={() => switchMode("login")}>
+                  Войти
+                </Button>
+              </>
+            ) : (
+              <>
+                Нет аккаунта?{" "}
+                <Button type="button" variant="link" className={switchModeClass} onClick={() => switchMode("register")}>
+                  Зарегистрироваться
+                </Button>
+              </>
+            )}
+          </p>
         </FieldGroup>
       </FieldSet>
     </form>
