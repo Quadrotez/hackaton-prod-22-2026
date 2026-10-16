@@ -38,8 +38,14 @@ export async function apiFetch<T>(
   { body, token, headers, ...init }: FetchOptions = {},
 ): Promise<T> {
   const requestHeaders = new Headers(headers);
+  const isFormData =
+    typeof FormData !== "undefined" && body instanceof FormData;
 
-  if (body !== undefined && !requestHeaders.has("Content-Type")) {
+  if (
+    body !== undefined &&
+    !isFormData &&
+    !requestHeaders.has("Content-Type")
+  ) {
     requestHeaders.set("Content-Type", "application/json");
   }
 
@@ -50,7 +56,12 @@ export async function apiFetch<T>(
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: requestHeaders,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body:
+      body === undefined
+        ? undefined
+        : isFormData
+          ? (body as FormData)
+          : JSON.stringify(body),
   });
 
   if (!response.ok) {
