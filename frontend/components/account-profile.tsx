@@ -26,6 +26,8 @@ import { PageError, PageLoading } from "@/components/page-state";
 import { PhotoUploadButton } from "@/components/photo-upload-button";
 import { UserAvatar } from "@/components/user-avatar";
 import Image from "next/image";
+import { clearAccessToken } from "@/lib/session";
+import { useRouter } from "next/navigation";
 
 const nameSchema = z.string().trim().min(1, "Введите имя").max(100, "Не больше 100 символов");
 
@@ -343,6 +345,7 @@ function GoogleCalendarCard() {
 }
 
 export function AccountProfile() {
+  const router = useRouter();
   const load = useCallback(() => Promise.all([getMe(), listPets().catch(() => null)]), []);
   const state = useProtectedData(load, "Не удалось загрузить профиль");
 
@@ -352,6 +355,11 @@ export function AccountProfile() {
   const [user, pets] = state.data;
   const handleUserChange = (updated: UserPublic) => state.update([updated, pets]);
 
+  function handleLogout() {
+    clearAccessToken();
+    router.push("/");
+  }
+
   return (
     <>
       <PageHeader title="Аккаунт" />
@@ -359,6 +367,7 @@ export function AccountProfile() {
       <AccountDetails user={user} />
       <PasswordChangeCard />
       <GoogleCalendarCard />
+      <Button onClick={() => handleLogout()}>Выйти</Button>
     </>
   );
 }

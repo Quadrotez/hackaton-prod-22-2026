@@ -40,7 +40,7 @@ export function PageError({
         )}
         {backToList && (
           <Link href="/me" className="text-sm text-muted-foreground underline underline-offset-4">
-            К моим питомцам
+            На главную
           </Link>
         )}
       </div>
