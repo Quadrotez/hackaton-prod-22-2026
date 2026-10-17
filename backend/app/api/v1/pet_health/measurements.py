@@ -28,9 +28,9 @@ from app.services.health.measurements import (
 )
 
 
-templates_router = APIRouter(prefix="/measurement-templates", tags=["health: measurements"])
+templates_router = APIRouter(prefix="/measurement-templates", tags=["pet health: measurements"])
 router = APIRouter(
-    prefix="/pets/{pet_id}/measurement-parameters", tags=["health: measurements"]
+    prefix="/pets/{pet_id}/measurement-parameters", tags=["pet health: measurements"]
 )
 PARAMETER_NOT_FOUND = "Measurement parameter not found"
 TEMPLATE_NOTE = (

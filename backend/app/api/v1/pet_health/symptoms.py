@@ -7,7 +7,7 @@ from app.schemas.health import SymptomCreate, SymptomPublic, SymptomUpdate
 from app.services.health.common import get_pet_child, patch_changes, save
 
 
-router = APIRouter(prefix="/pets/{pet_id}/symptoms", tags=["health: symptoms"])
+router = APIRouter(prefix="/pets/{pet_id}/symptoms", tags=["pet health: symptoms"])
 NOT_FOUND = "Symptom not found"
 
 
