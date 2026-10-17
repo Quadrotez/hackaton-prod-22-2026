@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { AVATAR_PATH, type UserPublic } from "@/lib/auth";
 import { useProtectedImage } from "@/hooks/use-protected-image";
 
-// Две буквы из имени («Анна Смирнова» → «АС»), иначе первая буква email
 function getInitials(user: Pick<UserPublic, "name" | "email">): string {
   const words = user.name?.trim().split(/\s+/).filter(Boolean) ?? [];
   const letters = words.length > 0 ? words.slice(0, 2).map((word) => word[0]) : [user.email[0]];

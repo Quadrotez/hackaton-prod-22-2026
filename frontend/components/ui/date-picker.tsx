@@ -8,7 +8,6 @@ import { cn } from "cn"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
-// "YYYY-MM-DD" ↔ Date в локальном времени, без сдвига на часовой пояс
 function parseIsoDate(value: string | undefined): Date | undefined {
   if (!value) return undefined
   const [year, month, day] = value.split("-").map(Number)
@@ -19,7 +18,6 @@ function toIsoDate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
 }
 
-// Выбор даты через календарь; значение уходит в форму скрытым полем name
 function DatePicker({
   id,
   name,

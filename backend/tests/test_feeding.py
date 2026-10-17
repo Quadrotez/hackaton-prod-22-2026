@@ -12,13 +12,12 @@ PASSWORD = "correct-horse-battery-staple"
 
 
 def auth_headers(client: TestClient, email: str) -> dict[str, str]:
-    username = email.split("@", 1)[0].replace("-", "_")
     assert client.post(
         "/api/v1/auth/register",
-        json={"email": email, "username": username, "password": PASSWORD},
+        json={"email": email, "password": PASSWORD},
     ).status_code == 201
     response = client.post(
-        "/api/v1/auth/login", json={"identifier": email, "password": PASSWORD}
+        "/api/v1/auth/login", json={"email": email, "password": PASSWORD}
     )
     assert response.status_code == 200
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
@@ -316,7 +315,7 @@ def test_catalog_food_link_preserves_first_time_rating_rule(client: TestClient, 
     missing_ratings = client.post(
         feeding_url(pet_id),
         headers=headers,
-        json={"food_id": food_id, "fed_at": "2026-10-15T12:00:00Z"},
+        json={"food_id": food_id, "amount_grams": 50, "fed_at": "2026-10-15T12:00:00Z"},
     )
     assert missing_ratings.status_code == 422
 
@@ -325,6 +324,7 @@ def test_catalog_food_link_preserves_first_time_rating_rule(client: TestClient, 
         headers=headers,
         json={
             "food_id": food_id,
+            "amount_grams": 50,
             "fed_at": "2026-10-15T12:00:00Z",
             "liked": False,
             "tolerated": True,
@@ -337,7 +337,7 @@ def test_catalog_food_link_preserves_first_time_rating_rule(client: TestClient, 
     repeated = client.post(
         feeding_url(pet_id),
         headers=headers,
-        json={"food_id": food_id, "fed_at": "2026-10-16T12:00:00Z"},
+        json={"food_id": food_id, "amount_grams": 50, "fed_at": "2026-10-16T12:00:00Z"},
     )
     assert repeated.status_code == 201
     assert (repeated.json()["liked"], repeated.json()["tolerated"]) == (False, True)
@@ -354,6 +354,7 @@ def test_catalog_food_is_owned_and_delete_unlinks_history(client: TestClient, db
         headers=owner_headers,
         json={
             "food_id": food_id,
+            "amount_grams": 50,
             "fed_at": "2026-10-15T12:00:00Z",
             "liked": True,
             "tolerated": True,
@@ -363,7 +364,13 @@ def test_catalog_food_is_owned_and_delete_unlinks_history(client: TestClient, db
     assert client.post(
         feeding_url(pet_id),
         headers=other_headers,
-        json={"food_id": food_id, "fed_at": "2026-10-15T12:00:00Z", "liked": True, "tolerated": True},
+        json={
+            "food_id": food_id,
+            "amount_grams": 50,
+            "fed_at": "2026-10-15T12:00:00Z",
+            "liked": True,
+            "tolerated": True,
+        },
     ).status_code == 404
 
     assert client.delete(f"/api/v1/foods/{food_id}", headers=owner_headers).status_code == 204
@@ -465,6 +472,158 @@ def test_delete_removes_only_selected_record_and_pet_delete_cascades(
     assert client.delete(f"/api/v1/pets/{pet_id}", headers=headers).status_code == 204
     db.expire_all()
     assert db.get(FeedingRecord, second["id"]) is None
+
+
+def feed_catalog_food(
+    client: TestClient,
+    headers: dict[str, str],
+    pet_id: int,
+    food_id: int,
+    amount_grams: int,
+    fed_at: str = "2026-10-15T12:00:00Z",
+):
+    return client.post(
+        feeding_url(pet_id),
+        headers=headers,
+        json={
+            "food_id": food_id,
+            "amount_grams": amount_grams,
+            "fed_at": fed_at,
+            "liked": True,
+            "tolerated": True,
+        },
+    )
+
+
+def create_small_food(client: TestClient, headers: dict[str, str], grams: int) -> int:
+    response = client.post(
+        "/api/v1/foods",
+        headers=headers,
+        json={**food_payload("Small Pack"), "total_grams": grams},
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+def test_catalog_feeding_requires_amount_grams(client: TestClient) -> None:
+    headers = auth_headers(client, "amount-required@example.com")
+    pet_id = create_pet(client, headers)
+    food_id = create_food(client, headers)
+
+    for amount in (None, 0, -5):
+        payload: dict[str, object] = {
+            "food_id": food_id,
+            "fed_at": "2026-10-15T12:00:00Z",
+            "liked": True,
+            "tolerated": True,
+        }
+        if amount is not None:
+            payload["amount_grams"] = amount
+        assert client.post(feeding_url(pet_id), headers=headers, json=payload).status_code == 422
+
+
+def test_catalog_feeding_deducts_stock_and_reports_it(client: TestClient) -> None:
+    headers = auth_headers(client, "deduct@example.com")
+    pet_id = create_pet(client, headers)
+    food_id = create_food(client, headers)
+
+    response = feed_catalog_food(client, headers, pet_id, food_id, 120)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["amount_grams"] == 120
+    assert body["out_of_stock"] is False
+    assert body["stock"] == {"food_id": food_id, "remaining_grams": 4880, "out_of_stock": False}
+    food = client.get(f"/api/v1/foods/{food_id}", headers=headers).json()
+    assert food["remaining_grams"] == 4880
+    assert food["out_of_stock"] is False
+
+
+def test_feeding_that_uses_last_grams_sets_out_of_stock_flag(client: TestClient) -> None:
+    headers = auth_headers(client, "last-grams@example.com")
+    pet_id = create_pet(client, headers)
+    food_id = create_small_food(client, headers, 100)
+
+    response = feed_catalog_food(client, headers, pet_id, food_id, 100)
+
+    assert response.status_code == 201
+    assert response.json()["out_of_stock"] is True
+    assert response.json()["stock"]["remaining_grams"] == 0
+    assert response.json()["stock"]["out_of_stock"] is True
+    assert client.get(f"/api/v1/foods/{food_id}", headers=headers).json()["out_of_stock"] is True
+
+
+def test_feeding_returns_409_when_food_ran_out_and_creates_nothing(
+    client: TestClient, db: Session
+) -> None:
+    headers = auth_headers(client, "ran-out@example.com")
+    pet_id = create_pet(client, headers)
+    food_id = create_small_food(client, headers, 100)
+    assert feed_catalog_food(client, headers, pet_id, food_id, 100).status_code == 201
+
+    response = feed_catalog_food(client, headers, pet_id, food_id, 30, "2026-10-16T12:00:00Z")
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "code": "food_out_of_stock",
+        "message": "Food has run out",
+        "food_id": food_id,
+        "food_name": "Small Pack",
+        "requested_grams": 30,
+        "remaining_grams": 0,
+        "out_of_stock": True,
+    }
+    assert db.scalar(select(func.count()).select_from(FeedingRecord)) == 1
+
+
+def test_feeding_returns_409_when_stock_is_insufficient_and_keeps_stock(
+    client: TestClient, db: Session
+) -> None:
+    headers = auth_headers(client, "insufficient@example.com")
+    pet_id = create_pet(client, headers)
+    food_id = create_small_food(client, headers, 100)
+    assert feed_catalog_food(client, headers, pet_id, food_id, 60).status_code == 201
+
+    response = feed_catalog_food(client, headers, pet_id, food_id, 50, "2026-10-16T12:00:00Z")
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["code"] == "food_out_of_stock"
+    assert body["remaining_grams"] == 40
+    assert body["requested_grams"] == 50
+    assert body["out_of_stock"] is False
+    assert client.get(f"/api/v1/foods/{food_id}", headers=headers).json()["remaining_grams"] == 40
+    assert db.scalar(select(func.count()).select_from(FeedingRecord)) == 1
+
+
+def test_legacy_food_name_feeding_does_not_touch_stock(client: TestClient) -> None:
+    headers = auth_headers(client, "legacy-stock@example.com")
+    pet_id = create_pet(client, headers)
+    food_id = create_food(client, headers)
+
+    response = create_record(client, headers, pet_id)
+
+    assert response.status_code == 201
+    assert response.json()["amount_grams"] is None
+    assert response.json()["stock"] is None
+    assert response.json()["out_of_stock"] is False
+    assert client.get(f"/api/v1/foods/{food_id}", headers=headers).json()["remaining_grams"] == 5000
+
+
+def test_openapi_documents_out_of_stock_response(client: TestClient) -> None:
+    schema = client.get("/openapi.json").json()
+    post = schema["paths"]["/api/v1/pets/{pet_id}/feeding-records"]["post"]
+    conflict = post["responses"]["409"]
+    assert (
+        conflict["content"]["application/json"]["schema"]["$ref"]
+        == "#/components/schemas/FoodOutOfStockError"
+    )
+    assert "ran_out" in conflict["content"]["application/json"]["examples"]
+    error_schema = schema["components"]["schemas"]["FoodOutOfStockError"]
+    assert {"code", "remaining_grams", "out_of_stock"}.issubset(error_schema["properties"])
+    created = schema["components"]["schemas"]["FeedingRecordCreated"]
+    assert {"stock", "out_of_stock"}.issubset(created["properties"])
+    assert "out_of_stock" in schema["components"]["schemas"]["FoodPublic"]["properties"]
 
 
 def test_openapi_documents_feeding_endpoints_and_conditional_ratings(
