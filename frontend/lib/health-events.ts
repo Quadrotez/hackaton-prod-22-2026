@@ -32,5 +32,6 @@ export function calendarEvents(
   ];
 }
 export function healthEventHref(event: CalendarEvent) {
-  return `/pet/${event.petId}/health?view=${event.view}&event=${event.recordKey}#health-${event.recordKey}`;
+  const section = { visit: "visits", vaccine: "vaccines", medicine: "medicines" }[event.kind];
+  return `/pet/${event.petId}/health/${section}#health-${event.recordKey}`;
 }
