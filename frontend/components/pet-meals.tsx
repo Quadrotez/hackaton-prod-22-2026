@@ -247,7 +247,7 @@ function MealForm({
               aria-invalid={Boolean(errors.fed_at)}
             />
             {!isEdit && (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2.5 md:gap-1.5">
                 {quickTimes.map(({ label, minutes }) => (
                   <Button
                     key={minutes}
