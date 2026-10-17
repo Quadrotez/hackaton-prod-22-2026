@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import auth, feeding, health, pets
+from app.api.v1 import auth, feeding, health, pets, vet_documents
 
 app = FastAPI(title="PetCare API", version="0.1.0")
 
@@ -17,3 +17,4 @@ app.include_router(health.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(pets.router, prefix="/api/v1")
 app.include_router(feeding.router, prefix="/api/v1")
+app.include_router(vet_documents.router, prefix="/api/v1")
