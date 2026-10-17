@@ -1,0 +1,15 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+// Текущее время, обновляемое раз в интервал, — для подписей вида «5 минут назад»
+export function useNow(intervalMs = 60_000): number {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(timer);
+  }, [intervalMs]);
+
+  return now;
+}
