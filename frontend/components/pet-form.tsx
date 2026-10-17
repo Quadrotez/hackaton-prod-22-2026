@@ -230,7 +230,7 @@ export function PetForm({ pet }: { pet?: Pet }) {
   return (
     <>
       {isEdit ? (
-        <PageHeader title="Редактировать питомца" backHref={`/pet/${pet.id}`} />
+        <PageHeader title="Редактировать" backHref={`/pet/${pet.id}`} />
       ) : (
         <PageHeader title="Добавить питомца" />
       )}
