@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { HomeIcon, LogOutIcon, type LucideIcon, UtensilsIcon, UserIcon } from "lucide-react";
+import { HomeIcon, CalendarIcon, LogOutIcon, type LucideIcon, UtensilsIcon, UserIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { clearAccessToken } from "@/lib/session";
@@ -70,9 +70,10 @@ function MenuBar({ pathname }: { pathname?: string }) {
   }
 
   return (
-    <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 flex flex-row gap-1 rounded-xl bg-white p-2">
+    <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 flex flex-row gap-1 rounded-xl bg-white border-2 border-secondary p-2">
       <MenuLink href="/me" label="Мои питомцы" icon={HomeIcon} active={pathname === "/me"} />
       <MenuLink href="/food" label="Корм" icon={UtensilsIcon} active={pathname === "/food"} />
+      <MenuLink href="/calendar" label="Календарь" icon={CalendarIcon} active={pathname === "/calendar"} />
       <MenuLink href="/account" label="Аккаунт" icon={UserIcon} active={pathname === "/account"} />
       <MenuAction onClick={handleLogout} label="Выйти" icon={LogOutIcon} />
     </nav>

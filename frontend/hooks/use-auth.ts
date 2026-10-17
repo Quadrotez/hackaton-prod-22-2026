@@ -6,13 +6,10 @@ import { toast } from "sonner";
 import { ApiError, getErrorMessage } from "@/lib/api";
 import { clearAccessToken, getAccessToken, subscribeToAccessToken } from "@/lib/session";
 
-// undefined — токен ещё не прочитан (сервер и гидратация), null — пользователь не вошёл
 function useAccessToken(): string | null | undefined {
   return useSyncExternalStore(subscribeToAccessToken, getAccessToken, () => undefined);
 }
 
-// Защищённая страница: без токена уводит на вход.
-// handleAuthError сбрасывает сессию при 401 и возвращает true, если ошибка обработана.
 export function useRequireAuth() {
   const router = useRouter();
   const token = useAccessToken();
@@ -38,8 +35,6 @@ type ProtectedData<T> =
   | { status: "error"; error: string; retry: () => void }
   | { status: "ready"; data: T; update: (data: T) => void };
 
-// Загрузка данных защищённой страницы с единым поведением при ошибках.
-// load должен быть стабильным (useCallback).
 export function useProtectedData<T>(load: () => Promise<T>, fallbackError: string): ProtectedData<T> {
   const { authorized, handleAuthError } = useRequireAuth();
   const [result, setResult] = useState<{ data: T } | { error: string } | null>(null);
@@ -63,7 +58,6 @@ export function useProtectedData<T>(load: () => Promise<T>, fallbackError: strin
     };
   }, [authorized, load, fallbackError, handleAuthError, attempt]);
 
-  // Подменить данные после успешного изменения, без повторной загрузки
   const update = useCallback((data: T) => setResult({ data }), []);
 
   const retry = useCallback(() => {

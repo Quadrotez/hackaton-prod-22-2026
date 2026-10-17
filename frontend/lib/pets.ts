@@ -3,15 +3,6 @@ import { apiFetch } from "@/lib/api";
 
 export type PetSex = "boy" | "girl";
 
-export const sexOptions: { value: PetSex; label: string }[] = [
-  { value: "boy", label: "Мальчик" },
-  { value: "girl", label: "Девочка" },
-];
-
-export function getSexLabel(sex: PetSex): string {
-  return sexOptions.find((option) => option.value === sex)?.label ?? sex;
-}
-
 export type Pet = {
   id: number;
   name: string;
@@ -20,12 +11,10 @@ export type Pet = {
   breed: string | null;
   birth_date: string | null;
   approximate_age_years: number | null;
-  // null только у питомцев, созданных до появления веса
   weight_g: number | null;
   photo_url: string | null;
 };
 
-// birth_date и approximate_age_years взаимоисключающие; оба можно не передавать
 export type PetCreate = {
   name: string;
   species: string;
@@ -52,6 +41,11 @@ export const speciesOptions: { value: string; label: string; icon: LucideIcon }[
   { value: "other", label: "Другой", icon: PawPrint },
 ];
 
+export const sexOptions: { value: PetSex; label: string }[] = [
+  { value: "boy", label: "Мальчик" },
+  { value: "girl", label: "Девочка" },
+];
+
 function findSpecies(species: string) {
   return speciesOptions.find((option) => option.value === species && option.value !== "other");
 }
@@ -60,7 +54,6 @@ export function getSpeciesLabel(species: string): string {
   return findSpecies(species)?.label ?? species;
 }
 
-// Произвольные виды (введённые вручную) отображаются как «Другой».
 export function getSpeciesOption(species: string) {
   return findSpecies(species) ?? speciesOptions[speciesOptions.length - 1];
 }
@@ -95,8 +88,8 @@ export function formatPetAge(pet: Pick<Pet, "birth_date" | "approximate_age_year
   return null;
 }
 
-export function formatPetSummary(pet: Pick<Pet, "species" | "sex" | "breed" | "birth_date" | "approximate_age_years">): string {
-  return [getSpeciesLabel(pet.species), getSexLabel(pet.sex), pet.breed, formatPetAge(pet)].filter(Boolean).join(" · ");
+export function formatPetSummary(pet: Pick<Pet, "species" | "breed" | "birth_date" | "approximate_age_years">): string {
+  return [getSpeciesLabel(pet.species), pet.breed, formatPetAge(pet)].filter(Boolean).join(" · ");
 }
 
 export function formatWeight(weightG: number): string {
@@ -105,7 +98,7 @@ export function formatWeight(weightG: number): string {
 }
 
 export async function listPets(): Promise<Pet[]> {
-  return apiFetch<Pet[]>("/api/v1/pets", {
+  return apiFetch<Pet[]>("/api/v1/pets/", {
     method: "GET",
     auth: true,
   });
@@ -119,7 +112,7 @@ export async function getPet(petId: number): Promise<Pet> {
 }
 
 export async function createPet(data: PetCreate): Promise<Pet> {
-  return apiFetch<Pet>("/api/v1/pets", {
+  return apiFetch<Pet>("/api/v1/pets/", {
     method: "POST",
     body: data,
     auth: true,
