@@ -1,6 +1,6 @@
 """Add analyzed veterinary-document fields and visit ownership.
 
-Revision ID: 20261017_0016
+Revision ID: 20261018_0016
 Revises: 20261017_0015
 Create Date: 2026-10-17
 """
@@ -10,7 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "20261017_0016"
+revision: str = "20261018_0016"
 down_revision: str | None = "20261017_0015"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
