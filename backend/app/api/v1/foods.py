@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.api.dependencies import CurrentUser, DbSession
+from app.models.feeding import FeedingRecord
 from app.models.food import Food, FoodStock
 from app.schemas.foods import FoodCreate, FoodPublic, FoodUpdate
 
@@ -93,5 +94,10 @@ def update_food(
 @router.delete("/{food_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_food(food_id: int, current_user: CurrentUser, db: DbSession) -> None:
     food = get_owned_food(food_id, current_user, db)
+    db.execute(
+        update(FeedingRecord)
+        .where(FeedingRecord.food_id == food.id)
+        .values(food_id=None)
+    )
     db.delete(food)
     db.commit()

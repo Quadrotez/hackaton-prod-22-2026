@@ -43,6 +43,9 @@ class Food(Base):
     )
 
     user = relationship("User", back_populates="foods")
+    feeding_records = relationship(
+        "FeedingRecord", back_populates="food", passive_deletes=True
+    )
     stock = relationship(
         "FoodStock", back_populates="food", uselist=False, cascade="all, delete-orphan"
     )
