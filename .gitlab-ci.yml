@@ -65,6 +65,8 @@ build:frontend:
       if ! grep -q 'PRIVATE KEY' ~/.ssh/id_deploy; then
         base64 -d ~/.ssh/id_deploy > ~/.ssh/id_deploy.dec && mv ~/.ssh/id_deploy.dec ~/.ssh/id_deploy
       fi
+    # GitLab File variables drop the trailing newline; OpenSSH needs it.
+    - printf '\n' >> ~/.ssh/id_deploy
     - chmod 600 ~/.ssh/id_deploy
     - |
       echo "SSH key diag: lines=$(wc -l < ~/.ssh/id_deploy) bytes=$(wc -c < ~/.ssh/id_deploy) prefix=$(head -c 27 ~/.ssh/id_deploy | tr '\n' ' ')"
