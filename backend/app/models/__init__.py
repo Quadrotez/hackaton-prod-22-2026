@@ -1,3 +1,4 @@
+from app.models.calendar import CalendarFeed
 from app.models.feeding import FeedingRecord
 from app.models.health import (
     Allergy,
@@ -17,6 +18,7 @@ from app.models.user import User
 
 __all__ = [
     "Allergy",
+    "CalendarFeed",
     "FeedingRecord",
     "Measurement",
     "MeasurementParameter",
