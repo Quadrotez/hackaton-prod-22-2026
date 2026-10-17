@@ -10,7 +10,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useProtectedData } from "@/hooks/use-auth";
-import { formatWeight, getPet, type Pet } from "@/lib/pets";
+import { formatWeight, type Pet } from "@/lib/pets";
+import { loadHealthDashboard, type Visit } from "@/lib/health";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
@@ -91,24 +92,24 @@ function QuickLinkTile({
 }
 
 export function HealthPage({ petId }: { petId: number }) {
-  const load = useCallback(() => getPet(petId), [petId]);
+  const load = useCallback(() => loadHealthDashboard(petId), [petId]);
   const state = useProtectedData(load, "Не удалось загрузить питомца");
 
-  if (state.status === "loading") return <PageLoading />;
+  if (state.status === "loading" || (state.status === "ready" && state.data.pet.id !== petId)) return <PageLoading />;
   if (state.status === "error") {
     return <PageError message={state.error} onRetry={state.retry} backToList />;
   }
-  return <HealthContent pet={state.data} />;
+  return <HealthContent pet={state.data.pet} nextVisit={state.data.overview.planned_visits[0]} onPetChange={(pet) => state.update({ ...state.data, pet })} />;
 }
 
-function HealthContent({ pet }: { pet: Pet }) {
+function HealthContent({ pet, nextVisit, onPetChange }: { pet: Pet; nextVisit?: Visit; onPetChange: (pet: Pet) => void }) {
   const base = `/pet/${pet.id}/health`;
 
   return (
     <>
       <PageHeader title="Здоровье" backHref={`/pet/${pet.id}`} />
 
-      <PetInfoCard pet={pet} />
+      <PetInfoCard pet={pet} onPetChange={onPetChange} />
 
       <div className="grid grid-cols-2 gap-3">
         <StatTile
@@ -117,7 +118,7 @@ function HealthContent({ pet }: { pet: Pet }) {
           value={pet.weight_g != null ? formatWeight(pet.weight_g) : "—"}
           hint={pet.weight_g != null ? "по данным профиля" : "вес не указан"}
         />
-        <StatTile label="Ближайший визит" value="—" hint="приёмов не запланировано" />
+        <StatTile label="Ближайший визит" value={nextVisit ? new Date(nextVisit.visit_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" }) : "—"} hint={nextVisit ? nextVisit.title : "приёмов не запланировано"} />
       </div>
 
       <ChartPlaceholder title="Динамика веса" hint="График появится после первых измерений" />
