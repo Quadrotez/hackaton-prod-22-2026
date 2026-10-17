@@ -105,6 +105,7 @@ function MealForm({
 
   async function handleFoodChange(value: string) {
     setFoodId(value);
+    setErrors((current) => ({ ...current, food_id: undefined, amount_grams: undefined }));
     latestFoodId.current = value;
     setSuggestion(null);
     if (isEdit || !value) return;
@@ -257,6 +258,8 @@ function MealForm({
                 min={1}
                 step={1}
                 defaultValue={DEFAULT_PORTION_GRAMS}
+                required
+                onChange={() => setErrors((current) => ({ ...current, amount_grams: undefined }))}
                 aria-invalid={Boolean(errors.amount_grams)}
                 aria-describedby="meal-amount-help meal-amount-error"
               />
