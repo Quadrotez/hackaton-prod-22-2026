@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import Image from "next/image";
+import { CameraIcon, XIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useRequireAuth } from "@/hooks/use-auth";
 import { getErrorMessage } from "@/lib/api";
-import { createPet, getSpeciesOption, speciesOptions, updatePet, type Pet } from "@/lib/pets";
+import { createPet, getSpeciesOption, speciesOptions, updatePet, uploadPetPhoto, type Pet } from "@/lib/pets";
+import { PHOTO_TYPES, validatePhoto } from "@/lib/photos";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -77,6 +80,25 @@ export function PetForm({ pet }: { pet?: Pet }) {
   const customSpeciesDefault = pet && getSpeciesOption(pet.species).value === "other" ? pet.species : undefined;
   const [errors, setErrors] = useState<FormErrors>({});
   const [pending, setPending] = useState(false);
+  const [photo, setPhoto] = useState<{ file: File; url: string } | null>(null);
+
+  useEffect(() => {
+    if (photo) return () => URL.revokeObjectURL(photo.url);
+  }, [photo]);
+
+  function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+
+    const photoError = validatePhoto(file);
+    if (photoError) {
+      toast.error(photoError);
+      return;
+    }
+    setPhoto({ file, url: URL.createObjectURL(file) });
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -123,7 +145,17 @@ export function PetForm({ pet }: { pet?: Pet }) {
         toast.success("Изменения сохранены");
         router.replace(`/pet/${pet.id}`);
       } else {
-        await createPet(data);
+        const created = await createPet(data);
+        if (photo) {
+          try {
+            await uploadPetPhoto(created.id, photo.file);
+          } catch (error) {
+            if (handleAuthError(error)) return;
+            toast.error(getErrorMessage(error, "Питомец добавлен, но фото загрузить не удалось. Попробуйте ещё раз на странице питомца"));
+            router.replace(`/pet/${created.id}`);
+            return;
+          }
+        }
         router.replace("/me");
       }
     } catch (error) {
@@ -149,6 +181,44 @@ export function PetForm({ pet }: { pet?: Pet }) {
         <form onSubmit={handleSubmit} noValidate aria-busy={pending}>
           <FieldSet disabled={pending}>
             <FieldGroup>
+              {!isEdit && (
+                <Field className="items-center">
+                  <div className="relative">
+                    <label
+                      title={photo ? "Изменить фото" : "Добавить фото"}
+                      className="flex size-20 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-secondary transition-colors hover:bg-secondary/70 has-focus-visible:ring-2 has-focus-visible:ring-foreground has-disabled:cursor-default"
+                    >
+                      <input
+                        type="file"
+                        accept={PHOTO_TYPES.join(",")}
+                        aria-label={photo ? "Изменить фото" : "Добавить фото"}
+                        onChange={handlePhotoChange}
+                        className="sr-only"
+                      />
+                      {photo ? (
+                        <Image unoptimized width={80} height={80} src={photo.url} alt="Фото питомца" className="size-full object-cover" />
+                      ) : (
+                        <CameraIcon aria-hidden="true" className="size-7 text-muted-foreground" strokeWidth={1.5} />
+                      )}
+                    </label>
+                    {photo && (
+                      <button
+                        type="button"
+                        title="Убрать фото"
+                        aria-label="Убрать фото"
+                        onClick={() => setPhoto(null)}
+                        className="absolute -right-1 -top-1 flex size-6 items-center justify-center rounded-full border-2 border-card bg-secondary transition-colors hover:bg-secondary/70 focus-visible:ring-2 focus-visible:ring-foreground focus-visible:outline-none"
+                      >
+                        <XIcon aria-hidden="true" className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    Фото <span className="font-normal">(необязательно)</span>
+                  </span>
+                </Field>
+              )}
+
               <Field data-invalid={!!errors.name}>
                 <FieldLabel htmlFor="pet-name">Имя питомца</FieldLabel>
                 <Input id="pet-name" name="name" defaultValue={pet?.name} placeholder="Например, Барсик" maxLength={255} required aria-invalid={!!errors.name} aria-describedby={errors.name ? "pet-name-error" : undefined} />

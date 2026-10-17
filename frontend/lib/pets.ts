@@ -8,12 +8,10 @@ export type Pet = {
   breed: string | null;
   birth_date: string | null;
   approximate_age_years: number | null;
-  // null только у питомцев, созданных до появления веса
   weight_g: number | null;
   photo_url: string | null;
 };
 
-// birth_date и approximate_age_years взаимоисключающие; оба можно не передавать
 export type PetCreate = {
   name: string;
   species: string;
@@ -46,7 +44,6 @@ export function getSpeciesLabel(species: string): string {
   return findSpecies(species)?.label ?? species;
 }
 
-// Произвольные виды (введённые вручную) отображаются как «Другой».
 export function getSpeciesOption(species: string) {
   return findSpecies(species) ?? speciesOptions[speciesOptions.length - 1];
 }

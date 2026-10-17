@@ -6,11 +6,6 @@ export type Credentials = {
   password: string;
 };
 
-// name и avatar_url — ожидаемый контракт, на бэкенде пока не реализован:
-//   PATCH /api/v1/auth/me          { name }  → UserPublic
-//   POST  /api/v1/auth/me/avatar   multipart file → UserPublic
-//   GET   /api/v1/auth/me/avatar   → изображение (с Bearer-токеном)
-// Пока бэкенд их не отдаёт, поля приходят undefined и считаются пустыми.
 export type UserPublic = {
   id: number;
   email: string;

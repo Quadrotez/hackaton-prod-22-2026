@@ -1,7 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
 
-// Единый стиль карточек: формы, плитки, элементы списков
 const cardVariants = cva("rounded-2xl border p-5", {
   variants: {
     variant: {

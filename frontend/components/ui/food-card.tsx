@@ -1,6 +1,8 @@
 import { CookieIcon, SoupIcon, WheatIcon } from "lucide-react";
 import { cardVariants } from "@/components/ui/card";
 import type { FoodCardProps } from "@/lib/card";
+import { getDaysLeft, isLowStock } from "@/lib/foods";
+import { pluralize } from "@/lib/pets";
 import { cn } from "@/lib/utils";
 
 const numberFormat = new Intl.NumberFormat("ru-RU", {
@@ -21,10 +23,19 @@ function formatWeight(grams: number) {
 
 export default function FoodCard({ food }: FoodCardProps) {
   const Icon = foodIcons[food.type];
-  const remainingPercent = food.totalGrams > 0
-    ? Math.min(100, Math.max(0, Math.round(food.remainingGrams / food.totalGrams * 100)))
+  const remainingPercent = food.total_g > 0
+    ? Math.min(100, Math.max(0, Math.round(food.remaining_g / food.total_g * 100)))
     : 0;
-  const stockDescription = `${formatWeight(food.remainingGrams)} из ${formatWeight(food.totalGrams)}`;
+  const stockDescription = `${formatWeight(food.remaining_g)} из ${formatWeight(food.total_g)}`;
+  const daysLeft = getDaysLeft(food);
+  const lowStock = isLowStock(food);
+  const forecast = food.remaining_g <= 0
+    ? "Закончился"
+    : daysLeft === null
+      ? "Расход пока не известен"
+      : daysLeft === 0
+        ? "Закончится сегодня"
+        : `Хватит примерно на ${daysLeft} ${pluralize(daysLeft, "день", "дня", "дней")}`;
   const nutrients = [
     { label: "Белки", value: `${numberFormat.format(food.protein)} г` },
     { label: "Жиры", value: `${numberFormat.format(food.fats)} г` },
@@ -51,9 +62,11 @@ export default function FoodCard({ food }: FoodCardProps) {
           >
             {food.name}
           </h2>
-          <p className="mt-0.5 text-sm leading-[1.55] text-muted-foreground">
-            {food.description}
-          </p>
+          {food.description && (
+            <p className="mt-0.5 text-sm leading-[1.55] text-muted-foreground">
+              {food.description}
+            </p>
+          )}
         </div>
       </div>
 
@@ -85,6 +98,9 @@ export default function FoodCard({ food }: FoodCardProps) {
             style={{ width: `${remainingPercent}%` }}
           />
         </div>
+        <p className={cn("text-xs", lowStock ? "font-semibold text-destructive" : "text-muted-foreground")}>
+          {forecast}
+        </p>
       </div>
     </article>
   );
