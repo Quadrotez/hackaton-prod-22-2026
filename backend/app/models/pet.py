@@ -54,3 +54,6 @@ class Pet(Base):
     measurement_profile = relationship(
         "MeasurementProfile", cascade="all, delete-orphan", uselist=False
     )
+    weight_history = relationship(
+        "PetWeight", back_populates="pet", cascade="all, delete-orphan"
+    )

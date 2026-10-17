@@ -65,6 +65,47 @@ def test_create_and_list_only_current_users_pets(client: TestClient) -> None:
     assert [pet["name"] for pet in listed.json()] == ["Milo"]
 
 
+def test_create_pet_with_weight_creates_initial_history(client: TestClient) -> None:
+    headers = auth_headers(client, "initial-weight@example.com")
+    created = create_pet(client, headers)
+
+    assert created.status_code == 201
+    history = client.get(f"/api/v1/pets/{created.json()['id']}/weight", headers=headers)
+    assert history.status_code == 200
+    assert len(history.json()) == 1
+    assert history.json()[0]["id"] > 0
+    assert history.json()[0]["pet_id"] == created.json()["id"]
+    assert history.json()[0]["weight_g"] == 4500
+    assert history.json()[0]["measured_at"]
+
+
+def test_patch_weight_creates_history_only_when_changed(client: TestClient) -> None:
+    headers = auth_headers(client, "weight-history@example.com")
+    pet_id = create_pet(client, headers).json()["id"]
+
+    same = client.patch(f"/api/v1/pets/{pet_id}", headers=headers, json={"weight_g": 4500})
+    changed = client.patch(f"/api/v1/pets/{pet_id}", headers=headers, json={"weight_g": 4600})
+    no_weight = client.patch(f"/api/v1/pets/{pet_id}", headers=headers, json={"name": "Milo II"})
+
+    assert same.status_code == 200
+    assert changed.status_code == 200
+    assert no_weight.status_code == 200
+    assert no_weight.json()["weight_g"] == 4600
+
+    history = client.get(f"/api/v1/pets/{pet_id}/weight", headers=headers)
+    assert [entry["weight_g"] for entry in history.json()] == [4500, 4600]
+    assert all("id" in entry for entry in history.json())
+
+
+def test_weight_history_is_private_and_missing_pet_is_not_found(client: TestClient) -> None:
+    owner_headers = auth_headers(client, "weight-owner@example.com")
+    other_headers = auth_headers(client, "weight-other@example.com")
+    pet_id = create_pet(client, owner_headers).json()["id"]
+
+    assert client.get(f"/api/v1/pets/{pet_id}/weight", headers=other_headers).status_code == 404
+    assert client.get("/api/v1/pets/999999/weight", headers=owner_headers).status_code == 404
+
+
 def test_retrieve_update_and_delete_pet(client: TestClient) -> None:
     headers = auth_headers(client, "owner@example.com")
     pet_id = create_pet(client, headers).json()["id"]

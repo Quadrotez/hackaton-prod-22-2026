@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import Link from "next/link";
-import { HeartPulseIcon, UtensilsIcon, type LucideIcon } from "lucide-react";
+import { ArrowRightIcon, HeartPulseIcon, UtensilsIcon, type LucideIcon } from "lucide-react";
 import { useProtectedData } from "@/hooks/use-auth";
 import { useNow } from "@/hooks/use-now";
 import { listFoods } from "@/lib/foods";
@@ -126,7 +126,7 @@ export function PetDetails({ petId }: { petId: number }) {
           href={`/pet/${petId}/health`}
           title="Здоровье"
           description="Вакцинации, визиты, заключения"
-          icon={HeartPulseIcon}
+          icon={ArrowRightIcon}
         />
         <QuickLinkTile
           title="Питание"
