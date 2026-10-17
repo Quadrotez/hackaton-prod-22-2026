@@ -1,6 +1,9 @@
 # NOTE: Shared job templates come from pipelines/pipelines (Spirit).
-# Required CI/CD variables (see README "Deploy"):
-#   SPIRIT_DOCKER_SA_KEY (File), DEPLOY_VM, DEPLOY_SSH_USER
+# Deploy goes to the Spirit VMaaS box over Teleport (tsh) - no public-IP SSH key needed.
+# Required CI/CD variables (group/project secrets):
+#   SPIRIT_DOCKER_SA_KEY (File)   - service-account key for the private registry
+#   TELEPORT_TENANT, TELEPORT_PROXY - provided by the group for .teleport_auth
+# The non-secret deploy target is set below; real CI/CD variables override it.
 
 stages:
   - prepare
@@ -20,6 +23,10 @@ include:
 
 variables:
   REGISTRY: registry.spirit.t-education.com/hack-led-22
+  DP_CLI_VERSION: 14.1.0
+  DEPLOY_VM: hack-led-22-vm1-606d53
+  # Teleport identity is a service account, so the only permitted login is the SA itself.
+  DEPLOY_SSH_USER: sa-hack-led-22-spirit-docker-ci
 
 test:backend:
   stage: test
@@ -60,20 +67,53 @@ deploy:
     - .teleport_auth
     - .rules-master
   variables:
-    DEPLOY_SSH_USER: $DEPLOY_SSH_USER
-    DEPLOY_VM: $DEPLOY_VM
     TAG: ${CI_COMMIT_SHORT_SHA}
   script:
+    # Idempotent: make sure the deploy user on the VM can pull from the private Registry.
+    - |
+      KEY_B64=$(base64 -w0 "$SPIRIT_DOCKER_SA_KEY")
+      tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "
+        set -e
+        umask 077
+        mkdir -p \$HOME/bin
+        # Use Spirit's dp explicitly: a system 'dp' (dynamic programming tool) may be on PATH.
+        if [ ! -x \$HOME/bin/dp ]; then
+          wget -q https://spirit.t-education.com/cli/tedu/${DP_CLI_VERSION}/linux/dp -O \$HOME/bin/dp
+          chmod +x \$HOME/bin/dp
+        fi
+        echo $KEY_B64 | base64 -d > \$HOME/sa-key.json
+        \$HOME/bin/dp auth service-acc --key-file \$HOME/sa-key.json
+        \$HOME/bin/dp auth configure-kaniko
+        rm -f \$HOME/sa-key.json
+      "
     - tsh scp docker-compose.yml "${DEPLOY_SSH_USER}@${DEPLOY_VM}:/opt/petcare/docker-compose.yml"
     - tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "cd /opt/petcare && TAG=${TAG} docker compose pull && TAG=${TAG} docker compose up -d --remove-orphans"
 
 prepare:docker:
   stage: prepare
-  extends: .configure_docker
+  image: registry.spirit.t-education.com/cicd-images/tsh-18:latest
+  extends:
+    - .teleport_auth
   rules:
     - if: $CI_COMMIT_REF_NAME == "master"
       when: manual
       allow_failure: true
   variables:
-    DEPLOY_SSH_USER: $DEPLOY_SSH_USER
-    DEPLOY_VM: $DEPLOY_VM
+    DP_CLI_VERSION: 14.1.3
+  script:
+    - |
+      KEY_B64=$(base64 -w0 "$SPIRIT_DOCKER_SA_KEY")
+      tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "
+        set -e
+        umask 077
+        mkdir -p \$HOME/bin
+        # Use Spirit's dp explicitly: a system 'dp' (dynamic programming tool) may be on PATH.
+        if [ ! -x \$HOME/bin/dp ]; then
+          wget -q https://spirit.t-education.com/cli/tedu/${DP_CLI_VERSION}/linux/dp -O \$HOME/bin/dp
+          chmod +x \$HOME/bin/dp
+        fi
+        echo $KEY_B64 | base64 -d > \$HOME/sa-key.json
+        \$HOME/bin/dp auth service-acc --key-file \$HOME/sa-key.json
+        \$HOME/bin/dp auth configure-kaniko
+        rm -f \$HOME/sa-key.json
+      "
