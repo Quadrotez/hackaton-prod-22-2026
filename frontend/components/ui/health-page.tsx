@@ -17,6 +17,8 @@ import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { PageError, PageLoading } from "@/components/page-state";
 import { PetInfoCard } from "@/components/pet-info-card";
+import { PetWeightChart } from "@/components/pet-weight-chart";
+import { MeasurementsPage } from "@/components/measurements-page";
 
 function StatTile({
   label,
@@ -34,21 +36,6 @@ function StatTile({
       <p className={cn("text-sm", !accent && "text-muted-foreground")}>{label}</p>
       <p className="text-2xl font-semibold leading-tight tracking-tight tabular-nums">{value}</p>
       <p className={cn("text-xs", !accent && "text-muted-foreground")}>{hint}</p>
-    </Card>
-  );
-}
-
-function ChartPlaceholder({ title, hint }: { title: string; hint: string }) {
-  return (
-    <Card className="flex flex-col gap-3">
-      <h2 className="text-[17px] font-semibold">{title}</h2>
-      <div
-        role="img"
-        aria-label={`${title}: данных пока нет`}
-        className="flex h-40 items-center justify-center rounded-xl border border-dashed text-center text-sm text-muted-foreground"
-      >
-        {hint}
-      </div>
     </Card>
   );
 }
@@ -121,7 +108,8 @@ function HealthContent({ pet, nextVisit, onPetChange }: { pet: Pet; nextVisit?: 
         <StatTile label="Ближайший визит" value={nextVisit ? new Date(nextVisit.visit_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" }) : "—"} hint={nextVisit ? nextVisit.title : "приёмов не запланировано"} />
       </div>
 
-      <ChartPlaceholder title="Динамика веса" hint="График появится после первых измерений" />
+      
+      <PetWeightChart key={`${pet.id}-${pet.weight_g}`} petId={pet.id} />
 
       <section aria-label="Разделы здоровья" className="grid grid-cols-2 gap-3">
         <QuickLinkTile
