@@ -5,7 +5,7 @@ import { CameraIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useRequireAuth } from "@/hooks/use-auth";
 import { getErrorMessage } from "@/lib/api";
-import { PHOTO_MAX_BYTES, PHOTO_TYPES } from "@/lib/photos";
+import { PHOTO_TYPES, validatePhoto } from "@/lib/photos";
 import { Spinner } from "@/components/ui/spinner";
 
 export function PhotoUploadButton({
@@ -25,12 +25,9 @@ export function PhotoUploadButton({
     input.value = "";
     if (!file) return;
 
-    if (!PHOTO_TYPES.includes(file.type)) {
-      toast.error("Неподдерживаемый формат. Загрузите PNG, JPEG, GIF или WebP");
-      return;
-    }
-    if (file.size > PHOTO_MAX_BYTES) {
-      toast.error("Файл слишком большой. Максимум 5 МБ");
+    const photoError = validatePhoto(file);
+    if (photoError) {
+      toast.error(photoError);
       return;
     }
 

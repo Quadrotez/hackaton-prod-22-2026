@@ -1,7 +1,19 @@
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import DateTime, Enum, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -53,7 +65,14 @@ class Food(Base):
 
 class FoodStock(Base):
     __tablename__ = "food_stocks"
-    __table_args__ = (UniqueConstraint("food_id", name="uq_food_stocks_food_id"),)
+    __table_args__ = (
+        UniqueConstraint("food_id", name="uq_food_stocks_food_id"),
+        CheckConstraint("total_grams > 0", name="ck_food_stocks_total_grams_positive"),
+        CheckConstraint(
+            "remaining_grams >= 0 AND remaining_grams <= total_grams",
+            name="ck_food_stocks_remaining_grams_range",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(

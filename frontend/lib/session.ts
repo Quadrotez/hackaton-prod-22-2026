@@ -21,7 +21,6 @@ export function clearAccessToken(): void {
   notify();
 }
 
-// Для useSyncExternalStore: изменения в этой вкладке и в соседних
 export function subscribeToAccessToken(listener: () => void): () => void {
   listeners.add(listener);
   window.addEventListener("storage", listener);

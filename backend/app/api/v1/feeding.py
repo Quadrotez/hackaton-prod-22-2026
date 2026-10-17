@@ -1,16 +1,20 @@
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import select
+from fastapi.responses import JSONResponse
+from sqlalchemy import select, update
 
-from app.api.dependencies import CurrentUser, DbSession
+from app.api.dependencies import CurrentUser, DbSession, get_owned_food
 from app.api.v1.pets import get_owned_pet
 from app.models.feeding import FeedingRecord
-from app.models.food import Food
+from app.models.food import Food, FoodStock
 from app.schemas.feeding import (
     FeedingRecordCreate,
+    FeedingRecordCreated,
     FeedingRecordPublic,
     FeedingRecordUpdate,
+    FeedingStockStatus,
     FeedingSuggestedValues,
     FeedingSuggestionResponse,
+    FoodOutOfStockError,
 )
 from app.services.feeding import clean_food_name, find_latest_matching_record
 
@@ -35,28 +39,90 @@ def get_pet_feeding_record(
     return record
 
 
-def get_owned_food(food_id: int, current_user: CurrentUser, db: DbSession) -> Food:
-    food = db.scalar(select(Food).where(Food.id == food_id, Food.user_id == current_user.id))
-    if food is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Food not found")
-    return food
+FOOD_OUT_OF_STOCK_EXAMPLE = {
+    "code": "food_out_of_stock",
+    "message": "Food has run out",
+    "food_id": 12,
+    "food_name": "Catalog Chicken",
+    "requested_grams": 85,
+    "remaining_grams": 0,
+    "out_of_stock": True,
+}
+
+
+def food_out_of_stock_response(
+    food: Food, requested_grams: int, remaining_grams: int
+) -> JSONResponse:
+    out_of_stock = remaining_grams <= 0
+    body = FoodOutOfStockError(
+        code="food_out_of_stock",
+        message=(
+            "Food has run out"
+            if out_of_stock
+            else "Not enough food left for the requested amount"
+        ),
+        food_id=food.id,
+        food_name=food.name,
+        requested_grams=requested_grams,
+        remaining_grams=max(remaining_grams, 0),
+        out_of_stock=out_of_stock,
+    )
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT, content=body.model_dump(mode="json")
+    )
 
 
 @router.post(
     "",
-    response_model=FeedingRecordPublic,
+    response_model=FeedingRecordCreated,
     status_code=status.HTTP_201_CREATED,
     summary="Create a feeding history record",
     description=(
         "Creates a new historical record without changing earlier records. Use food_id for a food "
         "from the user's catalog, or food_name for legacy records. For a food this pet has never "
         "tried, liked and tolerated are both required. For a previously tried food, omitted ratings "
-        "are copied from the most recent record."
+        "are copied from the most recent record.\n\n"
+        "**Stock handling (catalog foods).** `amount_grams` is required with `food_id` and is "
+        "deducted atomically from the food's remaining stock. The 201 response includes `stock` "
+        "and `out_of_stock` (true when this feeding used up the last of the food). If the stock "
+        "is empty (`remaining_grams <= 0`) or smaller than `amount_grams`, nothing is saved and "
+        "the API returns **409** with `code = food_out_of_stock` so the frontend can show that "
+        "the food has run out."
     ),
+    responses={
+        status.HTTP_409_CONFLICT: {
+            "model": FoodOutOfStockError,
+            "description": (
+                "The catalog food has run out or the remaining stock is smaller than "
+                "`amount_grams`. No feeding record is created and the stock is unchanged."
+            ),
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "ran_out": {
+                            "summary": "Food has run out",
+                            "value": FOOD_OUT_OF_STOCK_EXAMPLE,
+                        },
+                        "not_enough": {
+                            "summary": "Not enough food for the requested amount",
+                            "value": {
+                                **FOOD_OUT_OF_STOCK_EXAMPLE,
+                                "message": "Not enough food left for the requested amount",
+                                "requested_grams": 85,
+                                "remaining_grams": 40,
+                                "out_of_stock": False,
+                            },
+                        },
+                    }
+                }
+            },
+        },
+        status.HTTP_404_NOT_FOUND: {"description": "Pet or catalog food not found."},
+    },
 )
 def create_feeding_record(
     pet_id: int, payload: FeedingRecordCreate, current_user: CurrentUser, db: DbSession
-) -> FeedingRecord:
+) -> FeedingRecordCreated | JSONResponse:
     get_owned_pet(pet_id, current_user, db)
 
     food: Food | None = None
@@ -83,10 +149,38 @@ def create_feeding_record(
         if tolerated is None:
             tolerated = previous.tolerated
 
+    stock_status: FeedingStockStatus | None = None
+    food_id = food.id if food is not None else None
+    if food is not None:
+        amount = payload.amount_grams or 0
+        # Atomic deduction: only succeeds if enough stock remains, so concurrent
+        # requests can never drive the stock below zero. RETURNING gives the exact
+        # post-deduction value without a racy second read.
+        remaining_after = db.scalar(
+            update(FoodStock)
+            .where(FoodStock.food_id == food.id, FoodStock.remaining_grams >= amount)
+            .values(remaining_grams=FoodStock.remaining_grams - amount)
+            .returning(FoodStock.remaining_grams)
+            .execution_options(synchronize_session=False)
+        )
+        if remaining_after is None:
+            remaining = db.scalar(
+                select(FoodStock.remaining_grams).where(FoodStock.food_id == food.id)
+            )
+            response = food_out_of_stock_response(food, amount, remaining or 0)
+            db.rollback()
+            return response
+        stock_status = FeedingStockStatus(
+            food_id=food.id,
+            remaining_grams=remaining_after,
+            out_of_stock=remaining_after <= 0,
+        )
+
     record = FeedingRecord(
         pet_id=pet_id,
-        food_id=food.id if food is not None else None,
+        food_id=food_id,
         food_name=food_name,
+        amount_grams=payload.amount_grams,
         fed_at=payload.fed_at,
         liked=liked,
         tolerated=tolerated,
@@ -96,7 +190,11 @@ def create_feeding_record(
     db.add(record)
     db.commit()
     db.refresh(record)
-    return record
+    return FeedingRecordCreated(
+        **FeedingRecordPublic.model_validate(record).model_dump(),
+        stock=stock_status,
+        out_of_stock=stock_status.out_of_stock if stock_status is not None else False,
+    )
 
 
 @router.get(

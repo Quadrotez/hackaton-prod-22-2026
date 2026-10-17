@@ -1,32 +1,22 @@
 "use client";
 
 import { useCallback } from "react";
-import { CheckIcon, HeartPulseIcon, UtensilsIcon, type LucideIcon } from "lucide-react";
+import Link from "next/link";
+import { HeartPulseIcon, UtensilsIcon, type LucideIcon } from "lucide-react";
 import { useProtectedData } from "@/hooks/use-auth";
-import { listFeedingRecords, type FeedingRecord } from "@/lib/feeding";
+import { useNow } from "@/hooks/use-now";
+import { listFoods } from "@/lib/foods";
+import { formatTimeAgo, listMeals, sortMeals, type Meal } from "@/lib/meals";
 import { formatWeight, getPet, pluralize } from "@/lib/pets";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { PageError, PageLoading } from "@/components/page-state";
 import { PetInfoCard } from "@/components/pet-info-card";
-
-const RECENT_FEEDINGS_LIMIT = 3;
+import { PetMeals } from "@/components/pet-meals";
 
 function isToday(date: Date): boolean {
   return date.toDateString() === new Date().toDateString();
-}
-
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-}
-
-function formatFedAt(fedAt: string): string {
-  const date = new Date(fedAt);
-  const day = isToday(date)
-    ? "сегодня"
-    : date.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
-  return `${day}, ${formatTime(date)}`;
 }
 
 function StatTile({
@@ -49,60 +39,22 @@ function StatTile({
   );
 }
 
-function FeedingStatus({ record }: { record: FeedingRecord }) {
-  if (!record.tolerated) return <span className="text-xs font-semibold text-destructive">плохо перенёс</span>;
-  if (!record.liked) return <span className="text-xs font-semibold">не понравилось</span>;
-  return <span className="text-xs text-muted-foreground">понравилось</span>;
-}
-
-function RecentFeedings({ records }: { records: FeedingRecord[] | null }) {
-  return (
-    <Card className="flex flex-col gap-2.5">
-      <h2>Последние кормления</h2>
-      {records === null ? (
-        <p className="border-t border-secondary pt-2.5 text-sm text-muted-foreground">Не удалось загрузить историю кормлений</p>
-      ) : records.length === 0 ? (
-        <p className="border-t border-secondary pt-2.5 text-sm text-muted-foreground">Записей о кормлении пока нет</p>
-      ) : (
-        <ul className="flex flex-col gap-2.5">
-          {records.slice(0, RECENT_FEEDINGS_LIMIT).map((record) => (
-            <li key={record.id} className="flex items-center gap-3 border-t border-secondary pt-2.5">
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "flex size-7 shrink-0 items-center justify-center rounded-full",
-                  record.liked && record.tolerated ? "bg-foreground text-primary" : "border-2 border-foreground bg-white",
-                )}
-              >
-                {record.liked && record.tolerated && <CheckIcon className="size-3.5" strokeWidth={3} />}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">{record.food_name}</p>
-                <p className="text-xs text-muted-foreground">{formatFedAt(record.fed_at)}</p>
-              </div>
-              <FeedingStatus record={record} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
-  );
-}
-
 function QuickLinkTile({
   title,
   description,
   icon: Icon,
   accent,
+  href,
 }: {
+  href?: string;
   title: string;
   description: string;
   icon: LucideIcon;
   accent?: boolean;
 }) {
-  return (
+  const content = (
     <Card
-      aria-disabled="true"
+      aria-disabled={href ? undefined : true}
       variant={accent ? "accent" : "default"}
       className="flex h-32 flex-col justify-between"
     >
@@ -115,36 +67,50 @@ function QuickLinkTile({
       </div>
     </Card>
   );
+  return href ? <Link href={href} className="rounded-2xl outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-foreground">{content}</Link> : content;
 }
 
 export function PetDetails({ petId }: { petId: number }) {
   const load = useCallback(
-    () => Promise.all([getPet(petId), listFeedingRecords(petId).catch(() => null)]),
+    () => Promise.all([
+      getPet(petId),
+      listMeals(petId).then(sortMeals).catch(() => null),
+      listFoods().catch(() => null),
+    ]),
     [petId],
   );
   const state = useProtectedData(load, "Не удалось загрузить питомца");
+  const now = useNow();
 
   if (state.status === "loading") return <PageLoading />;
   if (state.status === "error") {
     return <PageError message={state.error} onRetry={state.retry} backToList />;
   }
 
-  const [pet, feedings] = state.data;
-  const fedToday = feedings?.filter((record) => isToday(new Date(record.fed_at))) ?? [];
-  const lastFeeding = feedings?.[0];
+  const [pet, meals, foods] = state.data;
+  const { update } = state;
+  const fedToday = meals?.filter((meal) => isToday(new Date(meal.fed_at))) ?? [];
+  const lastMeal = meals?.[0];
+
+  async function handleMealsChange(next: Meal[]) {
+    const sorted = sortMeals(next);
+    update([pet, sorted, foods]);
+    const refreshed = await listFoods().catch(() => null);
+    if (refreshed) update([pet, sorted, refreshed]);
+  }
 
   return (
     <>
       <PageHeader title={pet.name} backHref="/me" />
 
-      <PetInfoCard pet={pet} onPetChange={(updated) => state.update([updated, feedings])} />
+      <PetInfoCard pet={pet} onPetChange={(updated) => state.update([updated, meals, foods])} />
 
       <div className="grid grid-cols-2 gap-3">
         <StatTile
           accent
           label="Ел сегодня"
-          value={feedings ? `${fedToday.length} ${pluralize(fedToday.length, "раз", "раза", "раз")}` : "—"}
-          hint={lastFeeding ? `последний раз ${formatFedAt(lastFeeding.fed_at)}` : "кормлений ещё не было"}
+          value={meals ? `${fedToday.length} ${pluralize(fedToday.length, "раз", "раза", "раз")}` : "—"}
+          hint={lastMeal ? `покормили ${formatTimeAgo(lastMeal.fed_at, now)}` : "кормлений ещё не было"}
         />
         <StatTile
           label="Текущий вес"
@@ -153,10 +119,11 @@ export function PetDetails({ petId }: { petId: number }) {
         />
       </div>
 
-      <RecentFeedings records={feedings} />
+      <PetMeals petId={pet.id} meals={meals} foods={foods} now={now} onMealsChange={handleMealsChange} />
 
       <section aria-label="Быстрые переходы" className="grid grid-cols-2 gap-3">
         <QuickLinkTile
+          href={`/pet/${petId}/health`}
           title="Здоровье"
           description="Вакцинации, визиты, заключения"
           icon={HeartPulseIcon}

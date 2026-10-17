@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/api";
-import { login } from "@/lib/auth";
+import { login, registerAndLogin } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import {
@@ -25,16 +25,27 @@ const credentialsSchema = z.object({
     .email("Введите корректный email"),
   password: z
     .string()
-    .min(1, "Введите пароль"),
+    .min(8, "Пароль должен содержать минимум 8 символов"),
 });
 
 type CredentialsValues = z.infer<typeof credentialsSchema>;
 type FormErrors = Partial<Record<keyof CredentialsValues, string>>;
+type Mode = "login" | "register";
+
+const switchModeClass = "h-auto p-0 text-sm text-foreground underline underline-offset-4";
 
 export function LoginForm() {
   const router = useRouter();
+  const [mode, setMode] = useState<Mode>("login");
   const [errors, setErrors] = useState<FormErrors>({});
   const [pending, setPending] = useState(false);
+
+  const isRegister = mode === "register";
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setErrors({});
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -58,10 +69,17 @@ export function LoginForm() {
     setErrors({});
     setPending(true);
     try {
-      await login(result.data);
+      if (isRegister) {
+        await registerAndLogin(result.data);
+      } else {
+        await login(result.data);
+      }
       router.push("/me");
     } catch (error) {
-      toast.error(getErrorMessage(error, "Не удалось войти"));
+      const fallback = isRegister
+        ? "Не удалось зарегистрироваться"
+        : "Не удалось войти";
+      toast.error(getErrorMessage(error, fallback));
     } finally {
       setPending(false);
     }
@@ -75,9 +93,11 @@ export function LoginForm() {
     >
       <FieldSet>
         <div className="flex flex-col gap-1">
-          <h2>Вход</h2>
+          <h2>{isRegister ? "Регистрация" : "Вход"}</h2>
           <p className="text-muted-foreground">
-            Войдите, чтобы управлять профилем питомца
+            {isRegister
+              ? "Создайте аккаунт, чтобы управлять профилем питомца"
+              : "Войдите, чтобы управлять профилем питомца"}
           </p>
         </div>
         <FieldGroup>
@@ -113,9 +133,27 @@ export function LoginForm() {
               disabled={pending}
             >
               {pending && <Spinner />}
-              Войти
+              {isRegister ? "Зарегистрироваться" : "Войти"}
             </Button>
           </Field>
+
+          <p className="text-center text-sm text-muted-foreground">
+            {isRegister ? (
+              <>
+                Уже есть аккаунт?{" "}
+                <Button type="button" variant="link" className={switchModeClass} onClick={() => switchMode("login")}>
+                  Войти
+                </Button>
+              </>
+            ) : (
+              <>
+                Нет аккаунта?{" "}
+                <Button type="button" variant="link" className={switchModeClass} onClick={() => switchMode("register")}>
+                  Зарегистрироваться
+                </Button>
+              </>
+            )}
+          </p>
         </FieldGroup>
       </FieldSet>
     </form>
