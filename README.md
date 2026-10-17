@@ -14,6 +14,20 @@ PetCare — приложение для владельцев домашних ж
 
 > PetCare — организационный инструмент, а не система ветеринарной диагностики. Приложение не ставит диагнозы и не назначает лечение.
 
+## Как проверить за пару минут
+
+- **Деплой:** https://petcare.quadrotez.com — приложение доступно (HTTP 200).
+- **Демо-вход:** нажмите «Войти в демо» на странице входа либо войдите как
+  `demo@quadrotez.com` / `demo`. Аккаунт с данными создаётся автоматически при
+  каждом деплое (job `demo:account`).
+- **Документация API (Swagger UI):** https://petcare.quadrotez.com/api/docs
+  (OpenAPI-схема: https://petcare.quadrotez.com/openapi.json).
+- **Тесты и линтеры:** каждый пайплайн GitLab CI прогоняет backend-, frontend- и
+  интеграционные тесты, а также `ruff` и `eslint`. На вкладке **Tests** пайплайна
+  виден отчёт pytest, в merge request — покрытие (cobertura), в артефактах —
+  `report.xml`, `coverage.xml` и «Swagger UI».
+- **Отчёт о покрытых сценариях:** [`SCENARIOS.md`](SCENARIOS.md:1).
+
 ## Возможности
 
 ### Аккаунт и безопасность
@@ -40,6 +54,10 @@ PetCare — приложение для владельцев домашних ж
 - текущий вес;
 - фотографию;
 - историю изменения веса.
+
+Питомца можно передать другому пользователю по email: владелец создаёт приглашение
+(срочное или временное, со сроком), получатель принимает или отклоняет, а также
+возможен запрос возврата питомца с подтверждением владельцем.
 
 ### Кормление и запасы
 
@@ -193,6 +211,23 @@ GET /api/v1/health
 | `GET` | `/api/v1/pets/{pet_id}/photo` | получить фотографию |
 | `GET` | `/api/v1/pets/{pet_id}/weight` | история веса |
 
+### Передача питомца
+
+| Метод | Endpoint | Назначение |
+|---|---|---|
+| `POST` | `/api/v1/pets/{pet_id}/transfers` | создать приглашение на передачу |
+| `GET` | `/api/v1/pets/{pet_id}/transfers` | история передач питомца |
+| `GET` | `/api/v1/pets/{pet_id}/transfers/current` | незавершённая передача питомца |
+| `GET` | `/api/v1/transfers/incoming` | входящие приглашения |
+| `GET` | `/api/v1/transfers/received` | принятые питомцы |
+| `GET` | `/api/v1/transfers/outgoing` | исходящие передачи |
+| `POST` | `/api/v1/transfers/{transfer_id}/accept` | принять передачу |
+| `POST` | `/api/v1/transfers/{transfer_id}/decline` | отклонить передачу |
+| `POST` | `/api/v1/transfers/{transfer_id}/cancel` | отозвать приглашение |
+| `POST` | `/api/v1/transfers/{transfer_id}/return` | запросить возврат |
+| `POST` | `/api/v1/transfers/{transfer_id}/cancel-return` | отменить запрос возврата |
+| `POST` | `/api/v1/transfers/{transfer_id}/confirm-return` | подтвердить возврат |
+
 ### Кормление и корма
 
 | Метод | Endpoint | Назначение |
@@ -230,7 +265,9 @@ Multipart-поля:
 - `image` — обязательный файл PNG, JPEG или WebP;
 - `pet_context` — необязательный текст до 4000 символов.
 
-Полная интерактивная документация доступна в Swagger UI по адресу `/docs` после запуска backend.
+Полная интерактивная документация доступна в Swagger UI по адресу `/docs` после
+запуска backend (на деплое — https://petcare.quadrotez.com/api/docs, схема —
+https://petcare.quadrotez.com/openapi.json).
 
 ## Требования
 
