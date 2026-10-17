@@ -85,6 +85,7 @@ export function PetShare({ petId }: { petId: number }) {
   }
 
   const [pet, shares] = state.data;
+  const { update } = state;
   const active = shares.filter(isActive);
   const cleanEmail = email.trim().toLowerCase();
   const isValidEmail = EMAIL_RE.test(cleanEmail);
@@ -97,7 +98,7 @@ export function PetShare({ petId }: { petId: number }) {
     setError(null);
     try {
       const created = await createShare(petId, { email: cleanEmail, expires_in_hours: hours });
-      state.update([pet, [created, ...shares.filter((s) => s.email !== created.email)]]);
+      update([pet, [created, ...shares.filter((s) => s.email !== created.email)]]);
       setEmail("");
     } catch (e) {
       setError(getErrorMessage(e, "Не удалось предоставить доступ"));
@@ -111,7 +112,7 @@ export function PetShare({ petId }: { petId: number }) {
     setError(null);
     try {
       await deleteShare(petId, shareId);
-      state.update([pet, shares.filter((s) => s.id !== shareId)]);
+      update([pet, shares.filter((s) => s.id !== shareId)]);
     } catch (e) {
       setError(getErrorMessage(e, "Не удалось закрыть доступ"));
     } finally {
@@ -214,9 +215,7 @@ export function PetShare({ petId }: { petId: number }) {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="outline">Отмена</Button>
-            </DialogClose>
+            <DialogClose render={<Button type="button" variant="outline" />}>Отмена</DialogClose>
             <Button type="button" onClick={handleCreate} disabled={submitting}>
               Выдать доступ
             </Button>
