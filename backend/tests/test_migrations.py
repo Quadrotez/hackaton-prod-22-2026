@@ -7,6 +7,41 @@ from sqlalchemy import create_engine, inspect, text
 from app.core.config import get_settings
 
 
+def test_food_catalog_migration_creates_and_drops_food_tables(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    database_path = tmp_path / "food-catalog-migration.sqlite"
+    database_url = f"sqlite+pysqlite:///{database_path}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+
+    config = Config("alembic.ini")
+    engine = create_engine(database_url)
+    try:
+        command.upgrade(config, "head")
+        inspector = inspect(engine)
+        assert {"foods", "food_stocks"}.issubset(inspector.get_table_names())
+        food_columns = {column["name"] for column in inspector.get_columns("foods")}
+        stock_columns = {column["name"] for column in inspector.get_columns("food_stocks")}
+        assert {"user_id", "name", "type", "protein", "fats", "carbohydrates", "calories"}.issubset(food_columns)
+        assert {"user_id", "food_id", "total_grams", "remaining_grams"}.issubset(stock_columns)
+        assert any(
+            index["name"] == "ix_foods_user_id" for index in inspector.get_indexes("foods")
+        )
+        assert any(
+            constraint["name"] == "uq_food_stocks_food_id"
+            for constraint in inspector.get_unique_constraints("food_stocks")
+        )
+
+        command.downgrade(config, "20261017_0006")
+        downgraded_tables = set(inspect(engine).get_table_names())
+        assert "foods" not in downgraded_tables
+        assert "food_stocks" not in downgraded_tables
+    finally:
+        engine.dispose()
+        get_settings.cache_clear()
+
+
 def test_feeding_records_migration_upgrade_and_downgrade(
     tmp_path: Path, monkeypatch,
 ) -> None:
@@ -44,6 +79,53 @@ def test_feeding_records_migration_upgrade_and_downgrade(
         assert "feeding_records" not in downgraded_inspector.get_table_names()
         assert "pets" in downgraded_inspector.get_table_names()
     finally:
+        get_settings.cache_clear()
+
+
+def test_user_profile_migration_backfills_username_and_supports_avatar(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    database_path = tmp_path / "user-profile-migration.sqlite"
+    database_url = f"sqlite+pysqlite:///{database_path}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+
+    config = Config("alembic.ini")
+    engine = create_engine(database_url)
+    try:
+        command.upgrade(config, "20261016_0005")
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO users (email, password_hash, created_at) "
+                    "VALUES ('Existing.Owner@example.com', 'hash', CURRENT_TIMESTAMP)"
+                )
+            )
+
+        command.upgrade(config, "head")
+        inspector = inspect(engine)
+        columns = {column["name"] for column in inspector.get_columns("users")}
+        assert {"username", "avatar_url"}.issubset(columns)
+        assert any(
+            index["name"] == "ix_users_username" and index["unique"]
+            for index in inspector.get_indexes("users")
+        )
+
+        with engine.begin() as connection:
+            row = connection.execute(
+                text("SELECT username, avatar_url FROM users")
+            ).one()
+            assert row.username == "existing_owner"
+            assert row.avatar_url is None
+
+        command.downgrade(config, "20261016_0005")
+        downgraded_columns = {
+            column["name"] for column in inspect(engine).get_columns("users")
+        }
+        assert "username" not in downgraded_columns
+        assert "avatar_url" not in downgraded_columns
+    finally:
+        engine.dispose()
         get_settings.cache_clear()
 
 

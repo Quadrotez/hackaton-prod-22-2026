@@ -11,11 +11,13 @@ PASSWORD = "correct-horse-battery-staple"
 
 
 def auth_headers(client: TestClient, email: str) -> dict[str, str]:
+    username = email.split("@", 1)[0].replace("-", "_")
     assert client.post(
-        "/api/v1/auth/register", json={"email": email, "password": PASSWORD}
+        "/api/v1/auth/register",
+        json={"email": email, "username": username, "password": PASSWORD},
     ).status_code == 201
     response = client.post(
-        "/api/v1/auth/login", json={"email": email, "password": PASSWORD}
+        "/api/v1/auth/login", json={"identifier": email, "password": PASSWORD}
     )
     assert response.status_code == 200
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
