@@ -20,6 +20,7 @@ from app.schemas.health import (
     VisitTopic,
 )
 from app.services.health.common import local_now, local_today
+from app.services.health.measurements import ensure_initialized, summarize
 from app.services.health.pregnancy import active_pregnancy, to_public
 from app.services.health.schedule import build_schedule, load_medications
 from app.services.health.visits import list_topics, load_visits
@@ -79,6 +80,7 @@ async def split_visits(
 
 async def build_overview(db: AsyncSession, pet: Pet, tz: ZoneInfo) -> HealthOverview:
     today, now = local_today(tz), local_now(tz)
+    await ensure_initialized(db, pet)
     pregnancy = await active_pregnancy(db, pet.id)
     schedule = await build_schedule(db, pet.id, today, today + timedelta(days=UPCOMING_DAYS - 1))
     planned_visits, past_visits, topics = await split_visits(db, pet.id)
@@ -100,6 +102,7 @@ async def build_overview(db: AsyncSession, pet: Pet, tz: ZoneInfo) -> HealthOver
         planned_visits=planned_visits,
         past_visits=past_visits,
         top_topic=topics[0] if topics else None,
+        measurements=await summarize(db, pet.id),
     )
 
 

@@ -323,6 +323,95 @@ class VisitTopicGraph(VisitTopic):
     edges: list[VisitEdge]
 
 
+# --- Measurements -----------------------------------------------------------------
+
+
+class MeasurementTemplateParameter(BaseModel):
+    name: str
+    unit: str
+
+
+class MeasurementTemplate(BaseModel):
+    key: str
+    species: list[str] = Field(description="Species values (case-insensitive) that use it.")
+    parameters: list[MeasurementTemplateParameter]
+
+
+class MeasurementParameterCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    unit: str | None = Field(default=None, max_length=20, description='E.g. "см" or "°C".')
+    sort_order: int | None = Field(
+        default=None, description="Position in lists; defaults to after the last parameter."
+    )
+
+    @field_validator("name", "unit")
+    @classmethod
+    def strip_fields(cls, value: str | None) -> str | None:
+        return strip_text(value)
+
+
+class MeasurementParameterUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    unit: str | None = Field(default=None, max_length=20)
+    sort_order: int | None = None
+
+    @field_validator("name", "unit")
+    @classmethod
+    def strip_fields(cls, value: str | None) -> str | None:
+        return strip_text(value)
+
+
+class MeasurementParameterPublic(ORMModel):
+    id: int
+    pet_id: int
+    name: str
+    unit: str | None
+    sort_order: int
+    created_at: datetime
+
+
+class MeasurementCreate(BaseModel):
+    value: float = Field(allow_inf_nan=False)
+    measured_at: datetime
+    notes: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("notes")
+    @classmethod
+    def strip_fields(cls, value: str | None) -> str | None:
+        return strip_text(value)
+
+
+class MeasurementUpdate(BaseModel):
+    value: float | None = Field(default=None, allow_inf_nan=False)
+    measured_at: datetime | None = None
+    notes: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("notes")
+    @classmethod
+    def strip_fields(cls, value: str | None) -> str | None:
+        return strip_text(value)
+
+
+class MeasurementPublic(ORMModel):
+    id: int
+    parameter_id: int
+    value: float
+    measured_at: datetime
+    notes: str | None
+    created_at: datetime
+
+
+class MeasurementPoint(BaseModel):
+    value: float
+    measured_at: datetime
+
+
+class MeasurementParameterSummary(MeasurementParameterPublic):
+    latest: MeasurementPoint | None
+    change: float | None = Field(description="Latest value minus the previous measurement.")
+    recent: list[MeasurementPoint] = Field(description="Last points, oldest first.")
+
+
 # --- Aggregates -------------------------------------------------------------------
 
 
@@ -337,6 +426,7 @@ class HealthOverview(BaseModel):
     planned_visits: list[VetVisitPublic]
     past_visits: list[VetVisitPublic]
     top_topic: VisitTopic | None
+    measurements: list[MeasurementParameterSummary]
 
 
 class PetBrief(ORMModel):

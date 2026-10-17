@@ -142,3 +142,28 @@ def test_health_tables_migration_upgrade_and_downgrade(tmp_path: Path, monkeypat
         assert "feeding_records" in downgraded
     finally:
         get_settings.cache_clear()
+
+
+MEASUREMENT_TABLES = {"measurement_profiles", "measurement_parameters", "measurements"}
+
+
+def test_measurements_migration_upgrade_and_downgrade(tmp_path: Path, monkeypatch) -> None:
+    database_url = f"sqlite+pysqlite:///{tmp_path / 'measurements-migration.sqlite'}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+
+    config = Config("alembic.ini")
+    try:
+        command.upgrade(config, "head")
+        inspector = inspect(create_engine(database_url))
+        assert MEASUREMENT_TABLES <= set(inspector.get_table_names())
+        measurement_keys = inspector.get_foreign_keys("measurements")
+        assert measurement_keys[0]["referred_table"] == "measurement_parameters"
+        assert measurement_keys[0]["options"].get("ondelete") == "CASCADE"
+
+        command.downgrade(config, "20261017_0006")
+        downgraded = set(inspect(create_engine(database_url)).get_table_names())
+        assert not MEASUREMENT_TABLES & downgraded
+        assert "vet_visits" in downgraded
+    finally:
+        get_settings.cache_clear()

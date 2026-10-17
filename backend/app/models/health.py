@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     Time,
@@ -214,6 +215,56 @@ class VetVisit(Base):
     referred_by_visit_id: Mapped[int | None] = mapped_column(
         ForeignKey("vet_visits.id", ondelete="SET NULL"), nullable=True
     )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MeasurementProfile(Base):
+    """Marks that a pet's measurement parameters were initialized, so a template is
+    applied once and parameters the owner deleted do not come back."""
+
+    __tablename__ = "measurement_profiles"
+
+    pet_id: Mapped[int] = mapped_column(
+        ForeignKey("pets.id", ondelete="CASCADE"), primary_key=True
+    )
+    # Key of the template applied at initialization; None when the species has none.
+    template: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    initialized_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MeasurementParameter(Base):
+    __tablename__ = "measurement_parameters"
+    __table_args__ = (Index("ix_measurement_parameters_pet_id", "pet_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    pet_id: Mapped[int] = mapped_column(ForeignKey("pets.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    unit: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    measurements = relationship("Measurement", cascade="all, delete-orphan")
+
+
+class Measurement(Base):
+    __tablename__ = "measurements"
+    __table_args__ = (
+        Index("ix_measurements_parameter_measured_at", "parameter_id", "measured_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    parameter_id: Mapped[int] = mapped_column(
+        ForeignKey("measurement_parameters.id", ondelete="CASCADE"), nullable=False
+    )
+    value: Mapped[float] = mapped_column(Numeric(12, 3, asdecimal=False), nullable=False)
+    measured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

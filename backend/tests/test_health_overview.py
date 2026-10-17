@@ -7,7 +7,7 @@ from tests.health_helpers import auth_headers, create_pet, local_today, pet_url
 
 def test_overview_of_pet_without_records(client: TestClient) -> None:
     headers = auth_headers(client, "owner@example.com")
-    pet_id = create_pet(client, headers)
+    pet_id = create_pet(client, headers, species="hamster")
 
     response = client.get(pet_url(pet_id, "health"), headers=headers)
     assert response.status_code == 200
@@ -22,6 +22,7 @@ def test_overview_of_pet_without_records(client: TestClient) -> None:
         "planned_visits": [],
         "past_visits": [],
         "top_topic": None,
+        "measurements": [],
     }
 
 
@@ -82,6 +83,9 @@ def test_overview_collects_every_section(client: TestClient) -> None:
     assert body["top_topic"] == {
         "topic": "Allergy", "total": 2, "planned": 1, "completed": 1, "cancelled": 0
     }
+    # A cat gets the template parameters, still without values.
+    assert [item["name"] for item in body["measurements"]][0] == "Рост в холке"
+    assert all(item["latest"] is None for item in body["measurements"])
 
 
 def test_summary_includes_feeding_and_owner(client: TestClient) -> None:

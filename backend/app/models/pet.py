@@ -50,3 +50,7 @@ class Pet(Base):
     vaccinations = relationship("Vaccination", cascade="all, delete-orphan")
     medications = relationship("Medication", cascade="all, delete-orphan")
     vet_visits = relationship("VetVisit", cascade="all, delete-orphan")
+    measurement_parameters = relationship("MeasurementParameter", cascade="all, delete-orphan")
+    measurement_profile = relationship(
+        "MeasurementProfile", cascade="all, delete-orphan", uselist=False
+    )

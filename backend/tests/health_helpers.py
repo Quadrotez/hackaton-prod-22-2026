@@ -15,12 +15,16 @@ def auth_headers(client: TestClient, email: str) -> dict[str, str]:
 
 
 def create_pet(
-    client: TestClient, headers: dict[str, str], name: str = "Barsik", sex: str = "girl"
+    client: TestClient,
+    headers: dict[str, str],
+    name: str = "Barsik",
+    sex: str = "girl",
+    species: str = "cat",
 ) -> int:
     response = client.post(
         "/api/v1/pets/",
         headers=headers,
-        json={"name": name, "species": "cat", "sex": sex, "weight_g": 4600},
+        json={"name": name, "species": species, "sex": sex, "weight_g": 4600},
     )
     assert response.status_code == 201
     return response.json()["id"]
