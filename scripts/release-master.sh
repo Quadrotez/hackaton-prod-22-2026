@@ -86,16 +86,23 @@ for _ in $(seq 1 30); do
 done
 
 # 4) Смёрджить сразу или включить auto-merge на время пайплайна.
-merge_attempt="$(api -w '\n%{http_code}' -X PUT "$API/projects/$project_id/merge_requests/$mr_iid/merge" \
+mr_url="$API/projects/$project_id/merge_requests/$mr_iid"
+merge_http="$(curl -s -o /dev/null -w '%{http_code}' \
+  --header "PRIVATE-TOKEN: $GITLAB_TOKEN" -X PUT "$mr_url/merge" \
   --data "should_remove_source_branch=false")"
-http_code="${merge_attempt##*$'\n'}"
-if [ "$http_code" = "200" ]; then
+if [ "$merge_http" = "200" ]; then
   echo "== MR !$mr_iid смёрджен =="
 else
-  echo "== прямой merge не прошёл (HTTP $http_code), включаю auto-merge =="
-  api -X PUT "$API/projects/$project_id/merge_requests/$mr_iid/merge" \
+  echo "== прямой merge не прошёл (HTTP $merge_http), включаю auto-merge =="
+  mws_http="$(curl -s -o /dev/null -w '%{http_code}' \
+    --header "PRIVATE-TOKEN: $GITLAB_TOKEN" -X PUT "$mr_url/merge" \
     --data "merge_when_pipeline_succeeds=true" \
-    --data "should_remove_source_branch=false" >/dev/null
+    --data "should_remove_source_branch=false")"
+  if [ "$mws_http" != "200" ]; then
+    echo "!! не удалось запланировать auto-merge (HTTP $mws_http), смёрджи MR вручную:" >&2
+    echo "   $API/projects/$project_id/merge_requests/$mr_iid" >&2
+    exit 1
+  fi
   echo "MR !$mr_iid вольётся автоматически после успешного пайплайна:"
   echo "  $API/projects/$project_id/merge_requests/$mr_iid"
 fi
