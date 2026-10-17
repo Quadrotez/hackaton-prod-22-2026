@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { FoodCatalog } from "@/components/food-catalog";
+import { FoodManager } from "@/components/food-manager";
 import type { Food } from "@/lib/card";
+import { PageShell } from "@/components/page-shell";
 
 export const metadata: Metadata = {
   title: "Корма — PetCare",
@@ -49,16 +49,9 @@ const foods: Food[] = [
 
 export default function FoodPage() {
   return (
-    <main className="relative flex min-h-dvh min-w-0 flex-col items-center bg-secondary px-6 pb-28 pt-20 font-normal leading-[1.55] [font-optical-sizing:auto]">
-      <Link
-        href="/me"
-        className="absolute left-6 top-6 rounded-sm text-lg font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-foreground"
-      >
-        PetCare
-      </Link>
-      <div className="flex w-full max-w-sm flex-col gap-6">
-        <FoodCatalog foods={foods} />
-      </div>
-    </main>
+    <PageShell>
+      {/* Временное управление кормами: для удаления замените FoodManager на FoodCatalog и его импорт. */}
+      <FoodManager foods={foods} />
+    </PageShell>
   );
 }
