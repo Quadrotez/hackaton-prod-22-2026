@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from app.models.health import MedicationIntake, MedicationTime
 from tests.health_helpers import auth_headers, create_pet, local_today, pet_url
 
-
 START = date(2026, 10, 1)
 
 

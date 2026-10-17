@@ -316,7 +316,7 @@ export function PetForm({ pet }: { pet?: Pet }) {
 
               <FieldSet className="gap-2" data-invalid={!!errors.sex}>
                 <FieldLegend variant="label">Пол</FieldLegend>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-invalid={!!errors.sex} aria-describedby={errors.sex ? "pet-sex-error" : undefined}>
                   {sexOptions.map(({ value, label }) => (
                     <label key={value} className="relative cursor-pointer">
                       <input
@@ -325,8 +325,6 @@ export function PetForm({ pet }: { pet?: Pet }) {
                         value={value}
                         defaultChecked={pet?.sex === value}
                         onChange={() => setErrors((current) => ({ ...current, sex: undefined }))}
-                        aria-invalid={!!errors.sex}
-                        aria-describedby={errors.sex ? "pet-sex-error" : undefined}
                         className="peer sr-only"
                       />
                       <span className={choiceClass}>{label}</span>

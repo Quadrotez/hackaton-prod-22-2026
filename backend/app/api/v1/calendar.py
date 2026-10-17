@@ -21,7 +21,6 @@ from app.services.calendar import MAX_RANGE_DAYS, collect_events, load_pets, upc
 from app.services.calendar_ics import render_calendar
 from app.services.health.common import local_today, unprocessable
 
-
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 
 DEFAULT_GRID_DAYS = 42  # six weeks, a full month grid

@@ -27,7 +27,6 @@ from app.services.health.measurements import (
     summarize,
 )
 
-
 templates_router = APIRouter(prefix="/measurement-templates", tags=["pet health: measurements"])
 router = APIRouter(
     prefix="/pets/{pet_id}/measurement-parameters", tags=["pet health: measurements"]

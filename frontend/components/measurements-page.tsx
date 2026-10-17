@@ -13,7 +13,6 @@ import { cn } from "@/lib/utils";
 import { MeasurementHistory } from "@/components/measurement-history";
 import { MeasurementEditor, type MeasurementDraft } from "@/components/measurement-editor";
 import { PetWeightChart } from "@/components/pet-weight-chart";
-import { PetInfoCard } from "@/components/pet-info-card";
 import { PageHeader } from "@/components/page-header";
 import { PageError, PageLoading } from "@/components/page-state";
 import { Button } from "@/components/ui/button";

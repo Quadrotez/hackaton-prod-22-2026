@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 from app.services.calendar_ics import fold
 from tests.health_helpers import auth_headers, create_pet, local_today, pet_url
 
-
 CALENDAR = "/api/v1/calendar"
 OCTOBER = {"from": "2026-10-01", "to": "2026-10-31"}
 

@@ -4,7 +4,6 @@ import { useProtectedData } from "@/hooks/use-auth";
 import { listPets } from "@/lib/pets";
 import { HomeDashboard } from "@/components/home";
 import { PageShell } from "@/components/page-shell";
-import { PageHeader } from "@/components/page-header";
 import { PageError, PageLoading } from "@/components/page-state";
 
 export default function MePage() {

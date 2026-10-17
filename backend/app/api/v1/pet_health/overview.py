@@ -5,7 +5,6 @@ from app.api.v1.pet_health.dependencies import LocalTimezone
 from app.schemas.health import HealthOverview, HealthSummary
 from app.services.health.overview import build_overview, build_summary
 
-
 router = APIRouter(prefix="/pets/{pet_id}/health", tags=["pet health"])
 
 

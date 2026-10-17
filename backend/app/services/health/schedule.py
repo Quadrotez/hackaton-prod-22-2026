@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.health import Medication, MedicationIntake
 from app.schemas.health import ScheduledDose
 
-
 MAX_SCHEDULE_DAYS = 92
 
 

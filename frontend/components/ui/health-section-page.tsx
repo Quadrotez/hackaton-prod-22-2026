@@ -11,7 +11,6 @@ import { HealthSectionForm } from "@/components/health-section-form";
 import { HealthRecordCard } from "@/components/health-record-card";
 import { PageHeader } from "@/components/page-header";
 import { PageError, PageLoading } from "@/components/page-state";
-import { PetInfoCard } from "@/components/pet-info-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";

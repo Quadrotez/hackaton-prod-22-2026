@@ -21,9 +21,9 @@ from pathlib import Path
 # Allow running this file directly (``python scripts/create_demo_user.py``).
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import app.models  # noqa: F401  (register all models for relationship resolution)
 from sqlalchemy import select
 
+import app.models  # noqa: F401  (register all models for relationship resolution)
 from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models.pet import Pet, PetSex

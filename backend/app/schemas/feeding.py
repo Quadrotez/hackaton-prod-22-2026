@@ -3,7 +3,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-
 CREATE_RATINGS_DESCRIPTION = (
     "Required when this pet has not previously tried the normalized food name. "
     "For a previously tried food, an omitted rating is copied from the most recent "

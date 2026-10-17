@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 from app.models.health import Measurement, MeasurementParameter, MeasurementProfile
 from tests.health_helpers import auth_headers, create_pet, pet_url
 
-
 TEMPLATE_NAMES = ["Рост в холке", "Длина тела", "Обхват груди", "Обхват шеи", "Температура"]
 
 
