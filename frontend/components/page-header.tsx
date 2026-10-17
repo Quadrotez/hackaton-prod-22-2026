@@ -18,11 +18,9 @@ export function PageHeader({
         <Link
           href={backHref}
           aria-label="Назад"
-          // Фон страницы (secondary) по светлоте близок к затемнённой при наведении кнопке,
-          // поэтому при наведении кнопка не темнеет, а светлеет и приподнимается тенью
           className={cn(
             buttonVariants({ variant: "secondary", size: "icon-lg" }),
-            "theme-shadcn shrink-0 hover:bg-background hover:shadow-sm",
+            "theme-shadcn shrink-0 hover:bg-background",
           )}
         >
           <ChevronLeftIcon aria-hidden="true" />

@@ -30,7 +30,7 @@ export function MeasurementHistory({ name, unit, history }: { name: string; unit
           <circle cx={last.x} cy={last.y} r="3" fill="currentColor" />
         </svg>
       </PopoverTrigger>
-      <PopoverContent align="end" side="top" sideOffset={8} className="w-[min(560px,calc(100vw-32px))] gap-1 rounded-[14px] border border-border p-4 shadow-[0_12px_32px_rgba(43,45,31,0.18)] ring-0">
+      <PopoverContent align="end" side="top" sideOffset={8} className="w-[min(560px,calc(100vw-32px))] gap-1 rounded-[14px] border border-border p-4 ring-0">
         <div className="flex flex-wrap items-baseline justify-between gap-1">
           <PopoverTitle>{name}</PopoverTitle>
           <span className="text-xs text-muted-foreground">Сейчас {measurementValue(history[history.length - 1].value, unit)}</span>
