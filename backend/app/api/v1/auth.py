@@ -1,19 +1,12 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.dependencies import AppSettings, CurrentUser, DbSession
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
-from app.schemas.auth import (
-    Credentials,
-    PasswordUpdate,
-    TokenResponse,
-    UserPublic,
-    UserRegistration,
-    UserUpdate,
-)
+from app.schemas.auth import Credentials, TokenResponse, UserPublic, UserRegistration
 from app.services.storage import FileTooLargeError, InvalidImageError, LocalMediaStorage
 
 
@@ -28,7 +21,7 @@ def storage_for(settings: AppSettings) -> LocalMediaStorage:
 def register(payload: UserRegistration, db: DbSession) -> User:
     user = User(
         email=str(payload.email),
-        name=payload.name,
+        username=payload.username,
         password_hash=hash_password(payload.password),
     )
     db.add(user)
@@ -38,21 +31,26 @@ def register(payload: UserRegistration, db: DbSession) -> User:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="A user with this email already exists",
+            detail="A user with this email or username already exists",
         ) from None
     db.refresh(user)
     return user
 
 
 def get_or_create_user(credentials: Credentials, db: DbSession) -> User:
-    email = str(credentials.email)
+    email = credentials.identifier
     user = db.scalar(select(User).where(User.email == email))
     if user is not None:
         return user
 
+    username = email.split("@", 1)[0].lower()
+    username = "".join(character if character.isalnum() or character == "_" else "_" for character in username)
+    username = username[:30].strip("_") or "user"
+    if len(username) < 3:
+        username = f"user_{username}"
     user = User(
         email=email,
-        name=None,
+        username=username,
         password_hash=hash_password(credentials.password),
     )
     db.add(user)
@@ -70,13 +68,23 @@ def get_or_create_user(credentials: Credentials, db: DbSession) -> User:
 
 @router.post("/login", response_model=TokenResponse)
 def login(credentials: Credentials, db: DbSession, settings: AppSettings) -> TokenResponse:
-    user = db.scalar(select(User).where(User.email == str(credentials.email)))
+    user = db.scalar(
+        select(User).where(
+            or_(User.email == credentials.identifier, User.username == credentials.identifier)
+        )
+    )
     if user is None:
+        if "@" not in credentials.identifier:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email/username or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         user = get_or_create_user(credentials, db)
     elif not verify_password(credentials.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
+            detail="Invalid email/username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -86,31 +94,6 @@ def login(credentials: Credentials, db: DbSession, settings: AppSettings) -> Tok
 @router.get("/me", response_model=UserPublic)
 def me(current_user: CurrentUser) -> User:
     return current_user
-
-
-@router.patch("/me", response_model=UserPublic)
-def update_me(payload: UserUpdate, current_user: CurrentUser, db: DbSession) -> User:
-    current_user.name = payload.name
-    db.commit()
-    db.refresh(current_user)
-    return current_user
-
-
-@router.patch("/me/password", status_code=status.HTTP_204_NO_CONTENT)
-def update_password(payload: PasswordUpdate, current_user: CurrentUser, db: DbSession) -> None:
-    if not verify_password(payload.current_password, current_user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password is incorrect",
-        )
-    if payload.current_password == payload.new_password:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="New password must be different from the current password",
-        )
-
-    current_user.password_hash = hash_password(payload.new_password)
-    db.commit()
 
 
 @router.post("/me/avatar", response_model=UserPublic)

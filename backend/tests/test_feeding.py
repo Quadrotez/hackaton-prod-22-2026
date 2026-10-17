@@ -5,17 +5,20 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.feeding import FeedingRecord
+from app.models.food import Food
 
 
 PASSWORD = "correct-horse-battery-staple"
 
 
 def auth_headers(client: TestClient, email: str) -> dict[str, str]:
+    username = email.split("@", 1)[0].replace("-", "_")
     assert client.post(
-        "/api/v1/auth/register", json={"email": email, "password": PASSWORD}
+        "/api/v1/auth/register",
+        json={"email": email, "username": username, "password": PASSWORD},
     ).status_code == 201
     response = client.post(
-        "/api/v1/auth/login", json={"email": email, "password": PASSWORD}
+        "/api/v1/auth/login", json={"identifier": email, "password": PASSWORD}
     )
     assert response.status_code == 200
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
@@ -27,6 +30,25 @@ def create_pet(client: TestClient, headers: dict[str, str], name: str = "Milo") 
         headers=headers,
         json={"name": name, "species": "cat", "sex": "boy", "weight_g": 4500},
     )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+def food_payload(name: str = "Catalog Chicken") -> dict[str, object]:
+    return {
+        "name": name,
+        "description": "Complete dry food",
+        "type": "dry",
+        "protein": 30.5,
+        "fats": 15,
+        "carbohydrates": 40,
+        "calories": 380,
+        "total_grams": 5000,
+    }
+
+
+def create_food(client: TestClient, headers: dict[str, str], name: str = "Catalog Chicken") -> int:
+    response = client.post("/api/v1/foods", headers=headers, json=food_payload(name))
     assert response.status_code == 201
     return response.json()["id"]
 
@@ -267,7 +289,6 @@ def test_suggestions_for_new_and_known_food_are_read_only(
     assert new_response.json() == {
         "food_name": "New Food",
         "previously_tried": False,
-        "suggested_values": None,
     }
 
     create_record(client, headers, pet_id, liked=False, tolerated=True)
@@ -285,6 +306,72 @@ def test_suggestions_for_new_and_known_food_are_read_only(
         "tolerated": True,
     }
     assert before == after == 1
+
+
+def test_catalog_food_link_preserves_first_time_rating_rule(client: TestClient, db: Session) -> None:
+    headers = auth_headers(client, "catalog-feeding@example.com")
+    pet_id = create_pet(client, headers)
+    food_id = create_food(client, headers)
+
+    missing_ratings = client.post(
+        feeding_url(pet_id),
+        headers=headers,
+        json={"food_id": food_id, "fed_at": "2026-10-15T12:00:00Z"},
+    )
+    assert missing_ratings.status_code == 422
+
+    first = client.post(
+        feeding_url(pet_id),
+        headers=headers,
+        json={
+            "food_id": food_id,
+            "fed_at": "2026-10-15T12:00:00Z",
+            "liked": False,
+            "tolerated": True,
+        },
+    )
+    assert first.status_code == 201
+    assert first.json()["food_id"] == food_id
+    assert first.json()["food_name"] == "Catalog Chicken"
+
+    repeated = client.post(
+        feeding_url(pet_id),
+        headers=headers,
+        json={"food_id": food_id, "fed_at": "2026-10-16T12:00:00Z"},
+    )
+    assert repeated.status_code == 201
+    assert (repeated.json()["liked"], repeated.json()["tolerated"]) == (False, True)
+    assert db.get(Food, food_id) is not None
+
+
+def test_catalog_food_is_owned_and_delete_unlinks_history(client: TestClient, db: Session) -> None:
+    owner_headers = auth_headers(client, "catalog-owner@example.com")
+    other_headers = auth_headers(client, "catalog-other@example.com")
+    pet_id = create_pet(client, owner_headers)
+    food_id = create_food(client, owner_headers)
+    record = client.post(
+        feeding_url(pet_id),
+        headers=owner_headers,
+        json={
+            "food_id": food_id,
+            "fed_at": "2026-10-15T12:00:00Z",
+            "liked": True,
+            "tolerated": True,
+        },
+    ).json()
+
+    assert client.post(
+        feeding_url(pet_id),
+        headers=other_headers,
+        json={"food_id": food_id, "fed_at": "2026-10-15T12:00:00Z", "liked": True, "tolerated": True},
+    ).status_code == 404
+
+    assert client.delete(f"/api/v1/foods/{food_id}", headers=owner_headers).status_code == 204
+    db.expire_all()
+    stored = db.get(FeedingRecord, record["id"])
+    assert stored is not None
+    assert stored.food_id is None
+    assert stored.food_name == "Catalog Chicken"
 
 
 def test_list_and_get_return_only_requested_pet_in_stable_order(client: TestClient) -> None:
@@ -391,7 +478,8 @@ def test_openapi_documents_feeding_endpoints_and_conditional_ratings(
         schema["paths"][f"{base_path}/{{record_id}}"]
     )
     create_schema = schema["components"]["schemas"]["FeedingRecordCreate"]
-    assert set(create_schema["required"]) == {"food_name", "fed_at"}
+    assert set(create_schema["required"]) == {"fed_at"}
+    assert "food_id" in create_schema["properties"]
     assert "conditionally required" in create_schema["description"]
     public_schema = schema["components"]["schemas"]["FeedingRecordPublic"]
     assert public_schema["properties"]["liked"]["type"] == "boolean"
