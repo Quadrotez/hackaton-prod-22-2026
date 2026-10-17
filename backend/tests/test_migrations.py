@@ -94,6 +94,65 @@ def test_feeding_records_migration_upgrade_and_downgrade(
         get_settings.cache_clear()
 
 
+def test_stock_checks_migration_adds_amount_and_constraints(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    database_path = tmp_path / "stock-checks-migration.sqlite"
+    database_url = f"sqlite+pysqlite:///{database_path}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+
+    config = Config("alembic.ini")
+    engine = create_engine(database_url)
+    try:
+        command.upgrade(config, "20261017_0009")
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO users (email, password_hash, created_at) "
+                    "VALUES ('stock@example.com', 'hash', CURRENT_TIMESTAMP)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO foods (user_id, name, type, protein, fats, carbohydrates, "
+                    "calories, created_at) VALUES (1, 'F', 'dry', 1, 1, 1, 1, CURRENT_TIMESTAMP)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO food_stocks (user_id, food_id, total_grams, remaining_grams, "
+                    "updated_at) VALUES (1, 1, 100, 250, CURRENT_TIMESTAMP)"
+                )
+            )
+
+        command.upgrade(config, "head")
+        inspector = inspect(engine)
+        columns = {c["name"]: c for c in inspector.get_columns("feeding_records")}
+        assert columns["amount_grams"]["nullable"] is True
+        check_names = {
+            c["name"] for c in inspector.get_check_constraints("food_stocks")
+        }
+        assert {
+            "ck_food_stocks_total_grams_positive",
+            "ck_food_stocks_remaining_grams_range",
+        }.issubset(check_names)
+        with engine.connect() as connection:
+            assert connection.execute(
+                text("SELECT remaining_grams FROM food_stocks")
+            ).scalar_one() == 100
+
+        command.downgrade(config, "20261017_0009")
+        inspector = inspect(engine)
+        assert "amount_grams" not in {
+            c["name"] for c in inspector.get_columns("feeding_records")
+        }
+        assert not inspector.get_check_constraints("food_stocks")
+    finally:
+        engine.dispose()
+        get_settings.cache_clear()
+
+
 def test_user_profile_migration_replaces_username_with_optional_name(
     tmp_path: Path, monkeypatch,
 ) -> None:
@@ -258,5 +317,27 @@ def test_measurements_migration_upgrade_and_downgrade(tmp_path: Path, monkeypatc
         downgraded = set(inspect(create_engine(database_url)).get_table_names())
         assert not MEASUREMENT_TABLES & downgraded
         assert "vet_visits" in downgraded
+    finally:
+        get_settings.cache_clear()
+
+
+def test_calendar_feeds_migration_upgrade_and_downgrade(tmp_path: Path, monkeypatch) -> None:
+    database_url = f"sqlite+pysqlite:///{tmp_path / 'calendar-migration.sqlite'}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+
+    config = Config("alembic.ini")
+    try:
+        command.upgrade(config, "head")
+        inspector = inspect(create_engine(database_url))
+        assert "calendar_feeds" in inspector.get_table_names()
+        keys = inspector.get_foreign_keys("calendar_feeds")
+        assert keys[0]["referred_table"] == "users"
+        assert keys[0]["options"].get("ondelete") == "CASCADE"
+
+        command.downgrade(config, "20261017_0012")
+        downgraded = set(inspect(create_engine(database_url)).get_table_names())
+        assert "calendar_feeds" not in downgraded
+        assert "measurements" in downgraded
     finally:
         get_settings.cache_clear()

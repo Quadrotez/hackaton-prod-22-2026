@@ -1,19 +1,12 @@
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select, update
 
-from app.api.dependencies import CurrentUser, DbSession
+from app.api.dependencies import CurrentUser, DbSession, get_owned_food
 from app.models.feeding import FeedingRecord
 from app.models.food import Food, FoodStock
 from app.schemas.foods import FoodCreate, FoodPublic, FoodUpdate
 
 router = APIRouter(prefix="/foods", tags=["foods"])
-
-
-def get_owned_food(food_id: int, current_user: CurrentUser, db: DbSession) -> Food:
-    food = db.scalar(select(Food).where(Food.id == food_id, Food.user_id == current_user.id))
-    if food is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Food not found")
-    return food
 
 
 def public_food(food: Food) -> FoodPublic:
@@ -30,6 +23,7 @@ def public_food(food: Food) -> FoodPublic:
         calories=food.calories,
         total_grams=food.stock.total_grams,
         remaining_grams=food.stock.remaining_grams,
+        out_of_stock=food.stock.remaining_grams <= 0,
         created_at=food.created_at,
     )
 

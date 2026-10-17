@@ -1,3 +1,4 @@
+from app.models.calendar import CalendarFeed
 from app.models.feeding import FeedingRecord
 from app.models.food import Food, FoodStock, FoodType
 from app.models.health import (
@@ -18,6 +19,7 @@ from app.models.user import User
 
 __all__ = [
     "Allergy",
+    "CalendarFeed",
     "FeedingRecord",
     "Food",
     "FoodStock",
