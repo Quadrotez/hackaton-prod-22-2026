@@ -12,6 +12,8 @@ const detailMessages: Record<string, string> = {
   "Invalid email/username or password": "Неверный email или пароль",
   "A user with this email already exists": "Пользователь с таким email уже зарегистрирован",
   "A user with this email or username already exists": "Пользователь с таким email уже зарегистрирован",
+  "Current password is incorrect": "Неверный текущий пароль",
+  "New password must be different from the current password": "Новый пароль должен отличаться от текущего",
   "Could not validate credentials": "Сессия истекла. Войдите снова",
   "Pet not found": "Питомец не найден",
   "Meal not found": "Запись о кормлении не найдена",

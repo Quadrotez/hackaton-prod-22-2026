@@ -319,3 +319,25 @@ def test_measurements_migration_upgrade_and_downgrade(tmp_path: Path, monkeypatc
         assert "vet_visits" in downgraded
     finally:
         get_settings.cache_clear()
+
+
+def test_calendar_feeds_migration_upgrade_and_downgrade(tmp_path: Path, monkeypatch) -> None:
+    database_url = f"sqlite+pysqlite:///{tmp_path / 'calendar-migration.sqlite'}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+
+    config = Config("alembic.ini")
+    try:
+        command.upgrade(config, "head")
+        inspector = inspect(create_engine(database_url))
+        assert "calendar_feeds" in inspector.get_table_names()
+        keys = inspector.get_foreign_keys("calendar_feeds")
+        assert keys[0]["referred_table"] == "users"
+        assert keys[0]["options"].get("ondelete") == "CASCADE"
+
+        command.downgrade(config, "20261017_0012")
+        downgraded = set(inspect(create_engine(database_url)).get_table_names())
+        assert "calendar_feeds" not in downgraded
+        assert "measurements" in downgraded
+    finally:
+        get_settings.cache_clear()
