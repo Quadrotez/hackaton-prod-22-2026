@@ -169,3 +169,7 @@
     text-wrap: pretty;
   }
 }
+
+html, body {
+  touch-action: pan-x pan-y;
+}
