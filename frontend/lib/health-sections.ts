@@ -2,10 +2,10 @@ import { apiFetch } from "@/lib/api";
 import { getPet } from "@/lib/pets";
 
 export const healthSections = {
-  vaccines: { title: "Прививки", resource: "vaccinations", description: "Плановые и сделанные прививки" },
-  visits: { title: "Приёмы", resource: "visits", description: "Записи к врачу и история визитов" },
-  medicines: { title: "Лекарства", resource: "medications", description: "Курсы, дозировки и расписание приёма" },
-  symptoms: { title: "Симптомы", resource: "symptoms", description: "Наблюдения за питомцем и известные аллергии" },
+  vaccines: { title: "Прививки", resource: "vaccinations" },
+  visits: { title: "Приёмы", resource: "visits" },
+  medicines: { title: "Лекарства", resource: "medications" },
+  symptoms: { title: "Симптомы", resource: "symptoms" },
 } as const;
 export type HealthSection = keyof typeof healthSections;
 export type Vaccine = { id: number; name: string; scheduled_on: string; status: "planned" | "done"; clinic: string | null; notes: string | null };

@@ -33,7 +33,7 @@ type CredentialsValues = z.infer<typeof credentialsSchema>;
 type FormErrors = Partial<Record<keyof CredentialsValues, string>>;
 type Mode = "login" | "register";
 
-const switchModeClass = "h-auto p-0 text-sm text-foreground underline underline-offset-4";
+const switchModeClass = "h-auto p-0 text-sm text-foreground underline underline-offset-4 cursor-pointer";
 
 export function LoginForm() {
   const router = useRouter();
