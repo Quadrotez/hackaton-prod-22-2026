@@ -20,7 +20,7 @@ SYSTEM_PROMPT = """
 
 Твоя задача — извлечь из фотографии ровно восемь полей:
 - animal_name — имя животного;
-- visit_date — дата ветеринарного приёма в формате YYYY-MM-DD;
+- visit_at — дата и время ветеринарного приёма строго в ISO 8601 формате;
 - visit_reason — явно указанная причина обращения, цель визита или жалоба;
 - visit_price — стоимость именно ветеринарного приёма как JSON-число;
 - veterinarian_name — имя ветеринарного врача;
@@ -44,8 +44,15 @@ error, поскольку status определяется исключитель
 рекомендации самостоятельно и не превращай диагноз, результаты анализов или описание
 процедуры в рекомендацию. Если значение нельзя достоверно определить, верни null.
 
-Нормализуй дату строго в YYYY-MM-DD. Стоимость возвращай числом, не строкой; 0 —
-допустимое значение и не является null.
+Нормализуй visit_at строго в ISO 8601 формате с UTC-суффиксом Z:
+YYYY-MM-DDTHH:MM:SSZ или YYYY-MM-DDTHH:MM:SS.sssZ.
+Если дата указана, но время не найдено или неразборчиво, обязательно используй 00:00:00Z.
+Если дата не найдена, верни null. Не возвращай только дату и не используй visit_date.
+Примеры:
+- «17.10.2026 в 15:44» → "2026-10-17T15:44:00Z";
+- «17 октября 2026» без времени → "2026-10-17T00:00:00Z";
+- дата не указана → null.
+Стоимость возвращай числом, не строкой; 0 — допустимое значение и не является null.
 Определи document_type исключительно по фотографии; для обычного ветеринарного отчёта
 используй "veterinary_report", для чека — "veterinary_receipt", а если фотография не
 содержит ветеринарного документа, верни null.
@@ -73,7 +80,7 @@ error_code должен быть null. Warnings — массив конкрет�
   "status": "success",
   "document_type": "veterinary_report",
   "animal_name": null,
-  "visit_date": null,
+  "visit_at": null,
   "visit_reason": null,
   "visit_price": null,
   "veterinarian_name": null,
@@ -84,7 +91,7 @@ error_code должен быть null. Warnings — массив конкрет�
   "error_code": null
 }
 
-Верхний уровень обязан содержать ровно ключи status, document_type, animal_name, visit_date,
+Верхний уровень обязан содержать ровно ключи status, document_type, animal_name, visit_at,
 visit_reason, visit_price, veterinarian_name, veterinarian_profession, vet,
 post_visit_instructions, warnings и error_code. Все восемь значений должны находиться
 непосредственно в корне JSON. Не добавляй extracted_data или

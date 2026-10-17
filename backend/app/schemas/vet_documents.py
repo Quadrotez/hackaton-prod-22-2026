@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, field_validator
@@ -10,7 +10,14 @@ class VeterinaryDocumentFields(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     animal_name: str | None
-    visit_date: str | None
+    visit_at: str | None = Field(
+        default=None,
+        description=(
+            "Veterinary visit date and time in ISO 8601 format. "
+            "Time defaults to midnight when unknown."
+        ),
+        examples=["2026-10-17T15:44:49.875Z"],
+    )
     visit_reason: str | None
     visit_price: StrictInt | StrictFloat | None = Field(ge=0)
     veterinarian_name: str | None
@@ -35,17 +42,17 @@ class VeterinaryDocumentFields(BaseModel):
             raise ValueError("must not be blank")
         return value
 
-    @field_validator("visit_date")
+    @field_validator("visit_at")
     @classmethod
-    def validate_iso_date(cls, value: str | None) -> str | None:
+    def validate_iso_datetime(cls, value: str | None) -> str | None:
         if value is None:
             return None
         try:
-            parsed = date.fromisoformat(value)
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError as exc:
-            raise ValueError("visit_date must use YYYY-MM-DD format") from exc
-        if parsed.isoformat() != value:
-            raise ValueError("visit_date must use YYYY-MM-DD format")
+            raise ValueError("visit_at must use ISO 8601 date-time format") from exc
+        if parsed.tzinfo is None or not value.endswith("Z"):
+            raise ValueError("visit_at must use ISO 8601 format with UTC suffix Z")
         return value
 
 
