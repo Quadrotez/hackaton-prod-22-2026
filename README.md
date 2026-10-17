@@ -401,10 +401,11 @@ Pipeline описан в [`.gitlab-ci.yml`](.gitlab-ci.yml:1) и включае�
 1. запуск backend-тестов (junit + cobertura-покрытие);
 2. запуск frontend юнит- и интеграционных тестов;
 3. линтеры backend (`ruff`) и frontend (`eslint`);
-4. экспорт OpenAPI-схемы и статического Swagger UI (артефакт пайплайна);
-5. сборку и публикацию backend/frontend-образов в registry;
-6. deployment на production из ветки `master`;
-7. применение Alembic-миграций перед запуском API;
+4. прогон Alembic-миграций против настоящего PostgreSQL (upgrade → downgrade → upgrade);
+5. экспорт OpenAPI-схемы и статического Swagger UI (артефакт пайплайна);
+6. сборку и публикацию backend/frontend-образов в registry;
+7. deployment на production из ветки `master`; миграции применяются в одноразовом
+   контейнере до перезапуска `api`/`site`, поэтому падение миграции не уводит прод вниз;
 8. создание демо-аккаунта.
 
 Тесты и линтеры идут в стадии `test` до `build`/`deploy`: красный результат

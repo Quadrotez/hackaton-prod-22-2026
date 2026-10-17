@@ -92,6 +92,34 @@ lint:frontend:
   script:
     - npm run lint
 
+# Миграции против настоящего PostgreSQL: SQLite-тесты ловят логику, но не
+# диалект-специфичные ошибки (например, batch recreate при самоссылающемся FK),
+# которые валят migrate уже на прод-деплое. Прогоняем всю цепочку вверх, вниз и
+# снова вверх, чтобы блокировать build/deploy на таких регрессиях.
+test:migrations:postgres:
+  stage: test
+  image: python:3.12
+  services:
+    - name: postgres:16-alpine
+      alias: postgres
+  variables:
+    POSTGRES_USER: petcare
+    POSTGRES_PASSWORD: petcare
+    POSTGRES_DB: petcare_test
+    DATABASE_URL: postgresql+psycopg://petcare:petcare@postgres:5432/petcare_test
+    JWT_SECRET_KEY: ci-postgres-migrations
+    UV_PROJECT_ENVIRONMENT: /tmp/venv
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq postgresql-client
+    - pip install --quiet uv
+    - cd backend
+  script:
+    - until pg_isready -h postgres -U petcare -d petcare_test; do sleep 1; done
+    - uv sync --frozen
+    - uv run alembic upgrade head
+    - uv run alembic downgrade base
+    - uv run alembic upgrade head
+
 build:backend:
   stage: build
   extends:
@@ -175,7 +203,10 @@ deploy:
       KEY_B64=$(base64 -w0 "$SPIRIT_DOCKER_SA_KEY")
       ssh $SSH_ADDRESS "bash /opt/petcare/registry-login.sh '$KEY_B64' ${DP_CLI_VERSION}"
     - scp docker-compose.yml "${SSH_ADDRESS}:/opt/petcare/docker-compose.yml"
-    - ssh $SSH_ADDRESS "cd /opt/petcare && TAG=${TAG} docker compose pull && TAG=${TAG} docker compose up -d --remove-orphans"
+    # Pre-flight: миграция в одноразовом контейнере ДО того, как трогать api/site.
+    # Если она падает — прод продолжает крутить предыдущий образ (без окна 502).
+    - ssh $SSH_ADDRESS "cd /opt/petcare && TAG=${TAG} docker compose pull && TAG=${TAG} docker compose run --rm migrate"
+    - ssh $SSH_ADDRESS "cd /opt/petcare && TAG=${TAG} docker compose up -d --remove-orphans"
 
 # Creates/refreshes the demo account (demo@quadrotez.com) inside the running API
 # container so the "Войти в демо" button keeps working. Idempotent.
