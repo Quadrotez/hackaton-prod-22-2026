@@ -16,9 +16,8 @@ import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { PageError, PageLoading } from "@/components/page-state";
-import { PetInfoCard } from "@/components/pet-info-card";
 import { PetWeightChart } from "@/components/pet-weight-chart";
-import { MeasurementsPage } from "@/components/measurements-page";
+import { PetCard } from "../pet-card";
 
 function StatTile({
   label,
@@ -96,7 +95,7 @@ function HealthContent({ pet, nextVisit, onPetChange }: { pet: Pet; nextVisit?: 
     <>
       <PageHeader title="Здоровье" backHref={`/pet/${pet.id}`} />
 
-      <PetInfoCard pet={pet} onPetChange={onPetChange} />
+      <PetCard pet={pet} />
 
       <div className="grid grid-cols-2 gap-3">
         <StatTile

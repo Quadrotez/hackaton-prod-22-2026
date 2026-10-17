@@ -33,7 +33,22 @@ const detailMessages: Record<string, string> = {
   "Not Found": "Эта функция пока недоступна",
   "Method Not Allowed": "Эта функция пока недоступна",
   "User not found": "Пользователь с таким email не найден",
+  "Transfer not found": "Передача не найдена",
+  "This pet already has an unfinished transfer": "У питомца уже есть незавершённая передача",
+  "You cannot transfer a pet to yourself": "Нельзя передать питомца самому себе",
 };
+
+// Детали, которые бэкенд собирает динамически (роль, статус), — локализуем по префиксу.
+const detailPrefixes: [RegExp, string][] = [
+  [/^Only the owner can /, "Это действие доступно только владельцу"],
+  [/^Only the recipient can /, "Это действие доступно только получателю"],
+  [/^Cannot .+ a transfer in status /, "Статус передачи уже изменился. Обновите страницу"],
+];
+
+function localizeDetail(detail: string): string | undefined {
+  if (detail in detailMessages) return detailMessages[detail];
+  return detailPrefixes.find(([pattern]) => pattern.test(detail))?.[1];
+}
 
 function statusMessage(status: number): string {
   if (status === NETWORK_ERROR_STATUS) return "Нет связи с сервером. Проверьте подключение и попробуйте ещё раз";
@@ -53,7 +68,7 @@ export class ApiError extends Error {
   detail: string;
 
   constructor(status: number, detail: string) {
-    super(detailMessages[detail] ?? statusMessage(status));
+    super(localizeDetail(detail) ?? statusMessage(status));
     this.name = "ApiError";
     this.status = status;
     this.detail = detail;
