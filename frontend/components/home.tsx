@@ -102,7 +102,7 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
   const dayEvents = events.filter((e) => e.date === selectedKey);
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-8">
+    <div className="mx-auto flex w-full max-w-[30rem] flex-col gap-8">
       <section aria-labelledby="pets-title" className="flex flex-col gap-3">
         <SectionTitle id="pets-title">Питомцы</SectionTitle>
         <ul
