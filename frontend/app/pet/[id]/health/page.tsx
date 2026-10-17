@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function PetHealthPage({ params }: PageProps<"/pet/[id]/health">) {
   return (
-    <PageShell contentClassName="max-w-2xl">
+    <PageShell>
       <Suspense fallback={<PageLoading />}>
         {params.then(({ id }) => {
           const petId = Number(id);
