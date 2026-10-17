@@ -82,7 +82,10 @@ docs:openapi:
     paths:
       - openapi/
   rules:
-    - if: $CI_COMMIT_BRANCH
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH'
+      when: always
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: always
 
 .ssh_setup:
   before_script:
@@ -150,4 +153,3 @@ prepare:docker:
     - |
       KEY_B64=$(base64 -w0 "$SPIRIT_DOCKER_SA_KEY")
       ssh $SSH_ADDRESS "bash /opt/petcare/registry-login.sh '$KEY_B64' ${DP_CLI_VERSION}"
-
