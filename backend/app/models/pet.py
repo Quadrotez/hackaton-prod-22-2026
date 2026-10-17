@@ -43,3 +43,6 @@ class Pet(Base):
     feeding_records = relationship(
         "FeedingRecord", back_populates="pet", cascade="all, delete-orphan"
     )
+    weight_history = relationship(
+        "PetWeight", back_populates="pet", cascade="all, delete-orphan"
+    )
