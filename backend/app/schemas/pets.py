@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -170,5 +170,14 @@ class PetPublic(BaseModel):
         description="Pet weight in grams. May be null only for records created before weight was added.",
     )
     photo_url: str | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PetWeightPublic(BaseModel):
+    id: int
+    pet_id: int
+    weight_g: int = Field(gt=0, description="Pet weight in grams.")
+    measured_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

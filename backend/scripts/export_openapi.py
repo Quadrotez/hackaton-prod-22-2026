@@ -7,9 +7,10 @@ CI can attach browsable docs to every branch as pipeline artifacts (see the
 Usage:
     python scripts/export_openapi.py [output_dir]
 
-The output directory contains ``openapi.json`` plus an ``index.html`` Swagger UI
-that loads the schema relatively, so the folder can be served from any static
-host.
+The output directory is self-contained: ``openapi.json``, the Swagger UI
+``index.html`` (the schema is inlined, so no ``fetch`` is needed) and the
+Swagger UI JS/CSS assets vendored next to it. It can therefore be opened
+directly from disk (``file://``) or served from any static host, online or not.
 """
 
 from __future__ import annotations
@@ -18,13 +19,14 @@ import json
 import os
 import sys
 from pathlib import Path
+from urllib.request import urlopen
 
 # Allow running this file directly (``python scripts/export_openapi.py``).
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.main import SWAGGER_REQUEST_INTERCEPTOR, app  # noqa: E402
 
-# Swagger UI assets are pulled from a CDN, matching the runtime ``/docs`` page.
+# Swagger UI assets are vendored locally; these CDN URLs are only a fallback.
 SWAGGER_UI_BUNDLE = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"
 SWAGGER_UI_CSS = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css"
 
@@ -48,11 +50,11 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   <body>
     __BANNER__
     <div id="swagger-ui"></div>
-    <script src="__BUNDLE__" crossorigin></script>
+    <script src="__BUNDLE__"></script>
     <script>
       window.onload = () => {
         window.ui = SwaggerUIBundle({
-          url: "openapi.json",
+          spec: __SPEC__,
           dom_id: "#swagger-ui",
           deepLinking: true,
           requestInterceptor: __INTERCEPTOR__,
@@ -75,23 +77,48 @@ def build(output_dir: Path) -> None:
         json.dumps(schema, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    (output_dir / "index.html").write_text(_render_index(), encoding="utf-8")
+
+    bundle, css = _vendor_swagger_assets(output_dir)
+    (output_dir / "index.html").write_text(
+        _render_index(bundle=bundle, css=css, spec_literal=_spec_literal(schema)),
+        encoding="utf-8",
+    )
 
     paths = len(schema.get("paths", {}))
     print(f"Wrote {paths} paths to {output_dir}/openapi.json and {output_dir}/index.html")
 
 
-def _render_index() -> str:
+def _spec_literal(schema: dict) -> str:
+    # Pure ASCII JSON, safe to inline as a JS object literal inside <script>.
+    return json.dumps(schema, ensure_ascii=True).replace("<", "\\u003c")
+
+
+def _vendor_swagger_assets(output_dir: Path) -> tuple[str, str]:
+    """Download the Swagger UI JS/CSS next to the HTML so the page works offline
+    and when opened directly from disk. Falls back to the CDN on failure."""
+    refs: dict[str, str] = {}
+    for url, name in ((SWAGGER_UI_BUNDLE, "swagger-ui-bundle.js"), (SWAGGER_UI_CSS, "swagger-ui.css")):
+        try:
+            (output_dir / name).write_bytes(urlopen(url, timeout=30).read())
+            refs[url] = name
+        except Exception as exc:  # noqa: BLE001
+            print(f"Warning: could not vendor {name} ({exc}); falling back to CDN")
+            refs[url] = url
+    return refs[SWAGGER_UI_BUNDLE], refs[SWAGGER_UI_CSS]
+
+
+def _render_index(*, bundle: str, css: str, spec_literal: str) -> str:
     banner = ""
     if label := _env("OPENAPI_DOCS_LABEL"):
         banner = f'<div class="build-banner">PetCare API docs &mdash; <code>{_escape(label)}</code></div>'
 
     return (
         INDEX_TEMPLATE.replace("__TITLE__", _escape(app.title))
-        .replace("__CSS__", SWAGGER_UI_CSS)
-        .replace("__BUNDLE__", SWAGGER_UI_BUNDLE)
+        .replace("__CSS__", css)
+        .replace("__BUNDLE__", bundle)
         .replace("__BANNER__", banner)
         .replace("__INTERCEPTOR__", SWAGGER_REQUEST_INTERCEPTOR)
+        .replace("__SPEC__", spec_literal)
     )
 
 

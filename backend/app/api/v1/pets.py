@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
@@ -8,7 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import AppSettings, CurrentUser, DbSession
 from app.models.pet import Pet
-from app.schemas.pets import PetCreate, PetPublic, PetUpdate
+from app.models.pet_weight import PetWeight
+from app.schemas.pets import PetCreate, PetPublic, PetUpdate, PetWeightPublic
 from app.services.storage import FileTooLargeError, InvalidImageError, LocalMediaStorage
 
 router = APIRouter(prefix="/pets", tags=["pets"])
@@ -29,6 +31,14 @@ def storage_for(settings: AppSettings) -> LocalMediaStorage:
 def create_pet(payload: PetCreate, current_user: CurrentUser, db: DbSession) -> Pet:
     pet = Pet(user_id=current_user.id, **payload.model_dump())
     db.add(pet)
+    db.flush()
+    db.add(
+        PetWeight(
+            pet_id=pet.id,
+            weight_g=pet.weight_g,
+            measured_at=datetime.now(timezone.utc),
+        )
+    )
     db.commit()
     db.refresh(pet)
     return pet
@@ -66,11 +76,34 @@ def update_pet(
             detail="birth_date and approximate_age_years cannot both be provided",
         )
 
+    previous_weight = pet.weight_g
     for field, value in changes.items():
         setattr(pet, field, value)
+    if "weight_g" in changes and changes["weight_g"] != previous_weight:
+        db.add(
+            PetWeight(
+                pet=pet,
+                weight_g=changes["weight_g"],
+                measured_at=datetime.now(timezone.utc),
+            )
+        )
     db.commit()
     db.refresh(pet)
     return pet
+
+
+@router.get("/{pet_id}/weight", response_model=list[PetWeightPublic])
+def get_pet_weight_history(
+    pet_id: int, current_user: CurrentUser, db: DbSession
+) -> list[PetWeight]:
+    get_owned_pet(pet_id, current_user, db)
+    return list(
+        db.scalars(
+            select(PetWeight)
+            .where(PetWeight.pet_id == pet_id)
+            .order_by(PetWeight.measured_at, PetWeight.id)
+        ).all()
+    )
 
 
 @router.delete("/{pet_id}", status_code=status.HTTP_204_NO_CONTENT)

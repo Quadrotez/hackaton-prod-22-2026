@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, field
 
 
 class VeterinaryDocumentFields(BaseModel):
-    """The six flat data fields in a veterinary-document analysis."""
+    """The eight flat data fields in a veterinary-document analysis."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -14,9 +14,18 @@ class VeterinaryDocumentFields(BaseModel):
     visit_reason: str | None
     visit_price: StrictInt | StrictFloat | None = Field(ge=0)
     veterinarian_name: str | None
-    dentistry: str | None
+    veterinarian_profession: str | None
+    vet: str | None
+    post_visit_instructions: str | None
 
-    @field_validator("animal_name", "visit_reason", "veterinarian_name", "dentistry")
+    @field_validator(
+        "animal_name",
+        "visit_reason",
+        "veterinarian_name",
+        "veterinarian_profession",
+        "vet",
+        "post_visit_instructions",
+    )
     @classmethod
     def validate_optional_text(cls, value: str | None) -> str | None:
         if value is None:
