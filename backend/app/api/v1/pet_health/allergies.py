@@ -7,7 +7,7 @@ from app.schemas.health import AllergyCreate, AllergyPublic, AllergyUpdate
 from app.services.health.common import get_pet_child, patch_changes, save
 
 
-router = APIRouter(prefix="/pets/{pet_id}/allergies", tags=["health: allergies"])
+router = APIRouter(prefix="/pets/{pet_id}/allergies", tags=["pet health: allergies"])
 NOT_FOUND = "Allergy not found"
 
 
