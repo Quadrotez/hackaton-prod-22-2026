@@ -89,7 +89,7 @@ error_code должен быть null. Warnings — массив конкрет�
 
 Верхний уровень обязан содержать ровно ключи status, document_type, visit_at, visit_reason,
 visit_price, veterinarian_name, veterinarian_profession, vet,
-post_visit_instructions, warnings и error_code. Все поля — включая семь извлекаемых полей и 
+post_visit_instructions, warnings и error_code. Все поля — включая семь извлекаемых полей и
 четыре служебных поля — должны находиться непосредственно в корне JSON. Не добавляй extracted_data или
 user_provided_data. Отсутствующие значения должны быть JSON null.
 
