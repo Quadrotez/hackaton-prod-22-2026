@@ -18,9 +18,14 @@ export function PageHeader({
         <Link
           href={backHref}
           aria-label="Назад"
-          className={cn(buttonVariants({ variant: "outline" }), "size-10 shrink-0 rounded-xl bg-card p-0 [&_svg:not([class*='size-'])]:size-5")}
+          // Фон страницы (secondary) по светлоте близок к затемнённой при наведении кнопке,
+          // поэтому при наведении кнопка не темнеет, а светлеет и приподнимается тенью
+          className={cn(
+            buttonVariants({ variant: "secondary", size: "icon-lg" }),
+            "theme-shadcn shrink-0 hover:bg-background hover:shadow-sm",
+          )}
         >
-          <ChevronLeftIcon aria-hidden="true" className="size-5" />
+          <ChevronLeftIcon aria-hidden="true" />
         </Link>
       )}
       <div className="flex min-w-0 flex-col gap-1">

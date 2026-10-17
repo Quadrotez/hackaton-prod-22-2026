@@ -32,7 +32,6 @@ type CredentialsValues = z.infer<typeof credentialsSchema>;
 type FormErrors = Partial<Record<keyof CredentialsValues, string>>;
 type Mode = "login" | "register";
 
-// Ссылка-кнопка внутри строки текста: без высоты и отступов кнопки, цвет текста, а не primary
 const switchModeClass = "h-auto p-0 text-sm text-foreground underline underline-offset-4";
 
 export function LoginForm() {

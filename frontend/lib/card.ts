@@ -1,19 +1,6 @@
-export type FoodType = "dry" | "wet" | "treat";
+import type { Food, FoodType } from "@/lib/foods";
 
 export type FoodFilter = "all" | FoodType;
-
-export type Food = {
-  id: string;
-  name: string;
-  description: string;
-  type: FoodType;
-  protein: number;
-  fats: number;
-  carbohydrates: number;
-  calories: number;
-  remainingGrams: number;
-  totalGrams: number;
-};
 
 export type FoodCardProps = {
   food: Food;

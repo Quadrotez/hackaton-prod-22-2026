@@ -5,25 +5,21 @@ const API_BASE_URL =
 
 export const NETWORK_ERROR_STATUS = 0;
 
-// Тексты ошибок бэкенда → сообщения для пользователя
 const detailMessages: Record<string, string> = {
   "Invalid email or password": "Неверный email или пароль",
   "A user with this email already exists": "Пользователь с таким email уже зарегистрирован",
   "Could not validate credentials": "Сессия истекла. Войдите снова",
   "Pet not found": "Питомец не найден",
-  "Feeding record not found": "Запись о кормлении не найдена",
+  "Meal not found": "Запись о кормлении не найдена",
+  "Food not found": "Корм не найден",
   "Photo not found": "Фото не найдено",
   "At least one field is required": "Измените хотя бы одно поле",
   "birth_date and approximate_age_years cannot both be provided":
     "Укажите либо дату рождения, либо примерный возраст",
-  "liked and tolerated are required when this pet has not previously tried this food":
-    "Для нового корма отметьте, понравился ли он и как питомец его перенёс",
-  "food_name must not be blank": "Введите название корма",
   "Image exceeds the maximum allowed size": "Файл слишком большой",
   "Unsupported or invalid image; use PNG, JPEG, GIF, or WebP":
     "Неподдерживаемый формат. Загрузите PNG, JPEG, GIF или WebP",
   "Could not save pet photo": "Не удалось сохранить фото",
-  // Стандартные ответы FastAPI на несуществующий маршрут или метод — функция ещё не готова на бэкенде
   "Not Found": "Эта функция пока недоступна",
   "Method Not Allowed": "Эта функция пока недоступна",
 };
@@ -41,7 +37,6 @@ function statusMessage(status: number): string {
   return "Что-то пошло не так. Попробуйте ещё раз";
 }
 
-// message — всегда на русском и готово к показу; detail — исходный ответ бэкенда
 export class ApiError extends Error {
   status: number;
   detail: string;
@@ -60,14 +55,12 @@ export function getErrorMessage(error: unknown, fallback: string): string {
 
 type FetchOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
-  // Подставить токен из сессии; без токена запрос не отправляется
   auth?: boolean;
 };
 
 async function parseError(response: Response): Promise<ApiError> {
   try {
     const data = (await response.json()) as { detail?: unknown };
-    // Массив detail — ошибки валидации pydantic, для них хватает общего сообщения по статусу
     const detail = typeof data.detail === "string" ? data.detail : response.statusText;
     return new ApiError(response.status, detail);
   } catch {
@@ -130,7 +123,6 @@ export async function apiFetch<T>(path: string, options: FetchOptions = {}): Pro
   return (await response.json()) as T;
 }
 
-// Для файлов, которые отдаются только с авторизацией (фото питомцев)
 export async function apiFetchBlob(path: string, options: FetchOptions = {}): Promise<Blob> {
   const response = await request(path, options);
   return response.blob();

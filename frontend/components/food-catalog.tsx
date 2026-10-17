@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import FoodCard from "@/components/ui/food-card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { FoodCatalogProps, FoodFilter } from "@/lib/card";
 
 const filters: { value: FoodFilter; label: string }[] = [
@@ -22,43 +23,32 @@ export function FoodCatalog({ foods, actions, onEdit }: FoodCatalogProps & {
     : foods.filter((food) => food.type === filter);
 
   return (
-    <>
+    <Tabs
+      value={filter}
+      onValueChange={(value) => setFilter(value as FoodFilter)}
+      className="contents"
+    >
       <header className="flex flex-col gap-5">
         <div>
           <h1 className="font-sans text-[clamp(1.75rem,1.45rem+1.25vw,2.5rem)] font-bold leading-[1.1] tracking-[-0.025em]">
             Корма
           </h1>
-          <p className="mt-1 text-[clamp(0.9375rem,0.9rem+0.15vw,1rem)] leading-[1.55] text-muted-foreground">
-            Состав питания и остатки на складе
-          </p>
         </div>
         {actions}
-        <div
-          role="group"
-          aria-label="Фильтр по типу"
-          className="flex flex-wrap gap-2"
-        >
+        <TabsList aria-label="Фильтр по типу" className="theme-shadcn">
           {filters.map(({ value, label }) => (
-            <Button
-              key={value}
-              type="button"
-              variant="outline"
-              aria-pressed={filter === value}
-              aria-controls="food-list"
-              onClick={() => setFilter(value)}
-              className="h-8 rounded-full bg-card px-3 text-xs aria-pressed:border-transparent aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/80"
-            >
+            <TabsTrigger key={value} value={value}>
               {label}
-            </Button>
+            </TabsTrigger>
           ))}
-        </div>
+        </TabsList>
       </header>
 
       <p role="status" className="sr-only">
         Найдено кормов: {filteredFoods.length}
       </p>
-      <section
-        id="food-list"
+      <TabsContent
+        value={filter}
         aria-label="Список кормов"
         className="flex flex-col gap-3"
       >
@@ -66,7 +56,7 @@ export function FoodCatalog({ foods, actions, onEdit }: FoodCatalogProps & {
           <div key={food.id} className="flex flex-col gap-2">
             <FoodCard food={food} />
             {onEdit && (
-              <Button type="button" variant="outline" className="self-end" aria-label={`Изменить корм: ${food.name}`} onClick={() => onEdit(food)}>
+              <Button type="button" variant="secondary" className="theme-shadcn self-end" aria-label={`Изменить корм: ${food.name}`} onClick={() => onEdit(food)}>
                 Изменить
               </Button>
             )}
@@ -77,7 +67,7 @@ export function FoodCatalog({ foods, actions, onEdit }: FoodCatalogProps & {
             Кормов этого типа пока нет
           </p>
         )}
-      </section>
-    </>
+      </TabsContent>
+    </Tabs>
   );
 }
