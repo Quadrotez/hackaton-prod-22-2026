@@ -33,10 +33,9 @@ export function register(credentials: Credentials) {
 }
 
 export async function login(credentials: Credentials): Promise<void> {
-  // Бэк принимает email или username в поле identifier
   const { access_token } = await apiFetch<TokenResponse>("/api/v1/auth/login", {
     method: "POST",
-    body: { identifier: credentials.email, password: credentials.password },
+    body: credentials,
   });
   setAccessToken(access_token);
 }
