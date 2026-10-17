@@ -12,7 +12,10 @@ const filters: { value: FoodFilter; label: string }[] = [
   { value: "treat", label: "Лакомства" },
 ];
 
-export function FoodCatalog({ foods }: FoodCatalogProps) {
+export function FoodCatalog({ foods, actions, onEdit }: FoodCatalogProps & {
+  actions?: React.ReactNode;
+  onEdit?: (food: FoodCatalogProps["foods"][number]) => void;
+}) {
   const [filter, setFilter] = useState<FoodFilter>("all");
   const filteredFoods = filter === "all"
     ? foods
@@ -29,6 +32,7 @@ export function FoodCatalog({ foods }: FoodCatalogProps) {
             Состав питания и остатки на складе
           </p>
         </div>
+        {actions}
         <div
           role="group"
           aria-label="Фильтр по типу"
@@ -58,7 +62,16 @@ export function FoodCatalog({ foods }: FoodCatalogProps) {
         aria-label="Список кормов"
         className="flex flex-col gap-3"
       >
-        {filteredFoods.map((food) => <FoodCard key={food.id} food={food} />)}
+        {filteredFoods.map((food) => (
+          <div key={food.id} className="flex flex-col gap-2">
+            <FoodCard food={food} />
+            {onEdit && (
+              <Button type="button" variant="outline" className="self-end" aria-label={`Изменить корм: ${food.name}`} onClick={() => onEdit(food)}>
+                Изменить
+              </Button>
+            )}
+          </div>
+        ))}
         {filteredFoods.length === 0 && (
           <p className="rounded-2xl border bg-card p-5 text-center text-sm text-muted-foreground">
             Кормов этого типа пока нет
