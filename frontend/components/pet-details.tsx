@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import Link from "next/link";
-import { ArrowRightIcon, HeartPulseIcon, UtensilsIcon, type LucideIcon } from "lucide-react";
+import { ArrowRightIcon, HeartPulseIcon, RulerIcon, UtensilsIcon, type LucideIcon } from "lucide-react";
 import { useProtectedData } from "@/hooks/use-auth";
 import { useNow } from "@/hooks/use-now";
 import { listFoods } from "@/lib/foods";
@@ -121,7 +121,7 @@ export function PetDetails({ petId }: { petId: number }) {
 
       <PetMeals petId={pet.id} meals={meals} foods={foods} now={now} onMealsChange={handleMealsChange} />
 
-      <section aria-label="Быстрые переходы" className="grid grid-cols-2 gap-3">
+      <section aria-label="Быстрые переходы" className="grid md:grid-cols-2 gap-3">
         <QuickLinkTile
           href={`/pet/${petId}/health`}
           title="Здоровье"
@@ -129,10 +129,10 @@ export function PetDetails({ petId }: { petId: number }) {
           icon={ArrowRightIcon}
         />
         <QuickLinkTile
-          title="Питание"
-          description="Последняя кормёжка и корма"
-          icon={UtensilsIcon}
-          accent
+          href={`/pet/${petId}/measurements`}
+          title="Измерения"
+          description="Отслеживайте параметры вашего питомца"
+          icon={ArrowRightIcon}
         />
       </section>
     </>
