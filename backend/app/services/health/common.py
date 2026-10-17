@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.base import Base
 
-
 DEFAULT_TIMEZONE = "Europe/Moscow"
 
 ModelT = TypeVar("ModelT", bound=Base)

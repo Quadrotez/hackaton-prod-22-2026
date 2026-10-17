@@ -3,7 +3,6 @@ from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
 
-
 PASSWORD = "correct-horse-battery-staple"
 TIMEZONE = ZoneInfo("Europe/Moscow")
 

@@ -11,7 +11,6 @@ from app.core.config import get_settings
 from app.core.security import ALGORITHM
 from app.models.user import User
 
-
 EMAIL = "owner@example.com"
 PASSWORD = "correct-horse-battery-staple"
 
@@ -205,7 +204,7 @@ def test_me_rejects_missing_invalid_and_expired_tokens(client: TestClient) -> No
 
         non_ascii = client.get(
             endpoint,
-            headers={b"authorization": "Bearer нещщн".encode("utf-8")},
+            headers={b"authorization": "Bearer нещщн".encode()},
         )
         assert non_ascii.status_code == 401
         assert non_ascii.json() == {"detail": "Could not validate credentials"}

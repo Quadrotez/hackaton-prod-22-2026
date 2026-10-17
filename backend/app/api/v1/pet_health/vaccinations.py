@@ -6,7 +6,6 @@ from app.models.health import Vaccination, VaccinationStatus
 from app.schemas.health import VaccinationCreate, VaccinationPublic, VaccinationUpdate
 from app.services.health.common import get_pet_child, patch_changes, save
 
-
 router = APIRouter(prefix="/pets/{pet_id}/vaccinations", tags=["pet health: vaccinations"])
 NOT_FOUND = "Vaccination not found"
 

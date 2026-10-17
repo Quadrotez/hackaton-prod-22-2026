@@ -16,7 +16,6 @@ from app.schemas.health import (
 from app.services.health.common import label_key
 from app.services.health.measurement_templates import SORT_STEP, TEMPLATES, template_for_species
 
-
 RECENT_POINTS = 8
 
 

@@ -11,7 +11,6 @@ from app.integrations.llm.client import FOLDER_ID, build_client
 from app.integrations.llm.response import checked_message
 from app.schemas.vet_documents import VeterinaryDocumentAnalysis
 
-
 MODEL_NAME = os.getenv("YANDEX_MODEL", "deepseek-v4.1-flash")
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 

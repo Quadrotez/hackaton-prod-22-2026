@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 
 from app.models.feeding import FeedingRecord
 
-
 _WHITESPACE_RE = re.compile(r"\s+")
 
 

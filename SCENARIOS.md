@@ -64,6 +64,11 @@ HTTP-запросы через весь стек (роутер → сервис�
 - `test:backend` — pytest + junit-отчёт + cobertura-покрытие (процент виден в MR и пайплайне)
 - `test:frontend` — юнит-тесты (node:20)
 - `test:frontend:integration` — интеграционные (node:20 + uv-окружение бекенда)
+- `lint:backend` — ruff (E/W/F/I/B/UP) по бекенду
+- `lint:frontend` — eslint по фронтенду
+
+Все джобы идут в стадии `test` до `build`/`deploy`: красный тест или линтер
+блокирует сборку и выкатку.
 
 ## Что нашли интеграционные тесты (и починили)
 

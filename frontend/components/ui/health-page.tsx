@@ -85,10 +85,10 @@ export function HealthPage({ petId }: { petId: number }) {
   if (state.status === "error") {
     return <PageError message={state.error} onRetry={state.retry} backToList />;
   }
-  return <HealthContent pet={state.data.pet} nextVisit={state.data.overview.planned_visits[0]} onPetChange={(pet) => state.update({ ...state.data, pet })} />;
+  return <HealthContent pet={state.data.pet} nextVisit={state.data.overview.planned_visits[0]} />;
 }
 
-function HealthContent({ pet, nextVisit, onPetChange }: { pet: Pet; nextVisit?: Visit; onPetChange: (pet: Pet) => void }) {
+function HealthContent({ pet, nextVisit }: { pet: Pet; nextVisit?: Visit }) {
   const base = `/pet/${pet.id}/health`;
 
   return (

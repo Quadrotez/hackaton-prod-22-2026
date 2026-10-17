@@ -14,6 +14,8 @@ import { pluralize, type Pet } from "@/lib/pets";
 import { listIncomingTransfers, listOutgoingTransfers } from "@/lib/transfers";
 import { Card } from "@/components/ui/card";
 
+const EMPTY_EVENTS: CalendarEvent[] = [];
+
 const longDate = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", weekday: "long" });
 const shortDate = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" });
 const fromKey = (key: string) => new Date(`${key}T00:00:00`);
@@ -82,17 +84,11 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
   const calendar = useProtectedData(load, "Не удалось загрузить события календаря");
   const loading =
     calendar.status === "loading" || (calendar.status === "ready" && calendar.data.range !== `${from}/${to}`);
-  const events = calendar.status === "ready" && !loading ? calendar.data.events : [];
-
-  const pastFrom = toDateKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 30));
-  const loadPast = useCallback(() => loadCalendar(pastFrom, todayKey), [pastFrom, todayKey]);
-  const past = useProtectedData(loadPast, "Не удалось загрузить события");
-  const attention =
-    past.status === "ready"
-      ? past.data.events
-          .filter((e) => !e.completed && e.date <= todayKey)
-          .sort((a, b) => a.date.localeCompare(b.date))
-      : [];
+  const loadedEvents = calendar.status === "ready" ? calendar.data.events : undefined;
+  const events = useMemo(
+    () => (loadedEvents && !loading ? loadedEvents : EMPTY_EVENTS),
+    [loadedEvents, loading],
+  );
 
   const petsByName = useMemo(() => new Map(pets.map((p) => [p.name, p])), [pets]);
 
