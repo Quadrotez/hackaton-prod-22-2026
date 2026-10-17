@@ -94,7 +94,7 @@ def test_feeding_records_migration_upgrade_and_downgrade(
         get_settings.cache_clear()
 
 
-def test_user_profile_migration_backfills_username_and_supports_avatar(
+def test_user_profile_migration_replaces_username_with_optional_name(
     tmp_path: Path, monkeypatch,
 ) -> None:
     database_path = tmp_path / "user-profile-migration.sqlite"
@@ -117,17 +117,15 @@ def test_user_profile_migration_backfills_username_and_supports_avatar(
         command.upgrade(config, "head")
         inspector = inspect(engine)
         columns = {column["name"] for column in inspector.get_columns("users")}
-        assert {"username", "avatar_url"}.issubset(columns)
-        assert any(
-            index["name"] == "ix_users_username" and index["unique"]
-            for index in inspector.get_indexes("users")
-        )
+        assert {"name", "avatar_url"}.issubset(columns)
+        assert "username" not in columns
+        assert not any(index["name"] == "ix_users_username" for index in inspector.get_indexes("users"))
 
         with engine.begin() as connection:
             row = connection.execute(
-                text("SELECT username, avatar_url FROM users")
+                text("SELECT name, avatar_url FROM users")
             ).one()
-            assert row.username == "existing_owner"
+            assert row.name is None
             assert row.avatar_url is None
 
         command.downgrade(config, "20261016_0005")
@@ -135,6 +133,7 @@ def test_user_profile_migration_backfills_username_and_supports_avatar(
             column["name"] for column in inspect(engine).get_columns("users")
         }
         assert "username" not in downgraded_columns
+        assert "name" not in downgraded_columns
         assert "avatar_url" not in downgraded_columns
     finally:
         engine.dispose()
