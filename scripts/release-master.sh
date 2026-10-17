@@ -28,7 +28,16 @@ fi
 
 git fetch "$REMOTE" --prune
 origin_url="$(git remote get-url "$REMOTE")"
-project_path="$(printf '%s\n' "$origin_url" | sed -E 's#^[^@]*@[^:/]+[:/]##; s#\.git$##')"
+project_path="$(python3 - "$origin_url" <<'PY'
+import sys
+u = sys.argv[1]
+if "://" in u:
+    u = __import__("urllib.parse", fromlist=["x"]).urlparse(u).path
+else:
+    u = u.split(":", 1)[-1]
+print(u.removeprefix("/").removesuffix(".git"))
+PY
+)"
 project_id="$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1], safe=''))" "$project_path")"
 API="https://gitlab.t-education.com/api/v4"
 api() { curl -s --fail-with-body --header "PRIVATE-TOKEN: $GITLAB_TOKEN" "$@"; }
