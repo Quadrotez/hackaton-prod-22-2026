@@ -12,6 +12,7 @@ set -eo pipefail
 TEAM_BRANCHES=(
   frontend-ivan
   frontend-maga
+  feat/pet-transfer
   tiver211-backend
   v1tush-backend
 )
@@ -31,9 +32,11 @@ if [ "$(git rev-parse --abbrev-ref HEAD)" != "$DEV_BRANCH" ]; then
   git checkout "$DEV_BRANCH"
 fi
 
-if ! git merge-base --is-ancestor "$DEV_BRANCH" "$REMOTE/$DEV_BRANCH"; then
-  echo "!! local $DEV_BRANCH has commits not pushed to $REMOTE/$DEV_BRANCH (or diverged)." >&2
-  echo "   Push or rebase onto $REMOTE/$DEV_BRANCH first." >&2
+# Расхождение = ни одна из веток не предок другой. Локальный dev впереди — это
+# нормально (наши же мёрджи после разрешения конфликта), тогда пушим в конце.
+if ! git merge-base --is-ancestor "$REMOTE/$DEV_BRANCH" "$DEV_BRANCH" \
+   && ! git merge-base --is-ancestor "$DEV_BRANCH" "$REMOTE/$DEV_BRANCH"; then
+  echo "!! локальный $DEV_BRANCH разошёлся с $REMOTE/$DEV_BRANCH — разберись вручную." >&2
   exit 1
 fi
 git merge --ff-only "$REMOTE/$DEV_BRANCH" || true
