@@ -142,3 +142,44 @@ def test_visits_are_isolated(client: TestClient) -> None:
     assert client.get(
         pet_url(pet_id, "visits/topics/graph"), headers=other, params={"topic": "Allergy"}
     ).status_code == 404
+
+
+def test_analyzer_fields_are_saved_and_returned_without_llm_call(client: TestClient, monkeypatch) -> None:
+    headers = auth_headers(client, "analyzer@example.com")
+    pet_id = create_pet(client, headers, "Milo")
+    payload = {
+        "visit_at": "2026-10-17T15:44:49.875Z",
+        "visit_reason": "Routine examination",
+        "visit_price": 0,
+        "veterinarian_name": "Dr. Smith",
+        "veterinarian_profession": "therapist",
+        "vet": "Happy Paws Clinic",
+        "post_visit_instructions": "Continue observation.",
+    }
+    monkeypatch.setattr(
+        "app.integrations.llm.vet_document_analyzer.analyze_veterinary_document",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("LLM must not be called")),
+    )
+    created = client.post(pet_url(pet_id, "visits"), headers=headers, json=payload)
+    assert created.status_code == 201, created.json()
+    body = created.json()
+    assert {key: body[key] for key in payload} == {
+        **payload,
+        "visit_at": "2026-10-17T15:44:49.875000",
+        "visit_price": 0.0,
+        "vet": "Happy Paws Clinic",
+    }
+
+    fetched = client.get(pet_url(pet_id, f"visits/{body['id']}"), headers=headers)
+    assert fetched.status_code == 200
+    assert fetched.json()["visit_at"] == "2026-10-17T15:44:49.875000"
+    assert fetched.json()["vet"] == "Happy Paws Clinic"
+
+    patched = client.patch(
+        pet_url(pet_id, f"visits/{body['id']}"),
+        headers=headers,
+        json={"visit_at": "2026-10-18T12:00:00Z", "visit_price": 1250},
+    )
+    assert patched.status_code == 200
+    assert patched.json()["visit_at"] == "2026-10-18T12:00:00"
+    assert patched.json()["visit_price"] == 1250

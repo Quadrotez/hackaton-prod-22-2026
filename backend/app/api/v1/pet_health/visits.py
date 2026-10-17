@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
-from app.api.async_dependencies import AsyncDbSession, OwnedPet
+from app.api.async_dependencies import AsyncCurrentUser, AsyncDbSession, OwnedPet
 from app.models.health import VetVisit, VisitStatus
 from app.schemas.health import (
     VetVisitCreate,
@@ -24,12 +24,21 @@ NOT_FOUND = "Visit not found"
 
 
 @router.post("", response_model=VetVisitPublic, status_code=status.HTTP_201_CREATED)
-async def create_visit(pet: OwnedPet, payload: VetVisitCreate, db: AsyncDbSession) -> VetVisit:
+async def create_visit(
+    pet: OwnedPet, current_user: AsyncCurrentUser, payload: VetVisitCreate, db: AsyncDbSession
+) -> VetVisit:
     await validate_referral(db, pet.id, None, payload.referred_by_visit_id)
     fields = payload.model_dump()
+    fields.pop("visit_reason", None)
+    fields.pop("veterinarian_name", None)
+    fields.pop("veterinarian_profession", None)
+    fields["clinic"] = fields.pop("vet")
+    fields["reason"] = payload.reason
+    fields["doctor_name"] = payload.doctor_name
+    fields["doctor_specialty"] = payload.doctor_specialty
     if fields["topic"] is not None:
         fields["topic"] = clean_label(fields["topic"])
-    return await save(db, VetVisit(pet_id=pet.id, **fields))
+    return await save(db, VetVisit(pet_id=pet.id, user_id=current_user.id, **fields))
 
 
 @router.get(
@@ -88,6 +97,16 @@ async def update_visit(
 ) -> VetVisit:
     visit = await get_pet_child(db, VetVisit, pet.id, visit_id, NOT_FOUND)
     changes = patch_changes(payload, {"title", "visit_at", "reason", "status"})
+    if "visit_reason" in changes:
+        changes["reason"] = changes.pop("visit_reason")
+    else:
+        changes.pop("visit_reason", None)
+    if "veterinarian_name" in changes:
+        changes["doctor_name"] = changes.pop("veterinarian_name")
+    if "veterinarian_profession" in changes:
+        changes["doctor_specialty"] = changes.pop("veterinarian_profession")
+    if "vet" in changes:
+        changes["clinic"] = changes.pop("vet")
     if "referred_by_visit_id" in changes:
         await validate_referral(db, pet.id, visit.id, changes["referred_by_visit_id"])
     if changes.get("topic") is not None:
