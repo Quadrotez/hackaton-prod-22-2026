@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function PetHealthPage({ params, searchParams }: PageProps<"/pet/[id]/health">) {
   return (
-    <PageShell contentClassName="max-w-2xl">
+    <PageShell>
       <Suspense fallback={<PageLoading />}>
         {Promise.all([params, searchParams]).then(([{ id }, query]) => {
           const view = query.view === "plan" || query.view === "history" ? query.view : "observations";
