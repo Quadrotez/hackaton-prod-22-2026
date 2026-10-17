@@ -23,10 +23,11 @@ const credentialsSchema = z.object({
     .string()
     .min(1, "Это обязательное поле")
     .email("Введите корректный email"),
-  password: z
-    .string()
-    .min(8, "Пароль должен содержать минимум 8 символов"),
+  password: z.string().min(1, "Это обязательное поле"),
 });
+
+const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL ?? "demo@quadrotez.com";
+const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? "demo";
 
 type CredentialsValues = z.infer<typeof credentialsSchema>;
 type FormErrors = Partial<Record<keyof CredentialsValues, string>>;
@@ -66,6 +67,11 @@ export function LoginForm() {
       return;
     }
 
+    if (isRegister && result.data.password.length < 8) {
+      setErrors({ password: "Пароль должен содержать минимум 8 символов" });
+      return;
+    }
+
     setErrors({});
     setPending(true);
     try {
@@ -80,6 +86,20 @@ export function LoginForm() {
         ? "Не удалось зарегистрироваться"
         : "Не удалось войти";
       toast.error(getErrorMessage(error, fallback));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleDemoLogin() {
+    if (pending) return;
+    setErrors({});
+    setPending(true);
+    try {
+      await login({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+      router.push("/me");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Не удалось войти в демо-аккаунт"));
     } finally {
       setPending(false);
     }
@@ -136,6 +156,19 @@ export function LoginForm() {
               {isRegister ? "Зарегистрироваться" : "Войти"}
             </Button>
           </Field>
+
+          {!isRegister && (
+            <Field>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDemoLogin}
+                disabled={pending}
+              >
+                Войти в демо
+              </Button>
+            </Field>
+          )}
 
           <p className="text-center text-sm text-muted-foreground">
             {isRegister ? (
