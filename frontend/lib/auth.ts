@@ -18,6 +18,11 @@ export type UserUpdate = {
   name: string;
 };
 
+export type PasswordUpdate = {
+  current_password: string;
+  new_password: string;
+};
+
 export const AVATAR_PATH = "/api/v1/auth/me/avatar";
 
 export type TokenResponse = {
@@ -51,6 +56,10 @@ export function getMe() {
 
 export function updateMe(data: UserUpdate) {
   return apiFetch<UserPublic>("/api/v1/auth/me", { method: "PATCH", body: data, auth: true });
+}
+
+export function updatePassword(data: PasswordUpdate) {
+  return apiFetch<void>("/api/v1/auth/me/password", { method: "PATCH", body: data, auth: true });
 }
 
 export function uploadAvatar(file: File | Blob) {
