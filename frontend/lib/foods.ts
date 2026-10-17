@@ -13,7 +13,7 @@ export type Food = {
   carbohydrates: number;
   calories: number;
   total_grams: number;
-  // Остаток пока ведётся вручную: бэк не списывает корм при кормлении
+  // Остаток списывается бэкендом при записи кормления (amount_grams)
   remaining_grams: number;
   // Средний суточный расход по всем питомцам за последние 14 дней; бэк пока не отдаёт
   avg_daily_g?: number | null;
