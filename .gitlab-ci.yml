@@ -57,14 +57,15 @@ build:frontend:
     DOCKERFILE_PATH: $CI_PROJECT_DIR/frontend/Dockerfile
     IMAGE_NAME: $REGISTRY/frontend:${CI_COMMIT_SHORT_SHA}
 
-# Publishes the OpenAPI schema + a static Swagger UI to GitLab Pages for every
-# branch, so API changes can be reviewed without running the backend.
-# Default branch -> Pages root; any other branch -> .../<branch-slug>/.
-pages:
+# Builds the OpenAPI schema + a static Swagger UI and exposes them as pipeline
+# artifacts for every branch (GitLab Pages is disabled in this environment).
+# Each pipeline keeps the docs for its own commit: use the "Swagger UI" artifact
+# link in the job/MR, or download the archive.
+docs:openapi:
   stage: docs
   image: python:3.12
   variables:
-    UV_PROJECT_ENVIRONMENT: /tmp/pages-venv
+    UV_PROJECT_ENVIRONMENT: /tmp/docs-venv
     JWT_SECRET_KEY: openapi-static-export
     OPENAPI_SERVER_URL: https://petcare.quadrotez.com
     OPENAPI_DOCS_LABEL: $CI_COMMIT_REF_NAME @ $CI_COMMIT_SHORT_SHA
@@ -73,17 +74,15 @@ pages:
     - cd backend
   script:
     - uv sync --frozen
-    - uv run python scripts/export_openapi.py "$CI_PROJECT_DIR/public"
-  pages:
-    publish: public
-    path_prefix: $PAGES_PATH_PREFIX
+    - uv run python scripts/export_openapi.py "$CI_PROJECT_DIR/openapi"
+  artifacts:
+    name: "openapi-$CI_COMMIT_REF_SLUG"
+    expire_in: 4 weeks
+    expose_as: "Swagger UI"
+    paths:
+      - openapi/
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      variables:
-        PAGES_PATH_PREFIX: ""
     - if: $CI_COMMIT_BRANCH
-      variables:
-        PAGES_PATH_PREFIX: $CI_COMMIT_REF_SLUG
 
 .ssh_setup:
   before_script:
