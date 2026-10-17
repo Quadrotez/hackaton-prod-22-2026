@@ -277,7 +277,12 @@ def test_health_tables_migration_upgrade_and_downgrade(tmp_path: Path, monkeypat
             tuple(key["constrained_columns"]): key
             for key in inspector.get_foreign_keys("vet_visits")
         }
+        visit_columns = {column["name"] for column in inspector.get_columns("vet_visits")}
+        assert "animal_name" not in visit_columns
+        assert "user_id" in visit_columns
         assert visit_keys[("pet_id",)]["options"].get("ondelete") == "CASCADE"
+        assert visit_keys[("user_id",)]["referred_table"] == "users"
+        assert visit_keys[("user_id",)]["options"].get("ondelete") == "CASCADE"
         assert visit_keys[("referred_by_visit_id",)]["referred_table"] == "vet_visits"
         assert visit_keys[("referred_by_visit_id",)]["options"].get("ondelete") == "SET NULL"
 
