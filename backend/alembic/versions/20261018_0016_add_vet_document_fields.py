@@ -34,7 +34,10 @@ def upgrade() -> None:
             "WHERE user_id IS NULL"
         )
     )
-    with op.batch_alter_table("vet_visits", recreate="always") as batch:
+    # Обычный batch: на PostgreSQL это нативный ALTER COLUMN SET NOT NULL,
+    # на SQLite — пересоздание таблицы. recreate="always" ломает PostgreSQL
+    # из-за самоссылающегося FK vet_visits_referred_by_visit_id_fkey.
+    with op.batch_alter_table("vet_visits") as batch:
         batch.alter_column("user_id", existing_type=sa.Integer(), nullable=False)
 
 
