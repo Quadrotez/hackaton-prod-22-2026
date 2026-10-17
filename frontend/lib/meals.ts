@@ -7,6 +7,7 @@ export type Meal = {
   // null, если корм удалили из списка; food_name при этом сохраняется
   food_id: number | null;
   food_name: string;
+  amount_grams: number | null;
   fed_at: string;
   liked: boolean;
   tolerated: boolean;
@@ -17,6 +18,7 @@ export type Meal = {
 
 export type MealCreate = {
   food_id: number;
+  amount_grams: number;
   fed_at: string;
   liked: boolean;
   tolerated: boolean;
@@ -24,7 +26,7 @@ export type MealCreate = {
   notes?: string | null;
 };
 
-export type MealUpdate = Partial<MealCreate>;
+export type MealUpdate = Partial<Omit<MealCreate, "amount_grams">>;
 
 export type MealSuggestion = {
   food_id: number;
