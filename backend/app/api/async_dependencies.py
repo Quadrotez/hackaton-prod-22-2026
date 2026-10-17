@@ -32,7 +32,7 @@ async def get_current_user(
         if not isinstance(subject, str):
             raise authentication_error()
         user_id = int(subject)
-    except (jwt.InvalidTokenError, ValueError):
+    except (jwt.InvalidTokenError, TypeError, UnicodeError, ValueError):
         raise authentication_error() from None
 
     user = await db.get(User, user_id)

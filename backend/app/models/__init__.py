@@ -16,6 +16,7 @@ from app.models.health import (
 )
 from app.models.pet import Pet
 from app.models.pet_weight import PetWeight
+from app.models.transfer import PetTransfer, TransferDuration, TransferStatus
 from app.models.user import User
 
 __all__ = [
@@ -32,9 +33,12 @@ __all__ = [
     "MedicationIntake",
     "MedicationTime",
     "Pet",
+    "PetTransfer",
     "PetWeight",
     "Pregnancy",
     "Symptom",
+    "TransferDuration",
+    "TransferStatus",
     "User",
     "Vaccination",
     "VetVisit",
