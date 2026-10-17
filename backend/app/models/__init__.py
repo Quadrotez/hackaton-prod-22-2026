@@ -1,4 +1,5 @@
 from app.models.feeding import FeedingRecord
+from app.models.food import Food, FoodStock, FoodType
 from app.models.health import (
     Allergy,
     Measurement,
@@ -18,6 +19,9 @@ from app.models.user import User
 __all__ = [
     "Allergy",
     "FeedingRecord",
+    "Food",
+    "FoodStock",
+    "FoodType",
     "Measurement",
     "MeasurementParameter",
     "MeasurementProfile",

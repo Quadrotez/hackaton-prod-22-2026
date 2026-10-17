@@ -1,7 +1,7 @@
 """Create pet measurement tables.
 
-Revision ID: 20261017_0007
-Revises: 20261017_0006
+Revision ID: 20261017_0011
+Revises: 20261017_0010
 Create Date: 2026-10-17
 """
 from collections.abc import Sequence
@@ -10,8 +10,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "20261017_0007"
-down_revision: str | None = "20261017_0006"
+revision: str = "20261017_0011"
+down_revision: str | None = "20261017_0010"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
