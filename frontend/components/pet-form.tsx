@@ -26,6 +26,14 @@ import { Spinner } from "@/components/ui/spinner";
 import { PageHeader } from "@/components/page-header";
 import { PageLoading } from "@/components/page-state";
 import { PetDeleteButton } from "@/components/pet-delete-button";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 
 function today() {
   const date = new Date();
@@ -72,10 +80,53 @@ function formatWeightKg(weightG: number): string {
 const choiceClass =
   "flex flex-col items-center gap-2 rounded-lg border border-input px-2 py-3 text-sm transition-colors hover:bg-secondary/40 peer-checked:border-foreground/40 peer-checked:bg-secondary peer-focus-visible:ring-2 peer-focus-visible:ring-foreground peer-disabled:cursor-default peer-disabled:opacity-60";
 
+const catBreeds = [
+  "Беспородная",
+  "Бенгальская",
+  "Британская короткошёрстная",
+  "Мейн-кун",
+  "Персидская",
+  "Русская голубая",
+  "Рэгдолл",
+  "Сиамская",
+  "Сибирская",
+  "Сфинкс",
+  "Шотландская вислоухая",
+  "Шотландская прямоухая",
+];
+
+const dogBreeds = [
+  "Метис",
+  "Акита-ину",
+  "Бигль",
+  "Вельш-корги",
+  "Джек-рассел-терьер",
+  "Золотистый ретривер",
+  "Йоркширский терьер",
+  "Лабрадор-ретривер",
+  "Мопс",
+  "Немецкая овчарка",
+  "Померанский шпиц",
+  "Пудель",
+  "Самоед",
+  "Сибирский хаски",
+  "Такса",
+  "Французский бульдог",
+  "Чихуахуа",
+  "Шиба-ину",
+];
+
+const otherBreeds: string[] = [];
+
 export function PetForm({ pet }: { pet?: Pet }) {
   const router = useRouter();
   const { authorized, handleAuthError } = useRequireAuth();
   const [species, setSpecies] = useState(pet ? getSpeciesOption(pet.species).value : "cat");
+  const [breedsBySpecies, setBreedsBySpecies] = useState<Record<string, string>>(() =>
+    pet ? { [getSpeciesOption(pet.species).value]: pet.breed ?? "" } : {}
+  );
+  const breed = breedsBySpecies[species] ?? "";
+  const breedOptions = species === "cat" ? catBreeds : species === "dog" ? dogBreeds : otherBreeds;
   const [ageMode, setAgeMode] = useState<AgeMode>(() => initialAgeMode(pet));
   const isEdit = pet !== undefined;
   const customSpeciesDefault = pet && getSpeciesOption(pet.species).value === "other" ? pet.species : undefined;
@@ -128,6 +179,7 @@ export function PetForm({ pet }: { pet?: Pet }) {
       const fieldName = firstField === "species" ? "customSpecies" : firstField;
       const input =
         fieldName === "birth_date" ? form.querySelector("#pet-birth-date")
+        : fieldName === "breed" ? form.querySelector("#pet-breed")
         : fieldName === "sex" ? form.querySelector('input[name="sex"]')
         : form.elements.namedItem(String(fieldName));
       if (input instanceof HTMLElement) input.focus();
@@ -242,7 +294,7 @@ export function PetForm({ pet }: { pet?: Pet }) {
                         checked={species === value}
                         onChange={() => {
                           setSpecies(value);
-                          setErrors((current) => ({ ...current, species: undefined }));
+                          setErrors((current) => ({ ...current, species: undefined, breed: undefined }));
                         }}
                         className="peer sr-only"
                       />
@@ -286,7 +338,42 @@ export function PetForm({ pet }: { pet?: Pet }) {
 
               <Field data-invalid={!!errors.breed}>
                 <FieldLabel htmlFor="pet-breed">Порода <span className="font-normal text-muted-foreground">(необязательно)</span></FieldLabel>
-                <Input id="pet-breed" name="breed" defaultValue={pet?.breed ?? undefined} placeholder="Например, британская короткошёрстная" maxLength={255} aria-invalid={!!errors.breed} aria-describedby={errors.breed ? "pet-breed-error" : undefined} />
+                <Combobox
+                  key={species}
+                  name="breed"
+                  items={breedOptions}
+                  value={breed || null}
+                  inputValue={breed}
+                  disabled={pending}
+                  // Keep free text as the value too, so closing the list preserves a custom breed.
+                  onInputValueChange={(value) => {
+                    setBreedsBySpecies((current) => ({ ...current, [species]: value }));
+                    setErrors((current) => ({ ...current, breed: undefined }));
+                  }}
+                  onValueChange={(value) => {
+                    setBreedsBySpecies((current) => ({ ...current, [species]: value ?? "" }));
+                    setErrors((current) => ({ ...current, breed: undefined }));
+                  }}
+                >
+                  <ComboboxInput
+                    id="pet-breed"
+                    placeholder="Выберите или введите породу"
+                    maxLength={255}
+                    showClear
+                    disabled={pending}
+                    aria-invalid={!!errors.breed}
+                    aria-describedby={errors.breed ? "pet-breed-hint pet-breed-error" : "pet-breed-hint"}
+                  />
+                  <ComboboxContent>
+                    <ComboboxEmpty>Нет подходящих вариантов. Введённая порода сохранится.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(item: string) => (
+                        <ComboboxItem key={item} value={item}>{item}</ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+                <p id="pet-breed-hint" className="text-sm text-muted-foreground">Если породы нет в списке, впишите её сами.</p>
                 {errors.breed && <FieldError id="pet-breed-error">{errors.breed}</FieldError>}
               </Field>
 
