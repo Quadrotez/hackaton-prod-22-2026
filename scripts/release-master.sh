@@ -75,6 +75,10 @@ mr_state() {
   api "$API/projects/$project_id/merge_requests/$mr_iid" \
     | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d.get("detailed_merge_status") or d.get("merge_status") or "")'
 }
+mr_field() {
+  api "$API/projects/$project_id/merge_requests/$mr_iid" \
+    | python3 -c "import json,sys;print(json.load(sys.stdin).get(sys.argv[1],''))" "$1"
+}
 for _ in $(seq 1 30); do
   status="$(mr_state)"
   echo "MR !$mr_iid: $status"
@@ -87,12 +91,11 @@ done
 
 # 4) Смёрджить сразу или включить auto-merge на время пайплайна.
 mr_url="$API/projects/$project_id/merge_requests/$mr_iid"
+mr_web="$(mr_field web_url)"
 merge_http="$(curl -s -o /dev/null -w '%{http_code}' \
   --header "PRIVATE-TOKEN: $GITLAB_TOKEN" -X PUT "$mr_url/merge" \
   --data "should_remove_source_branch=false")"
-if [ "$merge_http" = "200" ]; then
-  echo "== MR !$mr_iid смёрджен =="
-else
+if [ "$merge_http" != "200" ]; then
   echo "== прямой merge не прошёл (HTTP $merge_http), включаю auto-merge =="
   mws_http="$(curl -s -o /dev/null -w '%{http_code}' \
     --header "PRIVATE-TOKEN: $GITLAB_TOKEN" -X PUT "$mr_url/merge" \
@@ -100,11 +103,28 @@ else
     --data "should_remove_source_branch=false")"
   if [ "$mws_http" != "200" ]; then
     echo "!! не удалось запланировать auto-merge (HTTP $mws_http), смёрджи MR вручную:" >&2
-    echo "   $API/projects/$project_id/merge_requests/$mr_iid" >&2
+    echo "   $mr_web" >&2
     exit 1
   fi
   echo "MR !$mr_iid вольётся автоматически после успешного пайплайна:"
-  echo "  $API/projects/$project_id/merge_requests/$mr_iid"
+  echo "  $mr_web"
+
+  echo "== жду фактического мёрджа MR !$mr_iid (до 15 минут) =="
+  merged=""
+  for _ in $(seq 1 90); do
+    state="$(mr_field state)"
+    case "$state" in
+      merged) merged=1; break ;;
+      opened) sleep 10 ;;
+      *) break ;;
+    esac
+  done
+  if [ "$merged" != "1" ]; then
+    echo "== MR ещё не смёрджен (state=$state); локальный $MASTER_BRANCH обнови позже:" >&2
+    echo "   git fetch $REMOTE && git checkout $MASTER_BRANCH && git merge --ff-only $REMOTE/$MASTER_BRANCH" >&2
+    exit 0
+  fi
+  echo "== MR !$mr_iid смёрджен =="
 fi
 
 # 5) Обновить локальный master до merge-коммита.
