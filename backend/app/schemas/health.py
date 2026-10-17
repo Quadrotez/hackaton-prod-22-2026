@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.models.health import IntakeStatus, VaccinationStatus, VisitReason, VisitStatus
+from app.models.health import IntakeStatus, VaccinationStatus, VisitStatus
 from app.models.pet import PetSex
 
 

@@ -1,7 +1,7 @@
 """Add analyzed veterinary-document fields and visit ownership.
 
-Revision ID: 20261017_0015
-Revises: 20261017_0014
+Revision ID: 20261018_0016
+Revises: 20261017_0015
 Create Date: 2026-10-17
 """
 from collections.abc import Sequence
@@ -10,8 +10,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "20261017_0015"
-down_revision: str | None = "20261017_0014"
+revision: str = "20261018_0016"
+down_revision: str | None = "20261017_0015"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

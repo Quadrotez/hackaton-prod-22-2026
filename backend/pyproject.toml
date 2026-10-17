@@ -53,5 +53,5 @@ known-first-party = ["app"]
 
 [tool.ruff.lint.per-file-ignores]
 # Многострочные тексты LLM-промптов: noqa внутри строк не работает,
-# а перенос меняет содержание промпта
-"app/integrations/llm/vet_document_analyzer.py" = ["E501"]
+# а перенос/обрезка меняет содержание промпта
+"app/integrations/llm/vet_document_analyzer.py" = ["E501", "W291"]
