@@ -11,11 +11,12 @@ TIMEZONE = ZoneInfo("Europe/Moscow")
 def auth_headers(client: TestClient, email: str) -> dict[str, str]:
     registration = client.post(
         "/api/v1/auth/register",
-        json={"email": email, "name": None, "password": PASSWORD},
+        json={"email": email, "password": PASSWORD},
     )
-    assert registration.status_code in (201, 409)
+    assert registration.status_code == 201, registration.json()
+
     response = client.post("/api/v1/auth/login", json={"email": email, "password": PASSWORD})
-    assert response.status_code == 200
+    assert response.status_code == 200, response.json()
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
