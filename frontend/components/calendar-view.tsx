@@ -101,7 +101,7 @@ export function CalendarView({ initialDate }: { initialDate: [number, number, nu
         {selectedEvents.length ? selectedEvents.map((event) => <EventLink key={event.key} event={event} />) : <p className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">На этот день событий нет. Запланируйте приём или прививку в разделе «Здоровье» питомца.</p>}
       </section>
       {nextEvents.length > 0 && <section aria-label="Ближайшие события" className="flex flex-col gap-3"><h2>Ближайшие в этом месяце</h2>{nextEvents.map((event) => <EventLink key={event.key} event={event} />)}</section>}
-      {!state.data.pets.length && <Link href="/pet/create" className="text-sm underline underline-offset-4">Добавить первого питомца</Link>}
+      {!state.data.pets.length && <Link href="/pet/create" className="text-sm underline underline-offset-4">Добавить первого питомца</Link> }
     </>}
   </>;
 }
