@@ -36,8 +36,8 @@ const numericFields = [
   { name: "fats", label: "Жиры, г на 100 г", max: 100 },
   { name: "carbohydrates", label: "Углеводы, г на 100 г", max: 100 },
   { name: "calories", label: "Ккал на 100 г" },
-  { name: "total_g", label: "Вес упаковки, г" },
-  { name: "remaining_g", label: "Осталось корма, г", editOnly: true },
+  { name: "total_grams", label: "Вес упаковки, г" },
+  { name: "remaining_grams", label: "Осталось корма, г", editOnly: true },
 ] as const;
 
 function parseNumber(value: FormDataEntryValue | null): number {
@@ -49,7 +49,6 @@ export function FoodManager() {
   const { handleAuthError } = useRequireAuth();
   const [editing, setEditing] = useState<Food | "new" | null>(null);
   const [error, setError] = useState("");
-  const [status, setStatus] = useState("");
   const [pending, setPending] = useState(false);
   const formId = useId();
   const current = editing && editing !== "new" ? editing : null;
@@ -61,7 +60,6 @@ export function FoodManager() {
 
   function open(food: Food | "new") {
     setError("");
-    setStatus("");
     setEditing(food);
   }
 
@@ -79,21 +77,22 @@ export function FoodManager() {
       numericFields
         .filter((field) => current || !("editOnly" in field))
         .map(({ name }) => [name, parseNumber(data.get(name))]),
-    ) as Pick<FoodCreate, "protein" | "fats" | "carbohydrates" | "calories" | "total_g"> & { remaining_g?: number };
-    // Новый корм — целая упаковка, остаток дальше ведёт бэк
-    const remaining = values.remaining_g ?? values.total_g;
+    ) as Pick<FoodCreate, "protein" | "fats" | "carbohydrates" | "calories" | "total_grams"> & { remaining_grams?: number };
+
+    const remaining = values.remaining_grams ?? values.total_grams;
 
     if (!name || !(type in foodTypeLabels) ||
       Object.values(values).some((value) => !Number.isFinite(value) || value < 0) ||
-      values.total_g <= 0 || remaining > values.total_g ||
+      !Number.isInteger(values.total_grams) || !Number.isInteger(remaining) ||
+      values.total_grams <= 0 || remaining > values.total_grams ||
       values.protein > 100 || values.fats > 100 || values.carbohydrates > 100) {
-      setError("Проверьте данные: остаток не может превышать вес упаковки, а БЖУ — 100 г.");
+      setError("Проверьте данные: вес — целое число граммов, остаток не больше веса упаковки, БЖУ — не больше 100 г.");
       return;
     }
 
     const payload: FoodCreate = {
       ...values,
-      remaining_g: remaining,
+      remaining_grams: remaining,
       name,
       description: String(data.get("description") ?? "").trim() || null,
       type: type as FoodType,
@@ -103,11 +102,9 @@ export function FoodManager() {
       if (current) {
         const updated = await updateFood(current.id, payload);
         update(items.map((item) => item.id === updated.id ? updated : item));
-        setStatus("Корм изменён");
       } else {
         const created = await createFood(payload);
         update([...items, created]);
-        setStatus("Корм добавлен. Он доступен в соответствующем фильтре.");
       }
       setEditing(null);
     } catch (error) {
@@ -123,7 +120,6 @@ export function FoodManager() {
       await deleteFood(food.id);
       update(items.filter((item) => item.id !== food.id));
       setEditing(null);
-      setStatus(`Корм «${food.name}» удалён`);
     } catch (error) {
       reportError(error, "Не удалось удалить корм");
     } finally {
@@ -136,7 +132,6 @@ export function FoodManager() {
       <FoodCatalog foods={items} onEdit={open} actions={
         <Button type="button" onClick={() => open("new")}>Добавить корм</Button>
       } />
-      <p role="status" className="text-sm text-muted-foreground">{status}</p>
       {editing && (
         <section aria-labelledby={`${formId}-title`} className="rounded-2xl border bg-card p-5">
           <h2 id={`${formId}-title`} className="text-lg font-semibold">{current ? "Изменить корм" : "Добавить корм"}</h2>
@@ -162,7 +157,7 @@ export function FoodManager() {
                 {numericFields.filter((field) => current || !("editOnly" in field)).map((field) => (
                   <label key={field.name} className="flex flex-col gap-1 text-sm">
                     {field.label}
-                    <Input name={field.name} type="number" inputMode="decimal" required min={field.name === "total_g" ? 1 : 0} max={"max" in field ? field.max : undefined} step="0.01" defaultValue={current?.[field.name] ?? 0} />
+                    <Input name={field.name} type="number" inputMode="decimal" required min={field.name === "total_grams" ? 1 : 0} max={"max" in field ? field.max : undefined} step={field.name.endsWith("_grams") ? 1 : 0.01} defaultValue={current?.[field.name] ?? 0} />
                   </label>
                 ))}
               </div>

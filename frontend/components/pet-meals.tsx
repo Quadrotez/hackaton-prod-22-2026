@@ -2,7 +2,7 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { PencilIcon, PlusIcon, StarIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronUpIcon, PencilIcon, PlusIcon } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { useRequireAuth } from "@/hooks/use-auth";
@@ -24,10 +24,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 
-const RECENT_MEALS_LIMIT = 5;
-const RATES = [1, 2, 3, 4, 5];
+const RECENT_MEALS_LIMIT = 2;
 // Запас на расхождение часов клиента и сервера
 const FUTURE_TOLERANCE_MS = 5 * 60_000;
 const quickTimes = [
@@ -53,18 +53,14 @@ function formatFedAt(fedAt: string): string {
 
 const mealSchema = z.object({
   food_id: z.coerce.number().int().positive("Выберите корм"),
-  portion_g: z.string().trim().min(1, "Укажите порцию")
-    .transform((value) => Number(value.replace(",", ".")))
-    .refine((grams) => Number.isFinite(grams) && grams > 0, "Укажите порцию числом больше нуля")
-    .refine((grams) => grams <= 10_000, "Не больше 10 кг"),
   fed_at: z.string().min(1, "Укажите время кормления")
     .transform((value) => new Date(value))
     .refine((date) => !Number.isNaN(date.getTime()), "Укажите корректное время")
     .refine((date) => date.getTime() <= Date.now() + FUTURE_TOLERANCE_MS, "Время кормления не может быть в будущем")
     .transform((date) => date.toISOString()),
-  rate: z.number().int().min(1, "Поставьте оценку").max(5),
+  liked: z.boolean(),
   tolerated: z.boolean(),
-  reactions: z.string().trim().max(1000, "Не больше 1000 символов"),
+  reaction_notes: z.string().trim().max(1000, "Не больше 1000 символов"),
   notes: z.string().trim().max(1000, "Не больше 1000 символов"),
 });
 
@@ -72,20 +68,6 @@ type MealErrors = Partial<Record<keyof z.infer<typeof mealSchema>, string>>;
 
 const choiceClass =
   "flex items-center justify-center rounded-lg border border-input px-2 py-2 text-sm transition-colors hover:bg-secondary/40 peer-checked:border-foreground/40 peer-checked:bg-secondary peer-focus-visible:ring-2 peer-focus-visible:ring-foreground";
-
-function RateStars({ rate, className }: { rate: number; className?: string }) {
-  return (
-    <span aria-label={`Оценка ${rate} из 5`} className={cn("inline-flex", className)}>
-      {RATES.map((value) => (
-        <StarIcon
-          key={value}
-          aria-hidden="true"
-          className={cn("size-3", value <= rate ? "fill-foreground text-foreground" : "text-muted-foreground/50")}
-        />
-      ))}
-    </span>
-  );
-}
 
 function MealForm({
   petId,
@@ -109,9 +91,8 @@ function MealForm({
   const { handleAuthError } = useRequireAuth();
   const ranked = rankFoods(foods, meals);
   const [foodId, setFoodId] = useState(meal?.food_id ? String(meal.food_id) : "");
-  const [portion, setPortion] = useState(meal ? String(meal.portion_g) : "");
   const [fedAt, setFedAt] = useState(() => toLocalInput(meal ? new Date(meal.fed_at) : new Date()));
-  const [rate, setRate] = useState(meal?.rate ?? 0);
+  const [liked, setLiked] = useState(meal?.liked ?? true);
   const [tolerated, setTolerated] = useState(meal?.tolerated ?? true);
   const [suggestion, setSuggestion] = useState<MealSuggestion | null>(null);
   const [errors, setErrors] = useState<MealErrors>({});
@@ -119,9 +100,6 @@ function MealForm({
   const latestFoodId = useRef(foodId);
   const isEdit = meal !== undefined;
   const selected = foods.find((food) => String(food.id) === foodId);
-  const portionNumber = Number(portion.replace(",", "."));
-  // При правке порция уже списана со склада, учитываем только разницу
-  const extraPortion = portionNumber - (meal && String(meal.food_id) === foodId ? meal.portion_g : 0);
 
   async function handleFoodChange(value: string) {
     setFoodId(value);
@@ -133,8 +111,7 @@ function MealForm({
       if (latestFoodId.current !== value) return;
       setSuggestion(result);
       if (result.suggested_values) {
-        setPortion(String(result.suggested_values.portion_g));
-        setRate(result.suggested_values.rate);
+        setLiked(result.suggested_values.liked);
         setTolerated(result.suggested_values.tolerated);
       }
     } catch (error) {
@@ -149,11 +126,10 @@ function MealForm({
     const formData = new FormData(event.currentTarget);
     const result = mealSchema.safeParse({
       food_id: foodId || 0,
-      portion_g: portion,
       fed_at: fedAt,
-      rate,
+      liked,
       tolerated,
-      reactions: formData.get("reactions") ?? "",
+      reaction_notes: formData.get("reaction_notes") ?? "",
       notes: formData.get("notes") ?? "",
     });
 
@@ -172,7 +148,7 @@ function MealForm({
     try {
       const data = {
         ...result.data,
-        reactions: result.data.reactions || null,
+        reaction_notes: result.data.reaction_notes || null,
         notes: result.data.notes || null,
       };
       const saved = isEdit ? await updateMeal(petId, meal.id, data) : await createMeal(petId, data);
@@ -192,7 +168,7 @@ function MealForm({
     setPending(true);
     try {
       await deleteMeal(petId, meal.id);
-      toast.success("Запись удалена, порция возвращена в остаток");
+      toast.success("Запись удалена");
       onDeleted(meal);
     } catch (error) {
       if (!handleAuthError(error)) {
@@ -223,28 +199,33 @@ function MealForm({
         <FieldGroup className="gap-4">
           <Field data-invalid={Boolean(errors.food_id)}>
             <FieldLabel htmlFor="meal-food">Корм</FieldLabel>
-            <select
-              id="meal-food"
-              value={foodId}
-              onChange={(event) => handleFoodChange(event.target.value)}
-              aria-invalid={Boolean(errors.food_id)}
-              className="h-9 rounded-lg border bg-background px-2 text-sm"
+            <Select
+              value={foodId || null}
+              onValueChange={(value) => handleFoodChange(value ?? "")}
+              items={ranked.map(({ food }) => ({ value: String(food.id), label: food.name }))}
+              disabled={pending}
             >
-              <option value="" disabled>Выберите корм</option>
-              {ranked.map(({ food, avgRate, intolerant }) => (
-                <option key={food.id} value={food.id}>
-                  {[
-                    food.name,
-                    intolerant ? "плохо переносит" : avgRate !== null ? `★ ${avgRate.toLocaleString("ru-RU", { maximumFractionDigits: 1 })}` : null,
-                    food.remaining_g <= 0 ? "закончился" : null,
-                  ].filter(Boolean).join(" · ")}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="meal-food" aria-invalid={Boolean(errors.food_id)} className="w-full">
+                <SelectValue placeholder="Выберите корм" />
+              </SelectTrigger>
+              <SelectContent>
+                {ranked.map(({ food, likedShare, intolerant }) => {
+                  const hint = [
+                    intolerant ? "плохо переносит" : likedShare !== null ? `нравится в ${Math.round(likedShare * 100)}% случаев` : null,
+                    food.remaining_grams <= 0 ? "закончился" : null,
+                  ].filter(Boolean).join(" · ");
+                  return (
+                    <SelectItem key={food.id} value={String(food.id)}>
+                      {food.name}
+                      {hint && <span className={cn("text-xs", intolerant ? "text-destructive" : "text-muted-foreground")}>{hint}</span>}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
             {selected && (
-              <p className={cn("text-xs", extraPortion > selected.remaining_g ? "text-destructive" : "text-muted-foreground")}>
-                В наличии {formatWeight(selected.remaining_g)}
-                {extraPortion > selected.remaining_g && " — порция больше остатка, остаток обнулится"}
+              <p className={cn("text-xs", selected.remaining_grams <= 0 ? "text-destructive" : "text-muted-foreground")}>
+                {selected.remaining_grams <= 0 ? "Корм закончился" : `В наличии ${formatWeight(selected.remaining_grams)}`}
               </p>
             )}
             {suggestion?.previously_tried && suggestion.suggested_values && (
@@ -254,18 +235,6 @@ function MealForm({
               </p>
             )}
             <FieldError>{errors.food_id}</FieldError>
-          </Field>
-
-          <Field data-invalid={Boolean(errors.portion_g)}>
-            <FieldLabel htmlFor="meal-portion">Порция, г</FieldLabel>
-            <Input
-              id="meal-portion"
-              inputMode="decimal"
-              value={portion}
-              onChange={(event) => setPortion(event.target.value)}
-              aria-invalid={Boolean(errors.portion_g)}
-            />
-            <FieldError>{errors.portion_g}</FieldError>
           </Field>
 
           <Field data-invalid={Boolean(errors.fed_at)}>
@@ -295,32 +264,25 @@ function MealForm({
             <FieldError>{errors.fed_at}</FieldError>
           </Field>
 
-          <FieldSet data-invalid={Boolean(errors.rate)} className="gap-1">
-            <FieldLegend variant="label">Насколько понравилось</FieldLegend>
-            <div className="flex gap-1">
-              {RATES.map((value) => (
-                <label key={value} className="cursor-pointer">
+          <FieldSet className="gap-1">
+            <FieldLegend variant="label">Понравилось?</FieldLegend>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { value: true, label: "Да" },
+                { value: false, label: "Нет" },
+              ].map((option) => (
+                <label key={String(option.value)}>
                   <input
                     type="radio"
-                    name="rate"
-                    value={value}
-                    checked={rate === value}
-                    onChange={() => setRate(value)}
+                    name="liked"
+                    checked={liked === option.value}
+                    onChange={() => setLiked(option.value)}
                     className="peer sr-only"
                   />
-                  <StarIcon
-                    aria-hidden="true"
-                    className={cn(
-                      "size-7 rounded-sm transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-foreground",
-                      value <= rate ? "fill-primary text-foreground" : "text-muted-foreground",
-                    )}
-                    strokeWidth={1.5}
-                  />
-                  <span className="sr-only">{value} из 5</span>
+                  <span className={choiceClass}>{option.label}</span>
                 </label>
               ))}
             </div>
-            <FieldError>{errors.rate}</FieldError>
           </FieldSet>
 
           <FieldSet className="gap-1">
@@ -344,20 +306,20 @@ function MealForm({
             </div>
           </FieldSet>
 
-          <Field data-invalid={Boolean(errors.reactions)}>
-            <FieldLabel htmlFor="meal-reactions">Реакции</FieldLabel>
+          <Field data-invalid={Boolean(errors.reaction_notes)}>
+            <FieldLabel htmlFor="meal-reactions">Реакции животного</FieldLabel>
             <Input
               id="meal-reactions"
-              name="reactions"
-              defaultValue={meal?.reactions ?? ""}
+              name="reaction_notes"
+              defaultValue={meal?.reaction_notes ?? ""}
               placeholder={tolerated ? "Необязательно" : "Рвота, зуд, вялость…"}
               maxLength={1000}
             />
-            <FieldError>{errors.reactions}</FieldError>
+            <FieldError>{errors.reaction_notes}</FieldError>
           </Field>
 
           <Field data-invalid={Boolean(errors.notes)}>
-            <FieldLabel htmlFor="meal-notes">Заметки</FieldLabel>
+            <FieldLabel htmlFor="meal-notes">Хотите ли что-то оставить в заметках?</FieldLabel>
             <Input id="meal-notes" name="notes" defaultValue={meal?.notes ?? ""} placeholder="Необязательно" maxLength={1000} />
             <FieldError>{errors.notes}</FieldError>
           </Field>
@@ -395,9 +357,9 @@ function StockAlerts({ foods, meals }: { foods: Food[]; meals: Meal[] }) {
             <li key={food.id} className="flex justify-between gap-3">
               <span className="truncate">{food.name}</span>
               <span className="shrink-0 text-muted-foreground tabular-nums">
-                {food.remaining_g <= 0
+                {food.remaining_grams <= 0
                   ? "закончился"
-                  : `${formatWeight(food.remaining_g)}${daysLeft !== null ? ` · ~${daysLeft} ${pluralize(daysLeft, "день", "дня", "дней")}` : ""}`}
+                  : `${formatWeight(food.remaining_grams)}${daysLeft !== null ? ` · ~${daysLeft} ${pluralize(daysLeft, "день", "дня", "дней")}` : ""}`}
               </span>
             </li>
           );
@@ -422,7 +384,6 @@ export function PetMeals({
 }) {
   const [editing, setEditing] = useState<Meal | "new" | null>(null);
   const [showAll, setShowAll] = useState(false);
-  const foodNames = new Map(foods?.map((food) => [food.id, food.name]));
   const visible = meals && (showAll ? meals : meals.slice(0, RECENT_MEALS_LIMIT));
   const knownMeals = meals ?? [];
 
@@ -468,20 +429,23 @@ export function PetMeals({
         ) : (
           <ul className="flex flex-col gap-2.5">
             {visible.map((meal) => {
-              const foodName = (meal.food_id !== null && foodNames.get(meal.food_id)) || "Корм удалён";
+              const foodName = meal.food_name;
               return (
                 <li key={meal.id} className="flex items-center gap-3 border-t border-secondary pt-2.5">
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{foodName}</p>
-                    <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                    <p className="truncate text-xs text-muted-foreground">
                       <span title={formatFedAt(meal.fed_at)}>{formatTimeAgo(meal.fed_at, now)}</span>
-                      <span>{formatWeight(meal.portion_g)}</span>
-                      <RateStars rate={meal.rate} />
-                      {!meal.tolerated && <span className="font-semibold text-destructive">реакция</span>}
+                      {" · "}
+                      {meal.liked ? "понравилось" : "не понравилось"}
+                      {!meal.tolerated && (
+                        <>
+                          {" · "}
+                          <span className="font-semibold text-destructive">реакция</span>
+                        </>
+                      )}
+                      {[meal.reaction_notes, meal.notes].filter(Boolean).map((note) => ` · ${note}`).join("")}
                     </p>
-                    {(meal.reactions || meal.notes) && (
-                      <p className="mt-0.5 truncate text-xs">{[meal.reactions, meal.notes].filter(Boolean).join(" · ")}</p>
-                    )}
                   </div>
                   {foods !== null && (
                     <Button
@@ -502,8 +466,9 @@ export function PetMeals({
         )}
 
         {meals && meals.length > RECENT_MEALS_LIMIT && (
-          <Button type="button" variant="ghost" className="self-start" onClick={() => setShowAll((value) => !value)}>
-            {showAll ? "Свернуть" : `Показать все (${meals.length})`}
+          <Button type="button" variant="ghost" className="justify-center mt-2" onClick={() => setShowAll((value) => !value)}>
+            {showAll ? <ChevronUpIcon /> : <ChevronDownIcon />}
+            {showAll ? "Свернуть" : `Показать больше`}
           </Button>
         )}
       </Card>
