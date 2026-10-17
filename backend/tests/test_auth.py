@@ -106,6 +106,57 @@ def test_me_returns_public_user_for_valid_token(client: TestClient) -> None:
     assert "password_hash" not in response.json()
 
 
+def test_me_name_can_be_updated_and_cleared(client: TestClient) -> None:
+    register(client)
+    token = login(client).json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    updated = client.patch(
+        "/api/v1/auth/me",
+        headers=headers,
+        json={"name": "  Виталий Петров  "},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "Виталий Петров"
+
+    cleared = client.patch(
+        "/api/v1/auth/me",
+        headers=headers,
+        json={"name": None},
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["name"] is None
+
+
+def test_password_can_be_changed_only_with_current_password(client: TestClient) -> None:
+    register(client)
+    token = login(client).json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    changed = client.patch(
+        "/api/v1/auth/me/password",
+        headers=headers,
+        json={
+            "current_password": PASSWORD,
+            "new_password": "new-correct-password",
+        },
+    )
+    assert changed.status_code == 204
+
+    assert login(client, password=PASSWORD).status_code == 401
+    assert login(client, password="new-correct-password").status_code == 200
+
+    wrong_current = client.patch(
+        "/api/v1/auth/me/password",
+        headers=headers,
+        json={
+            "current_password": PASSWORD,
+            "new_password": "another-password",
+        },
+    )
+    assert wrong_current.status_code == 400
+
+
 def test_avatar_upload_and_replacement(client: TestClient) -> None:
     register(client)
     token = login(client).json()["access_token"]
