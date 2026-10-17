@@ -13,42 +13,39 @@ from app.models.user import User
 
 
 EMAIL = "owner@example.com"
-USERNAME = "pet_owner"
 PASSWORD = "correct-horse-battery-staple"
 
 
 def register(
     client: TestClient,
     email: str = EMAIL,
-    username: str = USERNAME,
+    name: str | None = None,
     password: str = PASSWORD,
 ):
     return client.post(
         "/api/v1/auth/register",
-        json={"email": email, "username": username, "password": password},
+        json={"email": email, "name": name, "password": password},
     )
 
 
 def login(
     client: TestClient,
-    identifier: str = EMAIL,
+    email: str = EMAIL,
     password: str = PASSWORD,
-    **kwargs: str,
 ):
-    identifier = kwargs.get("email", identifier)
     return client.post(
-        "/api/v1/auth/login", json={"identifier": identifier, "password": password}
+        "/api/v1/auth/login", json={"email": email, "password": password}
     )
 
 
-def test_registration_hashes_password_and_rejects_duplicate_email_and_username(
+def test_registration_hashes_password_and_rejects_duplicate_email(
     client: TestClient, db: Session
 ) -> None:
-    response = register(client, email="  OWNER@Example.COM ", username=" Pet_Owner ")
+    response = register(client, email="  OWNER@Example.COM ", name=" Петр Лукьянов ")
 
     assert response.status_code == 201
     assert response.json()["email"] == EMAIL
-    assert response.json()["username"] == USERNAME
+    assert response.json()["name"] == "Петр Лукьянов"
     assert response.json()["avatar_url"] is None
     assert "password" not in response.json()
     assert "password_hash" not in response.json()
@@ -70,13 +67,14 @@ def test_login_success_and_incorrect_password_rejection(client: TestClient) -> N
     assert response.json()["token_type"] == "bearer"
     assert response.json()["access_token"]
 
-    username_login = login(client, identifier="PET_OWNER")
-    assert username_login.status_code == 200
-    assert username_login.json()["access_token"]
-
     incorrect = login(client, password="incorrect-password")
     assert incorrect.status_code == 401
     assert incorrect.headers["www-authenticate"] == "Bearer"
+
+
+def test_login_rejects_non_email(client: TestClient) -> None:
+    response = login(client, email="PET_OWNER")
+    assert response.status_code == 422
 
 
 def test_login_auto_registers_unknown_email(client: TestClient, db: Session) -> None:
@@ -103,7 +101,7 @@ def test_me_returns_public_user_for_valid_token(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json()["id"] == registered.json()["id"]
     assert response.json()["email"] == EMAIL
-    assert response.json()["username"] == USERNAME
+    assert response.json()["name"] is None
     assert response.json()["avatar_url"] is None
     assert "password_hash" not in response.json()
 

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.dependencies import AppSettings, CurrentUser, DbSession
@@ -21,7 +21,7 @@ def storage_for(settings: AppSettings) -> LocalMediaStorage:
 def register(payload: UserRegistration, db: DbSession) -> User:
     user = User(
         email=str(payload.email),
-        username=payload.username,
+        name=payload.name,
         password_hash=hash_password(payload.password),
     )
     db.add(user)
@@ -31,26 +31,21 @@ def register(payload: UserRegistration, db: DbSession) -> User:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="A user with this email or username already exists",
+            detail="A user with this email already exists",
         ) from None
     db.refresh(user)
     return user
 
 
 def get_or_create_user(credentials: Credentials, db: DbSession) -> User:
-    email = credentials.identifier
+    email = str(credentials.email)
     user = db.scalar(select(User).where(User.email == email))
     if user is not None:
         return user
 
-    username = email.split("@", 1)[0].lower()
-    username = "".join(character if character.isalnum() or character == "_" else "_" for character in username)
-    username = username[:30].strip("_") or "user"
-    if len(username) < 3:
-        username = f"user_{username}"
     user = User(
         email=email,
-        username=username,
+        name=None,
         password_hash=hash_password(credentials.password),
     )
     db.add(user)
@@ -68,23 +63,13 @@ def get_or_create_user(credentials: Credentials, db: DbSession) -> User:
 
 @router.post("/login", response_model=TokenResponse)
 def login(credentials: Credentials, db: DbSession, settings: AppSettings) -> TokenResponse:
-    user = db.scalar(
-        select(User).where(
-            or_(User.email == credentials.identifier, User.username == credentials.identifier)
-        )
-    )
+    user = db.scalar(select(User).where(User.email == str(credentials.email)))
     if user is None:
-        if "@" not in credentials.identifier:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email/username or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
         user = get_or_create_user(credentials, db)
     elif not verify_password(credentials.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email/username or password",
+            detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
