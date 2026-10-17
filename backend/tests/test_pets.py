@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 def auth_headers(client: TestClient, email: str) -> dict[str, str]:
     password = "correct-horse-battery-staple"
     registered = client.post(
-        "/api/v1/auth/register", json={"email": email, "password": password}
+        "/api/v1/auth/register",
+        json={"email": email, "password": password},
     )
     assert registered.status_code == 201
     logged_in = client.post(
