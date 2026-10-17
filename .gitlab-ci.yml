@@ -1,9 +1,9 @@
 # NOTE: Shared job templates come from pipelines/pipelines (Spirit).
-# Deploy goes to the Spirit VMaaS box over Teleport (tsh) - no public-IP SSH key needed.
-# Required CI/CD variables (group/project secrets):
-#   SPIRIT_DOCKER_SA_KEY (File)   - service-account key for the private registry
-#   TELEPORT_TENANT, TELEPORT_PROXY - provided by the group for .teleport_auth
-# The non-secret deploy target is set below; real CI/CD variables override it.
+# Deploy goes to the Spirit VM over SSH as a dedicated, key-only "deployer" user.
+# Required CI/CD variables (project secrets):
+#   SPIRIT_DOCKER_SA_KEY (File) - service-account key for the private registry
+#   SSH_PRIVATE_KEY (File)      - private key of the VM deploy user
+#   DEPLOY_USER, DEPLOY_HOST    - deploy user name and VM address
 
 stages:
   - prepare
@@ -18,15 +18,11 @@ include:
       - /jobs/build.yaml
       - /jobs/docker.yaml
       - /jobs/rules.yaml
-      - /jobs/teleport.yaml
-      - /jobs/configure-docker.yaml
 
 variables:
   REGISTRY: registry.spirit.t-education.com/hack-led-22
   DP_CLI_VERSION: 14.1.3
-  DEPLOY_VM: hack-led-22-vm1-606d53
-  # Teleport identity is a service account, so the only permitted login is the SA itself.
-  DEPLOY_SSH_USER: sa-hack-led-22-spirit-docker-ci
+  SSH_ADDRESS: $DEPLOY_USER@$DEPLOY_HOST
 
 test:backend:
   stage: test
@@ -60,30 +56,44 @@ build:frontend:
     DOCKERFILE_PATH: $CI_PROJECT_DIR/frontend/Dockerfile
     IMAGE_NAME: $REGISTRY/frontend:${CI_COMMIT_SHORT_SHA}
 
+.ssh_setup:
+  before_script:
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - cp "$SSH_PRIVATE_KEY" ~/.ssh/id_deploy
+    - sed -i 's/\\n/\n/g; s/\r$//' ~/.ssh/id_deploy
+    - |
+      if ! grep -q 'PRIVATE KEY' ~/.ssh/id_deploy; then
+        base64 -d ~/.ssh/id_deploy > ~/.ssh/id_deploy.dec && mv ~/.ssh/id_deploy.dec ~/.ssh/id_deploy
+      fi
+    - chmod 600 ~/.ssh/id_deploy
+    - |
+      echo "SSH key diag: lines=$(wc -l < ~/.ssh/id_deploy) bytes=$(wc -c < ~/.ssh/id_deploy) prefix=$(head -c 27 ~/.ssh/id_deploy | tr '\n' ' ')"
+    - ssh-keygen -y -f ~/.ssh/id_deploy > ~/.ssh/id_deploy.pub 2>/dev/null || { echo "SSH_PRIVATE_KEY is not a usable private key"; exit 1; }
+    - ssh-keygen -lf ~/.ssh/id_deploy.pub
+    - printf 'Host *\n  StrictHostKeyChecking no\n  IdentityFile ~/.ssh/id_deploy\n' > ~/.ssh/config && chmod 600 ~/.ssh/config
+
 deploy:
   stage: deploy
-  image: registry.spirit.t-education.com/cicd-images/tsh-18:latest
+  image: kroniak/ssh-client:3.19
   extends:
-    - .teleport_auth
     - .rules-master
+    - .ssh_setup
   variables:
     TAG: ${CI_COMMIT_SHORT_SHA}
   script:
     # Idempotent: make sure the deploy user on the VM can pull from the private Registry.
-    - tsh scp scripts/registry-login.sh "${DEPLOY_SSH_USER}@${DEPLOY_VM}:/opt/petcare/registry-login.sh"
+    - scp scripts/registry-login.sh "${SSH_ADDRESS}:/opt/petcare/registry-login.sh"
     - |
       KEY_B64=$(base64 -w0 "$SPIRIT_DOCKER_SA_KEY")
-      tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "bash /opt/petcare/registry-login.sh '$KEY_B64' ${DP_CLI_VERSION}"
-    # Remove first: the file may be owned by another local user, and tsh scp chmods it.
-    - tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "rm -f /opt/petcare/docker-compose.yml"
-    - tsh scp docker-compose.yml "${DEPLOY_SSH_USER}@${DEPLOY_VM}:/opt/petcare/docker-compose.yml"
-    - tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "cd /opt/petcare && TAG=${TAG} docker compose pull && TAG=${TAG} docker compose up -d --remove-orphans"
+      ssh $SSH_ADDRESS "bash /opt/petcare/registry-login.sh '$KEY_B64' ${DP_CLI_VERSION}"
+    - scp docker-compose.yml "${SSH_ADDRESS}:/opt/petcare/docker-compose.yml"
+    - ssh $SSH_ADDRESS "cd /opt/petcare && TAG=${TAG} docker compose pull && TAG=${TAG} docker compose up -d --remove-orphans"
 
 prepare:docker:
   stage: prepare
-  image: registry.spirit.t-education.com/cicd-images/tsh-18:latest
+  image: kroniak/ssh-client:3.19
   extends:
-    - .teleport_auth
+    - .ssh_setup
   rules:
     - if: $CI_COMMIT_REF_NAME == "master"
       when: manual
@@ -91,7 +101,8 @@ prepare:docker:
   variables:
     DP_CLI_VERSION: 14.1.3
   script:
-    - tsh scp scripts/registry-login.sh "${DEPLOY_SSH_USER}@${DEPLOY_VM}:/opt/petcare/registry-login.sh"
+    - scp scripts/registry-login.sh "${SSH_ADDRESS}:/opt/petcare/registry-login.sh"
     - |
       KEY_B64=$(base64 -w0 "$SPIRIT_DOCKER_SA_KEY")
-      tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "bash /opt/petcare/registry-login.sh '$KEY_B64' ${DP_CLI_VERSION}"
+      ssh $SSH_ADDRESS "bash /opt/petcare/registry-login.sh '$KEY_B64' ${DP_CLI_VERSION}"
+
