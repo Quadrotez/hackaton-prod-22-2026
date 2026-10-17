@@ -5,11 +5,10 @@ from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, field
 
 
 class VeterinaryDocumentFields(BaseModel):
-    """The eight flat data fields in a veterinary-document analysis."""
+    """The seven flat data fields in a veterinary-document analysis."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    animal_name: str | None
     visit_at: str | None = Field(
         default=None,
         description=(
@@ -26,7 +25,6 @@ class VeterinaryDocumentFields(BaseModel):
     post_visit_instructions: str | None
 
     @field_validator(
-        "animal_name",
         "visit_reason",
         "veterinarian_name",
         "veterinarian_profession",

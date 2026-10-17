@@ -8,8 +8,7 @@ from PIL import Image
 
 from app.integrations.llm.vet_document_analyzer import analyze_veterinary_document
 
-EIGHT_FIELDS = {
-    "animal_name": "Milo",
+ANALYZED_FIELDS = {
     "visit_at": "2026-10-10T00:00:00Z",
     "visit_reason": "Routine examination",
     "visit_price": 1500,
@@ -21,7 +20,7 @@ EIGHT_FIELDS = {
 EXPECTED_ANALYSIS = {
     "status": "success",
     "document_type": "veterinary_report",
-    **EIGHT_FIELDS,
+    **ANALYZED_FIELDS,
     "warnings": [],
     "error_code": None,
 }
@@ -82,7 +81,7 @@ def test_analyze_endpoint_returns_exact_new_contract(
     assert set(response.json()) == {
         "status",
         "document_type",
-        *EIGHT_FIELDS,
+        *ANALYZED_FIELDS,
         "warnings",
         "error_code",
     }
@@ -207,7 +206,7 @@ def test_llm_validation_accepts_null_optional_values() -> None:
     payload = {
         **EXPECTED_ANALYSIS,
         "status": "error",
-        **{key: None for key in EIGHT_FIELDS},
+        **{key: None for key in ANALYZED_FIELDS},
         "error_code": "UNSUPPORTED_DOCUMENT",
     }
     result = analyze_veterinary_document(
