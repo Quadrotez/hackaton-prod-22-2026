@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.models.health import IntakeStatus, VaccinationStatus, VisitReason, VisitStatus
+from app.models.health import IntakeStatus, VaccinationStatus, VisitStatus
 from app.models.pet import PetSex
 
 
@@ -248,42 +248,75 @@ class IntakeMark(BaseModel):
 
 
 class VetVisitCreate(BaseModel):
-    title: str = Field(min_length=1, max_length=255)
+    # Analyzer field names are accepted alongside the existing visit contract.
     visit_at: datetime
+    visit_reason: str | None = Field(default=None, min_length=1, max_length=5000)
+    visit_price: float | None = Field(default=None, ge=0)
+    veterinarian_name: str | None = Field(default=None, max_length=255)
+    veterinarian_profession: str | None = Field(default=None, max_length=255)
+    vet: str | None = Field(default=None, max_length=255)
+    post_visit_instructions: str | None = Field(default=None, max_length=5000)
+    title: str | None = Field(default=None, min_length=1, max_length=255)
     doctor_name: str | None = Field(default=None, max_length=255)
     doctor_specialty: str | None = Field(default=None, max_length=255)
-    reason: VisitReason
-    topic: str | None = Field(
-        default=None,
-        max_length=255,
-        description='Grouping label such as "Allergy", matched case-insensitively.',
-    )
+    reason: str | None = Field(default=None, min_length=1, max_length=5000)
+    topic: str | None = Field(default=None, max_length=255)
     status: VisitStatus = VisitStatus.PLANNED
     diagnosis: str | None = Field(default=None, max_length=5000)
     notes: str | None = Field(default=None, max_length=5000)
-    referred_by_visit_id: int | None = Field(
-        default=None, description="Earlier visit of the same pet that referred to this one."
-    )
+    referred_by_visit_id: int | None = Field(default=None)
 
-    @field_validator("title", "doctor_name", "doctor_specialty", "topic", "diagnosis", "notes")
+    @model_validator(mode="after")
+    def normalize_analyzer_fields(self) -> "VetVisitCreate":
+        if self.reason is None:
+            self.reason = self.visit_reason
+        if self.title is None:
+            self.title = self.visit_reason or "Veterinary visit"
+        if self.doctor_name is None:
+            self.doctor_name = self.veterinarian_name
+        if self.doctor_specialty is None:
+            self.doctor_specialty = self.veterinarian_profession
+        return self
+
+    @field_validator(
+        "visit_reason", "veterinarian_name", "veterinarian_profession",
+        "vet", "post_visit_instructions", "title", "doctor_name", "doctor_specialty",
+        "reason", "topic", "diagnosis", "notes",
+    )
     @classmethod
     def strip_fields(cls, value: str | None) -> str | None:
         return strip_text(value)
 
+    @model_validator(mode="after")
+    def require_reason(self) -> "VetVisitCreate":
+        if self.reason is None:
+            raise ValueError("visit_reason or reason is required")
+        return self
+
 
 class VetVisitUpdate(BaseModel):
-    title: str | None = Field(default=None, min_length=1, max_length=255)
     visit_at: datetime | None = None
+    visit_reason: str | None = Field(default=None, min_length=1, max_length=5000)
+    visit_price: float | None = Field(default=None, ge=0)
+    veterinarian_name: str | None = Field(default=None, max_length=255)
+    veterinarian_profession: str | None = Field(default=None, max_length=255)
+    vet: str | None = Field(default=None, max_length=255)
+    post_visit_instructions: str | None = Field(default=None, max_length=5000)
+    title: str | None = Field(default=None, min_length=1, max_length=255)
     doctor_name: str | None = Field(default=None, max_length=255)
     doctor_specialty: str | None = Field(default=None, max_length=255)
-    reason: VisitReason | None = None
+    reason: str | None = Field(default=None, min_length=1, max_length=5000)
     topic: str | None = Field(default=None, max_length=255)
     status: VisitStatus | None = None
     diagnosis: str | None = Field(default=None, max_length=5000)
     notes: str | None = Field(default=None, max_length=5000)
     referred_by_visit_id: int | None = None
 
-    @field_validator("title", "doctor_name", "doctor_specialty", "topic", "diagnosis", "notes")
+    @field_validator(
+        "visit_reason", "veterinarian_name", "veterinarian_profession",
+        "vet", "post_visit_instructions", "title", "doctor_name", "doctor_specialty",
+        "reason", "topic", "diagnosis", "notes",
+    )
     @classmethod
     def strip_fields(cls, value: str | None) -> str | None:
         return strip_text(value)
@@ -292,11 +325,18 @@ class VetVisitUpdate(BaseModel):
 class VetVisitPublic(ORMModel):
     id: int
     pet_id: int
-    title: str
     visit_at: datetime
+    visit_reason: str
+    visit_price: float | None
+    veterinarian_name: str | None
+    veterinarian_profession: str | None
+    vet: str | None
+    post_visit_instructions: str | None
+    # Existing response fields remain available for current clients.
+    title: str
     doctor_name: str | None
     doctor_specialty: str | None
-    reason: VisitReason
+    reason: str
     topic: str | None
     status: VisitStatus
     diagnosis: str | None

@@ -193,18 +193,24 @@ class VetVisit(Base):
     __tablename__ = "vet_visits"
     __table_args__ = (
         Index("ix_vet_visits_pet_id", "pet_id"),
+        Index("ix_vet_visits_user_id", "user_id"),
         Index("ix_vet_visits_referred_by", "referred_by_visit_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     pet_id: Mapped[int] = mapped_column(ForeignKey("pets.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # Legacy API names are retained for compatibility; the analyzer maps
+    # veterinarian_name -> doctor_name, veterinarian_profession -> doctor_specialty,
+    # and visit_reason -> reason.
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     visit_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     doctor_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     doctor_specialty: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    reason: Mapped[VisitReason] = mapped_column(
-        string_enum(VisitReason, "visit_reason"), nullable=False
-    )
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    visit_price: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    clinic: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    post_visit_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Free-form grouping label such as "Allergy"; compared case-insensitively.
     topic: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[VisitStatus] = mapped_column(
@@ -218,6 +224,25 @@ class VetVisit(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+    pet = relationship("Pet", back_populates="vet_visits")
+    user = relationship("User", back_populates="vet_visits")
+
+    @property
+    def visit_reason(self) -> str:
+        return self.reason
+
+    @property
+    def veterinarian_name(self) -> str | None:
+        return self.doctor_name
+
+    @property
+    def veterinarian_profession(self) -> str | None:
+        return self.doctor_specialty
+
+    @property
+    def vet(self) -> str | None:
+        return self.clinic
 
 
 class MeasurementProfile(Base):

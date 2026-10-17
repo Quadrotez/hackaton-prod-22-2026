@@ -49,7 +49,7 @@ class Pet(Base):
     pregnancies = relationship("Pregnancy", cascade="all, delete-orphan")
     vaccinations = relationship("Vaccination", cascade="all, delete-orphan")
     medications = relationship("Medication", cascade="all, delete-orphan")
-    vet_visits = relationship("VetVisit", cascade="all, delete-orphan")
+    vet_visits = relationship("VetVisit", back_populates="pet", cascade="all, delete-orphan")
     measurement_parameters = relationship("MeasurementParameter", cascade="all, delete-orphan")
     measurement_profile = relationship(
         "MeasurementProfile", cascade="all, delete-orphan", uselist=False

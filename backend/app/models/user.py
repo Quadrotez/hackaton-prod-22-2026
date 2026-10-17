@@ -18,5 +18,6 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     pets = relationship("Pet", back_populates="user", cascade="all, delete-orphan")
+    vet_visits = relationship("VetVisit", back_populates="user", cascade="all, delete-orphan")
     foods = relationship("Food", back_populates="user", cascade="all, delete-orphan")
     food_stocks = relationship("FoodStock", back_populates="user", cascade="all, delete-orphan")
