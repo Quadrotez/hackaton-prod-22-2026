@@ -61,6 +61,7 @@ def test_feeding_records_migration_upgrade_and_downgrade(
             for column in inspector.get_columns("feeding_records")
         }
         assert columns["pet_id"]["nullable"] is False
+        assert columns["food_id"]["nullable"] is True
         assert columns["food_name"]["nullable"] is False
         assert columns["fed_at"]["nullable"] is False
         assert columns["liked"]["nullable"] is False
@@ -69,10 +70,21 @@ def test_feeding_records_migration_upgrade_and_downgrade(
         assert columns["notes"]["nullable"] is True
 
         foreign_keys = inspector.get_foreign_keys("feeding_records")
-        assert len(foreign_keys) == 1
-        assert foreign_keys[0]["constrained_columns"] == ["pet_id"]
-        assert foreign_keys[0]["referred_table"] == "pets"
-        assert foreign_keys[0]["options"].get("ondelete") == "CASCADE"
+        assert len(foreign_keys) == 2
+        pet_foreign_key = next(
+            foreign_key
+            for foreign_key in foreign_keys
+            if foreign_key["constrained_columns"] == ["pet_id"]
+        )
+        food_foreign_key = next(
+            foreign_key
+            for foreign_key in foreign_keys
+            if foreign_key["constrained_columns"] == ["food_id"]
+        )
+        assert pet_foreign_key["referred_table"] == "pets"
+        assert pet_foreign_key["options"].get("ondelete") == "CASCADE"
+        assert food_foreign_key["referred_table"] == "foods"
+        assert food_foreign_key["options"].get("ondelete") == "SET NULL"
 
         command.downgrade(config, "20261016_0003")
         downgraded_inspector = inspect(create_engine(database_url))
