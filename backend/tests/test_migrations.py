@@ -96,3 +96,49 @@ def test_pet_sex_migration_backfills_existing_rows_and_enforces_choices(
     finally:
         engine.dispose()
         get_settings.cache_clear()
+
+
+HEALTH_TABLES = {
+    "symptoms",
+    "allergies",
+    "pregnancies",
+    "vaccinations",
+    "medications",
+    "medication_times",
+    "medication_intakes",
+    "vet_visits",
+}
+
+
+def test_health_tables_migration_upgrade_and_downgrade(tmp_path: Path, monkeypatch) -> None:
+    database_url = f"sqlite+pysqlite:///{tmp_path / 'health-migration.sqlite'}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+
+    config = Config("alembic.ini")
+    try:
+        command.upgrade(config, "head")
+        inspector = inspect(create_engine(database_url))
+        assert HEALTH_TABLES <= set(inspector.get_table_names())
+
+        visit_keys = {
+            tuple(key["constrained_columns"]): key
+            for key in inspector.get_foreign_keys("vet_visits")
+        }
+        assert visit_keys[("pet_id",)]["options"].get("ondelete") == "CASCADE"
+        assert visit_keys[("referred_by_visit_id",)]["referred_table"] == "vet_visits"
+        assert visit_keys[("referred_by_visit_id",)]["options"].get("ondelete") == "SET NULL"
+
+        active_index = next(
+            index
+            for index in inspector.get_indexes("pregnancies")
+            if index["name"] == "uq_pregnancies_active_pet"
+        )
+        assert active_index["unique"]
+
+        command.downgrade(config, "20261016_0005")
+        downgraded = set(inspect(create_engine(database_url)).get_table_names())
+        assert not HEALTH_TABLES & downgraded
+        assert "feeding_records" in downgraded
+    finally:
+        get_settings.cache_clear()

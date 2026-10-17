@@ -43,3 +43,10 @@ class Pet(Base):
     feeding_records = relationship(
         "FeedingRecord", back_populates="pet", cascade="all, delete-orphan"
     )
+    # Health records: listed only so that deleting a pet through the ORM removes them.
+    symptoms = relationship("Symptom", cascade="all, delete-orphan")
+    allergies = relationship("Allergy", cascade="all, delete-orphan")
+    pregnancies = relationship("Pregnancy", cascade="all, delete-orphan")
+    vaccinations = relationship("Vaccination", cascade="all, delete-orphan")
+    medications = relationship("Medication", cascade="all, delete-orphan")
+    vet_visits = relationship("VetVisit", cascade="all, delete-orphan")
