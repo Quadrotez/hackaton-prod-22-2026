@@ -74,6 +74,8 @@ deploy:
     - |
       KEY_B64=$(base64 -w0 "$SPIRIT_DOCKER_SA_KEY")
       tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "bash /opt/petcare/registry-login.sh '$KEY_B64' ${DP_CLI_VERSION}"
+    # Remove first: the file may be owned by another local user, and tsh scp chmods it.
+    - tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "rm -f /opt/petcare/docker-compose.yml"
     - tsh scp docker-compose.yml "${DEPLOY_SSH_USER}@${DEPLOY_VM}:/opt/petcare/docker-compose.yml"
     - tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "cd /opt/petcare && TAG=${TAG} docker compose pull && TAG=${TAG} docker compose up -d --remove-orphans"
 
