@@ -258,3 +258,15 @@ def test_health_endpoint_remains_available(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_health_tags_distinguish_liveness_from_pet_health(client: TestClient) -> None:
+    schema = client.get("/openapi.json").json()
+
+    liveness = schema["paths"]["/api/v1/health"]["get"]
+    pet_health = schema["paths"]["/api/v1/pets/{pet_id}/health"]["get"]
+
+    assert liveness["tags"] == ["healthcheck"]
+    assert pet_health["tags"] == ["pet health"]
+    assert "health" not in liveness["tags"]
+    assert "health" not in pet_health["tags"]
