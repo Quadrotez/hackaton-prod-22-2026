@@ -59,7 +59,13 @@ build:frontend:
 .ssh_setup:
   before_script:
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    - cp "$SSH_PRIVATE_KEY" ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+    - cp "$SSH_PRIVATE_KEY" ~/.ssh/id_deploy
+    - |
+      if ! grep -q 'PRIVATE KEY' ~/.ssh/id_deploy; then
+        base64 -d ~/.ssh/id_deploy > ~/.ssh/id_deploy.dec && mv ~/.ssh/id_deploy.dec ~/.ssh/id_deploy
+      fi
+    - sed -i 's/\r$//' ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+    - ssh-keygen -y -f ~/.ssh/id_deploy | ssh-keygen -lf - || { echo "SSH_PRIVATE_KEY is not a usable private key"; exit 1; }
     - printf 'Host *\n  StrictHostKeyChecking no\n  IdentityFile ~/.ssh/id_deploy\n' > ~/.ssh/config && chmod 600 ~/.ssh/config
 
 deploy:
