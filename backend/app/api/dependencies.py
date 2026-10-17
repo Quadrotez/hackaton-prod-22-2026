@@ -38,7 +38,7 @@ def get_current_user(
         if not isinstance(subject, str):
             raise authentication_error()
         user_id = int(subject)
-    except (jwt.InvalidTokenError, TypeError, UnicodeError, ValueError):
+    except (jwt.InvalidTokenError, ValueError):
         raise authentication_error() from None
 
     user = db.get(User, user_id)

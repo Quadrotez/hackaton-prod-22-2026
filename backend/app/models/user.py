@@ -11,12 +11,8 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
-    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     pets = relationship("Pet", back_populates="user", cascade="all, delete-orphan")
-    foods = relationship("Food", back_populates="user", cascade="all, delete-orphan")
-    food_stocks = relationship("FoodStock", back_populates="user", cascade="all, delete-orphan")

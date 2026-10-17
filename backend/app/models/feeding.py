@@ -17,9 +17,6 @@ class FeedingRecord(Base):
     pet_id: Mapped[int] = mapped_column(
         ForeignKey("pets.id", ondelete="CASCADE"), nullable=False
     )
-    food_id: Mapped[int | None] = mapped_column(
-        ForeignKey("foods.id", ondelete="SET NULL"), nullable=True
-    )
     food_name: Mapped[str] = mapped_column(String(255), nullable=False)
     fed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     liked: Mapped[bool] = mapped_column(Boolean, nullable=False)
@@ -31,4 +28,3 @@ class FeedingRecord(Base):
     )
 
     pet = relationship("Pet", back_populates="feeding_records")
-    food = relationship("Food", back_populates="feeding_records")
