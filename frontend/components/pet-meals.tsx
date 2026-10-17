@@ -53,6 +53,7 @@ function formatFedAt(fedAt: string): string {
 
 const mealSchema = z.object({
   food_id: z.coerce.number().int().positive("Выберите корм"),
+  amount_grams: z.coerce.number().int("Граммы — целое число").positive("Укажите, сколько граммов дали"),
   fed_at: z.string().min(1, "Укажите время кормления")
     .transform((value) => new Date(value))
     .refine((date) => !Number.isNaN(date.getTime()), "Укажите корректное время")
@@ -126,6 +127,7 @@ function MealForm({
     const formData = new FormData(event.currentTarget);
     const result = mealSchema.safeParse({
       food_id: foodId || 0,
+      amount_grams: formData.get("amount_grams") ?? "",
       fed_at: fedAt,
       liked,
       tolerated,
@@ -235,6 +237,22 @@ function MealForm({
               </p>
             )}
             <FieldError>{errors.food_id}</FieldError>
+          </Field>
+
+          <Field data-invalid={Boolean(errors.amount_grams)}>
+            <FieldLabel htmlFor="meal-amount">Сколько граммов</FieldLabel>
+            <Input
+              id="meal-amount"
+              name="amount_grams"
+              type="number"
+              min={1}
+              step={1}
+              inputMode="numeric"
+              defaultValue={meal?.amount_grams ?? ""}
+              placeholder={selected ? `В наличии ${formatWeight(selected.remaining_grams)}` : ""}
+              aria-invalid={Boolean(errors.amount_grams)}
+            />
+            <FieldError>{errors.amount_grams}</FieldError>
           </Field>
 
           <Field data-invalid={Boolean(errors.fed_at)}>
