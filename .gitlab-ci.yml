@@ -130,8 +130,10 @@ demo:account:
     - .ssh_setup
   needs:
     - deploy
+  variables:
+    TAG: ${CI_COMMIT_SHORT_SHA}
   script:
-    - ssh $SSH_ADDRESS "cd /opt/petcare && docker compose exec -T api python scripts/create_demo_user.py"
+    - ssh $SSH_ADDRESS "cd /opt/petcare && TAG=${TAG} docker compose exec -T api python scripts/create_demo_user.py"
 
 prepare:docker:
   stage: prepare
