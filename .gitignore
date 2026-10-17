@@ -51,3 +51,7 @@ backend/test-media/
 
 # Opencode settings
 opencode.json
+
+
+
+docker-compose2.yml
