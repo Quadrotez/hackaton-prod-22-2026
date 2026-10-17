@@ -79,30 +79,45 @@ mr_field() {
   api "$API/projects/$project_id/merge_requests/$mr_iid" \
     | python3 -c "import json,sys;print(json.load(sys.stdin).get(sys.argv[1],''))" "$1"
 }
+mr_pipeline_status() {
+  api "$API/projects/$project_id/merge_requests/$mr_iid" \
+    | python3 -c 'import json,sys;d=json.load(sys.stdin);print((d.get("head_pipeline") or {}).get("status") or "none")'
+}
+# PUT .../merge с захватом HTTP-кода и тела ответа (ошибки GitLab приходят в body).
+merge_put() {
+  local body code
+  local -a extra=()
+  [ -n "${1:-}" ] && extra=(--data-urlencode "$1")
+  body="$(mktemp)"
+  code="$(curl -s -o "$body" -w '%{http_code}' \
+    --header "PRIVATE-TOKEN: $GITLAB_TOKEN" -X PUT \
+    "$API/projects/$project_id/merge_requests/$mr_iid/merge" \
+    --data "should_remove_source_branch=false" "${extra[@]}")"
+  if [ "$code" != "200" ]; then
+    echo "HTTP $code: $(python3 -c "import json,sys;print(json.load(open('$body')).get('message',''))" 2>/dev/null || cat "$body")" >&2
+    rm -f "$body"
+    return 1
+  fi
+  rm -f "$body"
+}
 for _ in $(seq 1 30); do
   status="$(mr_state)"
   echo "MR !$mr_iid: $status"
   case "$status" in
-    can_be_merged|ci_still_running|ci_must_be_passed|pipeline_blocking) break ;;
+    can_be_merged|ci_still_running|ci_must_pass|pipeline_blocking) break ;;
     checking|preparing|unchecked) sleep 5 ;;
     *) echo "!! MR нельзя смёрджить (статус: $status)."; exit 1 ;;
   esac
 done
 
 # 4) Смёрджить сразу или включить auto-merge на время пайплайна.
-mr_url="$API/projects/$project_id/merge_requests/$mr_iid"
 mr_web="$(mr_field web_url)"
-merge_http="$(curl -s -o /dev/null -w '%{http_code}' \
-  --header "PRIVATE-TOKEN: $GITLAB_TOKEN" -X PUT "$mr_url/merge" \
-  --data "should_remove_source_branch=false")"
-if [ "$merge_http" != "200" ]; then
-  echo "== прямой merge не прошёл (HTTP $merge_http), включаю auto-merge =="
-  mws_http="$(curl -s -o /dev/null -w '%{http_code}' \
-    --header "PRIVATE-TOKEN: $GITLAB_TOKEN" -X PUT "$mr_url/merge" \
-    --data "merge_when_pipeline_succeeds=true" \
-    --data "should_remove_source_branch=false")"
-  if [ "$mws_http" != "200" ]; then
-    echo "!! не удалось запланировать auto-merge (HTTP $mws_http), смёрджи MR вручную:" >&2
+if merge_put ""; then
+  echo "== MR !$mr_iid смёрджен =="
+else
+  echo "== прямой merge не прошёл, включаю auto-merge =="
+  if ! merge_put "merge_when_pipeline_succeeds=true"; then
+    echo "!! не удалось запланировать auto-merge, смёрджи MR вручную:" >&2
     echo "   $mr_web" >&2
     exit 1
   fi
@@ -113,14 +128,24 @@ if [ "$merge_http" != "200" ]; then
   merged=""
   for _ in $(seq 1 90); do
     state="$(mr_field state)"
+    pipeline="$(mr_pipeline_status)"
     case "$state" in
       merged) merged=1; break ;;
-      opened) sleep 10 ;;
+      opened) ;;
       *) break ;;
     esac
+    # Упавший/отменённый пайплайн отменяет auto-merge — дальше ждать бессмысленно.
+    case "$pipeline" in
+      failed|canceled|skipped)
+        echo "!! пайплайн завершился со статусом '$pipeline', auto-merge отменён." >&2
+        echo "   Почини пайплайн ($mr_web), затем запусти скрипт снова." >&2
+        exit 1
+        ;;
+    esac
+    sleep 10
   done
   if [ "$merged" != "1" ]; then
-    echo "== MR ещё не смёрджен (state=$state); локальный $MASTER_BRANCH обнови позже:" >&2
+    echo "== MR ещё не смёрджен (state=$state, pipeline=$pipeline); локальный $MASTER_BRANCH обнови позже:" >&2
     echo "   git fetch $REMOTE && git checkout $MASTER_BRANCH && git merge --ff-only $REMOTE/$MASTER_BRANCH" >&2
     exit 0
   fi
