@@ -341,3 +341,34 @@ def test_calendar_feeds_migration_upgrade_and_downgrade(tmp_path: Path, monkeypa
         assert "measurements" in downgraded
     finally:
         get_settings.cache_clear()
+
+
+def test_pet_transfers_migration_upgrade_and_downgrade(tmp_path: Path, monkeypatch) -> None:
+    database_url = f"sqlite+pysqlite:///{tmp_path / 'transfers-migration.sqlite'}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+
+    config = Config("alembic.ini")
+    try:
+        command.upgrade(config, "head")
+        inspector = inspect(create_engine(database_url))
+        assert "pet_transfers" in inspector.get_table_names()
+        keys = {
+            tuple(key["constrained_columns"]): key
+            for key in inspector.get_foreign_keys("pet_transfers")
+        }
+        assert keys[("pet_id",)]["options"].get("ondelete") == "CASCADE"
+        assert keys[("owner_id",)]["referred_table"] == "users"
+        open_index = next(
+            index
+            for index in inspector.get_indexes("pet_transfers")
+            if index["name"] == "uq_pet_transfers_open_pet"
+        )
+        assert open_index["unique"]
+
+        command.downgrade(config, "20261017_0014")
+        downgraded = set(inspect(create_engine(database_url)).get_table_names())
+        assert "pet_transfers" not in downgraded
+        assert "pets" in downgraded
+    finally:
+        get_settings.cache_clear()
