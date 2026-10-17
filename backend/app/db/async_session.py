@@ -5,7 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import get_settings
 
-
 # Sync drivers used by the rest of the app -> their async counterparts.
 # psycopg 3 serves both modes under the same driver name.
 ASYNC_DRIVERS = {

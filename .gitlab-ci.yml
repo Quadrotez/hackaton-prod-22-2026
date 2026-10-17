@@ -72,6 +72,26 @@ test:frontend:integration:
   script:
     - npm run test:integration
 
+# Линтеры: статический анализ бекенда (ruff) и фронтенда (eslint).
+# Идут в той же стадии, что и тесты, поэтому падение линта блокирует build/deploy.
+lint:backend:
+  stage: test
+  image: python:3.12
+  before_script:
+    - pip install --quiet "ruff==0.17.1"
+    - cd backend
+  script:
+    - ruff check .
+
+lint:frontend:
+  stage: test
+  image: node:20
+  before_script:
+    - cd frontend
+    - npm ci --no-audit --no-fund
+  script:
+    - npm run lint
+
 build:backend:
   stage: build
   extends:

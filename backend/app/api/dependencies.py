@@ -12,7 +12,6 @@ from app.db.session import get_db
 from app.models.food import Food
 from app.models.user import User
 
-
 bearer_scheme = HTTPBearer(auto_error=False)
 DbSession = Annotated[Session, Depends(get_db)]
 AppSettings = Annotated[Settings, Depends(get_settings)]

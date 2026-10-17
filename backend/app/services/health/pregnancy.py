@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.health import Pregnancy
 from app.schemas.health import PregnancyPublic
 
-
 DAYS_PER_MONTH = 30
 MAX_MONTH = 9
 

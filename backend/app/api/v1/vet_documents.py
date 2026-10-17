@@ -9,7 +9,6 @@ from app.api.v1.pets import get_owned_pet
 from app.integrations.llm.vet_document_analyzer import analyze_veterinary_document
 from app.schemas.vet_documents import VeterinaryDocumentAnalysis
 
-
 router = APIRouter(prefix="/pets/{pet_id}/vet-documents", tags=["vet documents"])
 IMAGE_FORMAT_CONTENT_TYPES = {
     "JPEG": "image/jpeg",

@@ -4,7 +4,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.models.pet import PetSex
 
-
 AGE_FIELDS_DESCRIPTION = (
     "Specify either birth_date or approximate_age_years, but not both. "
     "Both may be omitted when the pet's age is unknown."

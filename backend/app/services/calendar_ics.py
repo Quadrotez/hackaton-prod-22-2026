@@ -6,7 +6,6 @@ from zoneinfo import ZoneInfo
 
 from app.schemas.calendar import CalendarEvent, CalendarEventType
 
-
 PRODID = "-//PetCare//Pet calendar//RU"
 EVENT_LENGTH = {
     CalendarEventType.VISIT: timedelta(hours=1),

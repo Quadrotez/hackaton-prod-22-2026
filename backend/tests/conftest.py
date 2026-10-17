@@ -22,7 +22,6 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 
-
 # A file instead of :memory: so the sync and the async engine share one database.
 DATABASE_PATH = Path(tempfile.mkdtemp(prefix="petcare-tests-")) / "test.sqlite"
 

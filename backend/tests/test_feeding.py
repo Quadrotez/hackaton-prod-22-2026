@@ -1,4 +1,3 @@
-from datetime import datetime
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
@@ -6,7 +5,6 @@ from sqlalchemy.orm import Session
 
 from app.models.feeding import FeedingRecord
 from app.models.food import Food
-
 
 PASSWORD = "correct-horse-battery-staple"
 
@@ -264,7 +262,11 @@ def test_food_history_is_isolated_per_pet_and_owner(client: TestClient) -> None:
 
     for method, path, kwargs in (
         ("get", feeding_url(foreign_pet), {}),
-        ("post", feeding_url(foreign_pet), {"json": {"food_name": "X", "fed_at": "2026-10-15T12:00:00Z", "liked": True, "tolerated": True}}),
+        (
+            "post",
+            feeding_url(foreign_pet),
+            {"json": {"food_name": "X", "fed_at": "2026-10-15T12:00:00Z", "liked": True, "tolerated": True}},
+        ),
         ("get", f"{feeding_url(foreign_pet)}/suggestions?food_name=X", {}),
         ("get", f"{feeding_url(foreign_pet)}/{first_record['id']}", {}),
         ("patch", f"{feeding_url(foreign_pet)}/{first_record['id']}", {"json": {"liked": False}}),
@@ -451,7 +453,15 @@ def test_patch_validation_rejects_empty_null_and_blank_required_fields(
     record_id = create_record(client, headers, pet_id).json()["id"]
     url = f"{feeding_url(pet_id)}/{record_id}"
 
-    for payload in ({}, {"liked": None}, {"tolerated": None}, {"fed_at": None}, {"food_name": None}, {"food_name": "  "}):
+    invalid_payloads = (
+        {},
+        {"liked": None},
+        {"tolerated": None},
+        {"fed_at": None},
+        {"food_name": None},
+        {"food_name": "  "},
+    )
+    for payload in invalid_payloads:
         response = client.patch(url, headers=headers, json=payload)
         assert response.status_code == 422
 

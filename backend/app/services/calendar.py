@@ -14,7 +14,6 @@ from app.schemas.calendar import CalendarEvent, CalendarEventType
 from app.services.health.common import local_now, local_today
 from app.services.health.schedule import build_schedule
 
-
 MAX_RANGE_DAYS = 400
 
 

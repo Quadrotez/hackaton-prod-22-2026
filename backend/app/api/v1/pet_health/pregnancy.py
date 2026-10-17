@@ -8,7 +8,6 @@ from app.schemas.health import PregnancyPublic, PregnancyUpsert
 from app.services.health.common import local_today, save, unprocessable
 from app.services.health.pregnancy import active_pregnancy, started_on_for_month, to_public
 
-
 router = APIRouter(prefix="/pets/{pet_id}/pregnancy", tags=["pet health: pregnancy"])
 
 

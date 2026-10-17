@@ -14,7 +14,6 @@ from app.db.async_session import get_async_db
 from app.models.pet import Pet
 from app.models.user import User
 
-
 AsyncDbSession = Annotated[AsyncSession, Depends(get_async_db)]
 
 

@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 from app.models.transfer import PetTransfer
 from app.services.transfers import add_months
 
-
 PASSWORD = "correct-horse-battery-staple"
 
 
