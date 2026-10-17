@@ -62,9 +62,9 @@ async def read_limited_image(file: UploadFile, max_size: int) -> tuple[bytes, st
     response_model=VeterinaryDocumentAnalysis,
     summary="Analyze a veterinary document photo",
     description=(
-        "Accepts a PNG, JPEG, or WebP photo and required context about the authenticated "
-        "user's pet. The response contains exactly animal_name, visit_date, visit_reason, "
-        "and visit_price."
+        "Accepts a PNG, JPEG, or WebP photo and optional context about the authenticated "
+        "user's pet. The photo has priority over context. Returns exactly the validated "
+        "status, document type, extracted data, warnings, and error code fields."
     ),
 )
 async def analyze_pet_veterinary_document(
@@ -73,15 +73,10 @@ async def analyze_pet_veterinary_document(
     db: DbSession,
     settings: AppSettings,
     image: UploadFile = File(...),
-    pet_context: str = Form(..., min_length=1, max_length=4000),
+    pet_context: str | None = Form(default=None, max_length=4000),
 ) -> VeterinaryDocumentAnalysis:
     get_owned_pet(pet_id, current_user, db)
-    normalized_context = pet_context.strip()
-    if not normalized_context:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="pet_context must not be blank",
-        )
+    normalized_context = (pet_context or "").strip()
 
     try:
         image_bytes, content_type = await read_limited_image(
