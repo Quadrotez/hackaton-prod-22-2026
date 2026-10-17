@@ -3,11 +3,13 @@ from typing import Annotated
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.core.security import decode_access_token
 from app.db.session import get_db
+from app.models.food import Food
 from app.models.user import User
 
 
@@ -48,3 +50,11 @@ def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def get_owned_food(food_id: int, current_user: CurrentUser, db: DbSession) -> Food:
+    """Return the catalog food only if it belongs to the authenticated user, else 404."""
+    food = db.scalar(select(Food).where(Food.id == food_id, Food.user_id == current_user.id))
+    if food is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Food not found")
+    return food
