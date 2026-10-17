@@ -51,6 +51,19 @@ fi
 git merge --ff-only "$REMOTE/$DEV_BRANCH"
 git push "$REMOTE" "$DEV_BRANCH"
 
+# 1.5) После squash-релиза история master не входит в dev — влить master обратно,
+#      иначе GitLab требует rebase и MR не смёрджится.
+if ! git merge-base --is-ancestor "$REMOTE/$MASTER_BRANCH" "$DEV_BRANCH"; then
+  echo "== синхронизирую $DEV_BRANCH с $REMOTE/$MASTER_BRANCH =="
+  if ! git merge --no-edit "$REMOTE/$MASTER_BRANCH" \
+      -m "Merge branch '$MASTER_BRANCH' into $DEV_BRANCH (post-release sync)"; then
+    echo "!! Конфликт при слиянии $MASTER_BRANCH в $DEV_BRANCH." >&2
+    echo "   Разреши конфликт (git status), закоммить и запусти скрипт снова." >&2
+    exit 1
+  fi
+  git push "$REMOTE" "$DEV_BRANCH"
+fi
+
 # 2) Найти или создать MR dev -> master.
 mr_iid="$(
   api "$API/projects/$project_id/merge_requests?state=opened&source_branch=$DEV_BRANCH&target_branch=$MASTER_BRANCH" \
@@ -152,13 +165,19 @@ else
   echo "== MR !$mr_iid смёрджен =="
 fi
 
-# 5) Обновить локальный master до merge-коммита.
+# 5) Обновить локальный master (GitLab мёрджит MR squash-коммитом, поэтому
+#    fast-forward возможен не всегда; если tip локального master уже вышел
+#    в релиз через dev — безопасно синхронизироваться reset'ом).
 git fetch "$REMOTE" "$MASTER_BRANCH"
 git checkout "$MASTER_BRANCH"
-if ! git merge-base --is-ancestor "$MASTER_BRANCH" "$REMOTE/$MASTER_BRANCH"; then
+if git merge-base --is-ancestor "$MASTER_BRANCH" "$REMOTE/$MASTER_BRANCH"; then
+  git merge --ff-only "$REMOTE/$MASTER_BRANCH"
+elif git merge-base --is-ancestor "$MASTER_BRANCH" "$REMOTE/$DEV_BRANCH"; then
+  echo "== релиз вышел squash-коммитом, синхронизирую локальный $MASTER_BRANCH с $REMOTE/$MASTER_BRANCH =="
+  git reset --hard "$REMOTE/$MASTER_BRANCH"
+else
   echo "!! локальный $MASTER_BRANCH разошёлся с $REMOTE/$MASTER_BRANCH — обнови вручную." >&2
   exit 1
 fi
-git merge --ff-only "$REMOTE/$MASTER_BRANCH"
 git checkout "$DEV_BRANCH"
 echo "== done =="
