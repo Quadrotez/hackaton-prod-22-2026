@@ -57,3 +57,4 @@ class Pet(Base):
     weight_history = relationship(
         "PetWeight", back_populates="pet", cascade="all, delete-orphan"
     )
+    transfers = relationship("PetTransfer", back_populates="pet", cascade="all, delete-orphan")

@@ -1,32 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
-import { spawn } from "node:child_process";
-import { createInterface } from "node:readline";
-import ts from "typescript";
-const nativeRequire = createRequire(import.meta.url);
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-function client(fetchImpl, getToken = () => "test-token") {
-  const cache = new Map();
-  function load(name) {
-    const file = path.join(root, `${name}.ts`);
-    if (cache.has(file)) return cache.get(file).exports;
-    const loaded = { exports: {} };
-    cache.set(file, loaded);
-    const source = ts.transpileModule(fs.readFileSync(file, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
-    const resolve = (id) => {
-      if (id === "@/lib/session") return { getAccessToken: getToken };
-      if (id === "@/lib/pets") return { getPet: (petId) => load("lib/api").apiFetch(`/api/v1/pets/${petId}`, { auth: true }) };
-      return id.startsWith("@/") ? load(id.slice(2)) : nativeRequire(id);
-    };
-    new Function("require", "module", "exports", "fetch", source)(resolve, loaded, loaded.exports, fetchImpl);
-    return loaded.exports;
-  }
-  return { api: load("lib/health-sections"), forms: load("lib/health-form") };
-}
+import { client, startBackend } from "./helpers/bridge.mjs";
+
 function body(resource, values, forms) {
   const fields = Object.fromEntries(forms.healthFields[resource].map((field) => [field.name, ""]));
   const result = forms.healthSchemas[resource].safeParse({ ...fields, ...values });
@@ -35,7 +10,8 @@ function body(resource, values, forms) {
 }
 
 test("состояние записи определяется статусом, а не прошедшей датой приёма", () => {
-  const { api } = client();
+  const { load } = client(() => Promise.resolve(new Response()));
+  const api = load("lib/health-sections");
   assert.equal(api.recordIsHistory({ resource: "visits", value: { status: "planned", visit_at: "2020-01-01" } }, "2026-10-17"), false);
   assert.equal(api.recordIsHistory({ resource: "visits", value: { status: "completed" } }, "2026-10-17"), true);
   assert.equal(api.recordIsHistory({ resource: "visits", value: { status: "cancelled" } }, "2026-10-17"), true);
@@ -44,14 +20,16 @@ test("состояние записи определяется статусом,
 });
 
 test("валидация календарных дат, длительности курса и локального времени доз", () => {
-  const { forms } = client();
+  const { load } = client(() => Promise.resolve(new Response()));
+  const forms = load("lib/health-form");
   assert.equal(forms.healthSchemas.vaccinations.safeParse({ name: "Прививка", scheduled_on: "2026-02-30", status: "planned", clinic: "", notes: "" }).success, false);
   assert.equal(forms.healthSchemas.medications.safeParse({ name: "Курс", dose: "1 таб.", start_date: "2026-10-17", end_date: "2026-10-01", interval_days: 1, times: "09:00", notes: "" }).success, false);
   assert.equal(forms.healthSchemas.medications.safeParse({ name: "Курс", dose: "1 таб.", start_date: "2026-10-17", end_date: "", interval_days: 1, times: "25:00", notes: "" }).success, false);
 });
 
 test("редактирование сохраняет все значения, время и расписание", () => {
-  const { forms } = client();
+  const { load } = client(() => Promise.resolve(new Response()));
+  const forms = load("lib/health-form");
   const data = { today: "2026-10-17", now: "2026-10-17T10:00:00Z" };
   const values = forms.healthFormDefaults(data, "medications", { resource: "medications", value: { name: "Курс", dose: "1 таб.", start_date: "2026-10-01", end_date: null, times: ["09:00:00", "18:00:00"], interval_days: 2, notes: "После еды" } });
   assert.equal(values.times, "09:00, 18:00");
@@ -62,37 +40,18 @@ test("редактирование сохраняет все значения, �
 });
 
 test("четыре подстраницы: формы проходят полный CRUD на настоящем health API", { skip: !process.env.PETCARE_TEST_PYTHON, timeout: 60_000 }, async (t) => {
-  const processApi = spawn(process.env.PETCARE_TEST_PYTHON, ["-B", fileURLToPath(new URL("./health-pages-bridge.py", import.meta.url))], { stdio: ["pipe", "pipe", "pipe"] });
-  let stderr = "", serial = 0;
-  const pending = new Map();
-  let resolveReady, rejectReady;
-  const ready = new Promise((resolve, reject) => { resolveReady = resolve; rejectReady = reject; });
-  processApi.stderr.on("data", (chunk) => { stderr = (stderr + chunk).slice(-6000); });
-  createInterface({ input: processApi.stdout }).on("line", (line) => {
-    const result = JSON.parse(line);
-    if (result.ready) return resolveReady();
-    const request = pending.get(result.id); pending.delete(result.id);
-    request?.resolve(new Response(result.status === 204 ? null : result.body, { status: result.status, headers: { "content-type": "application/json" } }));
-  });
-  processApi.on("error", rejectReady);
-  processApi.on("exit", (code) => {
-    const error = new Error(`Backend test process exited ${code}: ${stderr}`);
-    rejectReady(error);
-    for (const request of pending.values()) request.reject(error);
-  });
-  t.after(() => { processApi.stdin.end(); processApi.kill("SIGTERM"); });
-  await ready;
-  const request = (url, options = {}) => new Promise((resolve, reject) => {
-    const id = ++serial; pending.set(id, { resolve, reject });
-    processApi.stdin.write(`${JSON.stringify({ id, path: url, method: options.method ?? "GET", headers: Object.fromEntries(new Headers(options.headers)), body: options.body ? JSON.parse(options.body) : undefined })}\n`);
-  });
+  const request = await startBackend(t);
+  const register = await request("/api/v1/auth/register", { method: "POST", body: JSON.stringify({ email: "health-pages-test@example.com", name: null, password: "health-pages-test-password" }) });
+  assert.ok([200, 201, 409].includes(register.status), await register.clone().text());
   const login = await request("/api/v1/auth/login", { method: "POST", body: JSON.stringify({ email: "health-pages-test@example.com", password: "health-pages-test-password" }) });
   assert.equal(login.status, 200, await login.clone().text());
   const token = (await login.json()).access_token;
   const petResponse = await request("/api/v1/pets/", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: "Test cat", species: "cat", sex: "girl", weight_g: 4000 }) });
   assert.equal(petResponse.status, 201, await petResponse.clone().text());
   const pet = await petResponse.json();
-  const { api, forms } = client(request, () => token);
+  const { load } = client(request, { session: { getAccessToken: () => token } });
+  const api = load("lib/health-sections");
+  const forms = load("lib/health-form");
   const start = await api.loadHealthSection(pet.id, "visits");
   const today = start.today;
   const samples = {

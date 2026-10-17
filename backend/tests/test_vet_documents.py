@@ -11,7 +11,7 @@ from app.integrations.llm.vet_document_analyzer import analyze_veterinary_docume
 
 EIGHT_FIELDS = {
     "animal_name": "Milo",
-    "visit_date": "2026-10-10",
+    "visit_at": "2026-10-10T00:00:00Z",
     "visit_reason": "Routine examination",
     "visit_price": 1500,
     "veterinarian_name": "Dr. Smith",
