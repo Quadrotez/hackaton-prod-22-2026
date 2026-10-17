@@ -63,8 +63,9 @@ async def read_limited_image(file: UploadFile, max_size: int) -> tuple[bytes, st
     summary="Analyze a veterinary document photo",
     description=(
         "Accepts a PNG, JPEG, or WebP photo and optional context about the authenticated "
-        "user's pet. The photo has priority over context. Returns exactly the validated "
-        "status, document type, extracted data, warnings, and error code fields."
+        "user's pet. The photo has priority over context. Returns status, document type, "
+        "the eight flat extracted fields, including veterinarian_profession, the clinic "
+        "in vet, and post-visit instructions, followed by warnings and error code."
     ),
 )
 async def analyze_pet_veterinary_document(
