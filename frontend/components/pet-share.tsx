@@ -90,7 +90,7 @@ export function PetShare({ petId }: { petId: number }) {
   const isValidEmail = EMAIL_RE.test(cleanEmail);
   const durationLabel = durationOptions.find((o) => o.hours === hours)?.label;
 
-  async function handleCreate() {
+  const handleCreate = async () => {
     if (!isValidEmail) return;
     setConfirmOpen(false);
     setSubmitting(true);
@@ -104,9 +104,9 @@ export function PetShare({ petId }: { petId: number }) {
     } finally {
       setSubmitting(false);
     }
-  }
+  };
 
-  async function handleRevoke(shareId: number) {
+  const handleRevoke = async (shareId: number) => {
     setRevokingId(shareId);
     setError(null);
     try {
@@ -214,9 +214,7 @@ export function PetShare({ petId }: { petId: number }) {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="outline">Отмена</Button>
-            </DialogClose>
+            <DialogClose render={<Button type="button" variant="outline">Отмена</Button>} />
             <Button type="button" onClick={handleCreate} disabled={submitting}>
               Выдать доступ
             </Button>
