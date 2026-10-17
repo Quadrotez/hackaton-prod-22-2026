@@ -34,9 +34,9 @@ export function MeasurementEditor({ name, unit, initialValue = "", initialDate =
   }
 
   return (
-    <form onSubmit={submit} noValidate aria-label={`Измерение: ${name}`} aria-busy={pending} className="rounded-xl bg-background p-3">
+    <form onSubmit={submit} noValidate aria-label={`Измерение: ${name}`} aria-busy={pending} className="rounded-xl bg-black/2 p-3">
       <fieldset disabled={pending} className="flex min-w-0 flex-col gap-3">
-        {!rename && <p className="text-sm font-medium">{name} · новое значение</p>}
+        {!rename && <p className="text-sm font-semibold">{name}</p>}
         {rename && <Field data-invalid={!!errors.name}>
           <FieldLabel htmlFor={`${id}-name`}>Название</FieldLabel>
           <Input id={`${id}-name`} name="name" defaultValue={name} maxLength={100} aria-invalid={!!errors.name} aria-describedby={errors.name ? `${id}-name-error` : undefined} />
@@ -56,7 +56,7 @@ export function MeasurementEditor({ name, unit, initialValue = "", initialDate =
         </div>
         {weight && <p className="text-xs text-muted-foreground">Новый вес сохранится в профиле и истории измерений.</p>}
         <div className="flex flex-wrap gap-2">
-          <Button type="submit" size="sm" disabled={pending}>{pending && <Spinner />}Сохранить</Button>
+          <Button type="submit" size="sm" variant="secondary" disabled={pending}>{pending && <Spinner />}Сохранить</Button>
           <Button type="button" size="sm" variant="outline" disabled={pending} onClick={onCancel}>Отмена</Button>
         </div>
       </fieldset>

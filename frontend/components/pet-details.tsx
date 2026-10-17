@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import Link from "next/link";
-import { ArrowRightIcon, HeartPulseIcon, RulerIcon, Share2Icon, UtensilsIcon, type LucideIcon } from "lucide-react";
+import { ArrowRightIcon, type LucideIcon } from "lucide-react";
 import { useProtectedData } from "@/hooks/use-auth";
 import { useNow } from "@/hooks/use-now";
 import { listFoods } from "@/lib/foods";
@@ -140,12 +140,12 @@ export function PetDetails({ petId }: { petId: number }) {
       <Card>
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-col gap-2">
-            <h3>Доступ для другого человека</h3>
+            <h3>Передача другому человеку</h3>
             <h5 className="leading-5 text-muted-foreground">
-              Если кто-то будет присматривать за питомцем во время отъезда, аллергии, корм и заметки будут у него под рукой.
+              Если кто-то будет присматривать за питомцем во время отъезда, отправьте ему заявку на передачу.
             </h5>
           </div>
-          <Link href={`/pet/${petId}/share`}><Button>Поделиться</Button></Link>
+          <Link href={`/pet/${petId}/transfer`}><Button>Передать</Button></Link>
         </div>
       </Card>
     </>

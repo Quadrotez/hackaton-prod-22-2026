@@ -71,7 +71,7 @@ function ParametersContent({ data, onUpdate }: { data: MeasurementParametersData
 
   return (
     <>
-      <PageHeader title="Параметры измерений" description={`Добавляйте и удаляйте показатели · ${pet.name}`} backHref={`/pet/${pet.id}/measurements`} />
+      <PageHeader title="Параметры измерений" backHref={`/pet/${pet.id}/measurements`} />
       <Card role="region" aria-label="Список параметров" className="flex flex-col gap-2 px-4 py-5 sm:px-5">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-[17px] font-semibold">Показатели</h2>

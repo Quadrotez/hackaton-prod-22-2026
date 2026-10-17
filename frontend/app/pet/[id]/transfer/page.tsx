@@ -2,20 +2,20 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { PageShell } from "@/components/page-shell";
 import { PageError, PageLoading } from "@/components/page-state";
-import { PetShare } from "@/components/pet-share";
+import { PetTransfer } from "@/components/pet-transfer";
 
 export const metadata: Metadata = {
-  title: "Поделиться питомцем — PetCare",
+  title: "Передача питомца — PetCare",
 };
 
-export default function SharePage({ params }: PageProps<"/pet/[id]/share">) {
+export default function TransferPage({ params }: PageProps<"/pet/[id]/transfer">) {
   return (
     <PageShell>
       <Suspense fallback={<PageLoading />}>
         {params.then(({ id }) => {
           const petId = Number(id);
           return Number.isInteger(petId) && petId > 0 ? (
-            <PetShare petId={petId} />
+            <PetTransfer petId={petId} />
           ) : (
             <PageError message="Питомец не найден" backToList />
           );

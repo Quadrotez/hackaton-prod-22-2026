@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { HomeIcon, type LucideIcon, UtensilsIcon, UserIcon } from "lucide-react";
+import { HandHeartIcon, HomeIcon, type LucideIcon, UtensilsIcon, UserIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 
@@ -53,6 +53,7 @@ function MenuBar({ pathname }: { pathname?: string }) {
   return (
     <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 flex flex-row gap-1 rounded-xl bg-white border-2 border-secondary p-2">
       <MenuLink href="/me" label="Главная" icon={HomeIcon} active={pathname === "/me"} />
+      <MenuLink href="/transfers" label="Передачи" icon={HandHeartIcon} active={pathname === "/transfers"} />
       <MenuLink href="/food" label="Корм" icon={UtensilsIcon} active={pathname === "/food"} />
       <MenuLink href="/account" label="Аккаунт" icon={UserIcon} active={pathname === "/account"} />
     </nav>

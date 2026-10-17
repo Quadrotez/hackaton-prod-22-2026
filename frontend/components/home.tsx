@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
-import { PlusIcon } from "lucide-react";
+import { ArrowRightIcon, PlusIcon } from "lucide-react";
 import { CalendarGrid, kindColor, monthGrid, type DayMarker } from "@/components/calendar-view";
 import { PetAvatar } from "@/components/pet-avatar";
 import { PageError } from "@/components/page-state";
@@ -10,7 +10,9 @@ import { useProtectedData } from "@/hooks/use-auth";
 import { loadCalendar } from "@/lib/health";
 import { healthEventHref, toDateKey, type CalendarEvent } from "@/lib/health-events";
 import { cn } from "@/lib/utils";
-import type { Pet } from "@/lib/pets";
+import { pluralize, type Pet } from "@/lib/pets";
+import { listIncomingTransfers, listOutgoingTransfers } from "@/lib/transfers";
+import { Card } from "@/components/ui/card";
 
 const longDate = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", weekday: "long" });
 const shortDate = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" });
@@ -64,6 +66,14 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
   const todayKey = toDateKey(today);
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedKey, setSelectedKey] = useState(todayKey);
+
+  const loadTransfers = useCallback(() => Promise.all([listIncomingTransfers(), listOutgoingTransfers()]), []);
+  const transfers = useProtectedData(loadTransfers, "Не удалось загрузить передачи");
+  const answersNeeded =
+    transfers.status === "ready"
+      ? transfers.data[0].length +
+        transfers.data[1].filter((transfer) => transfer.status === "return_requested").length
+      : 0;
 
   const days = useMemo(() => monthGrid(month), [month]);
   const from = toDateKey(days[0]);
@@ -139,6 +149,24 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
           </li>
         </ul>
       </section>
+
+      {answersNeeded > 0 && (
+        <Link
+          href="/transfers"
+          className="rounded-2xl outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-foreground"
+        >
+          <Card variant="accent" className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-0.5">
+              <h2>Передачи</h2>
+              <p className="text-sm">
+                {answersNeeded} {pluralize(answersNeeded, "заявка ждёт", "заявки ждут", "заявок ждут")} вашего
+                ответа
+              </p>
+            </div>
+            <ArrowRightIcon aria-hidden="true" className="size-5 shrink-0" strokeWidth={1.5} />
+          </Card>
+        </Link>
+      )}
 
       <CalendarGrid
         days={days}
