@@ -71,7 +71,7 @@ export function CalendarGrid({
                 aria-pressed={key === selectedKey}
                 onClick={() => onSelectKey(key)}
                 className={cn(
-                  "relative aspect-square min-w-0 rounded-lg border p-1 text-left text-sm transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground sm:rounded-xl sm:p-2.5 sm:text-base",
+                  "relative aspect-[1/1.05] min-w-0 rounded-lg border p-1 text-left text-sm transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground sm:aspect-square sm:rounded-xl sm:p-2.5 sm:text-base",
                   outside ? "border-transparent text-muted-foreground" : "border-muted bg-card",
                   key === todayKey && "border-2 border-foreground",
                   key === selectedKey && "bg-primary hover:bg-primary/80",
