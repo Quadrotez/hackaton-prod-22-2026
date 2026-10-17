@@ -43,3 +43,4 @@ class Pet(Base):
     feeding_records = relationship(
         "FeedingRecord", back_populates="pet", cascade="all, delete-orphan"
     )
+    transfers = relationship("PetTransfer", back_populates="pet", cascade="all, delete-orphan")
