@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import Link from "next/link";
-import { ArrowRightIcon, HeartPulseIcon, RulerIcon, UtensilsIcon, type LucideIcon } from "lucide-react";
+import { ArrowRightIcon, HeartPulseIcon, RulerIcon, Share2Icon, UtensilsIcon, type LucideIcon } from "lucide-react";
 import { useProtectedData } from "@/hooks/use-auth";
 import { useNow } from "@/hooks/use-now";
 import { listFoods } from "@/lib/foods";
@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/page-header";
 import { PageError, PageLoading } from "@/components/page-state";
 import { PetInfoCard } from "@/components/pet-info-card";
 import { PetMeals } from "@/components/pet-meals";
+import { Button } from "./ui/button";
 
 function isToday(date: Date): boolean {
   return date.toDateString() === new Date().toDateString();
@@ -135,6 +136,18 @@ export function PetDetails({ petId }: { petId: number }) {
           icon={ArrowRightIcon}
         />
       </section>
+
+      <Card>
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col gap-2">
+            <h3>Доступ для другого человека</h3>
+            <h5 className="leading-5 text-muted-foreground">
+              Если кто-то будет присматривать за питомцем во время отъезда, аллергии, корм и заметки будут у него под рукой.
+            </h5>
+          </div>
+          <Link href={`/pet/${petId}/share`}><Button>Поделиться</Button></Link>
+        </div>
+      </Card>
     </>
   );
 }

@@ -32,6 +32,7 @@ const detailMessages: Record<string, string> = {
   "Could not save pet photo": "Не удалось сохранить фото",
   "Not Found": "Эта функция пока недоступна",
   "Method Not Allowed": "Эта функция пока недоступна",
+  "User not found": "Пользователь с таким email не найден",
 };
 
 function statusMessage(status: number): string {

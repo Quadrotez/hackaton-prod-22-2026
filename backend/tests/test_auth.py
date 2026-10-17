@@ -77,17 +77,17 @@ def test_login_rejects_non_email(client: TestClient) -> None:
     assert response.status_code == 422
 
 
-def test_login_auto_registers_unknown_email(client: TestClient, db: Session) -> None:
+def test_login_rejects_unknown_email_without_creating_user(
+    client: TestClient, db: Session
+) -> None:
     email = "brand-new@example.com"
 
     response = login(client, email=email, password="whatever")
 
-    assert response.status_code == 200
-    assert response.json()["access_token"]
-
-    user = db.scalar(select(User).where(User.email == email))
-    assert user is not None
-    assert user.password_hash != "whatever"
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Invalid email or password"}
+    assert response.headers["www-authenticate"] == "Bearer"
+    assert db.scalar(select(User).where(User.email == email)) is None
 
 
 def test_me_returns_public_user_for_valid_token(client: TestClient) -> None:
@@ -258,3 +258,15 @@ def test_health_endpoint_remains_available(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_health_tags_distinguish_liveness_from_pet_health(client: TestClient) -> None:
+    schema = client.get("/openapi.json").json()
+
+    liveness = schema["paths"]["/api/v1/health"]["get"]
+    pet_health = schema["paths"]["/api/v1/pets/{pet_id}/health"]["get"]
+
+    assert liveness["tags"] == ["healthcheck"]
+    assert pet_health["tags"] == ["pet health"]
+    assert "health" not in liveness["tags"]
+    assert "health" not in pet_health["tags"]

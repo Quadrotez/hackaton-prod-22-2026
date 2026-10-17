@@ -20,7 +20,7 @@ from app.services.health.visits import (
 )
 
 
-router = APIRouter(prefix="/pets/{pet_id}/visits", tags=["health: vet visits"])
+router = APIRouter(prefix="/pets/{pet_id}/visits", tags=["pet health: vet visits"])
 NOT_FOUND = "Visit not found"
 
 
