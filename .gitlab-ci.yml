@@ -35,7 +35,42 @@ test:backend:
     - cd backend
   script:
     - uv sync --frozen
-    - uv run pytest
+    - uv run pytest --junitxml=report.xml --cov=app --cov-report=term --cov-report=xml:coverage.xml
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  artifacts:
+    when: always
+    reports:
+      junit: backend/report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: backend/coverage.xml
+    expire_in: 2 weeks
+
+test:frontend:
+  stage: test
+  image: node:20
+  before_script:
+    - cd frontend
+    - npm ci --no-audit --no-fund
+  script:
+    - npm test
+
+# Интеграционные тесты фронтенда: реальные lib-модули против настоящего FastAPI
+# (изолированная SQLite). Требуют и Node, и Python-окружение бекенда.
+test:frontend:integration:
+  stage: test
+  image: node:20
+  variables:
+    UV_PROJECT_ENVIRONMENT: /tmp/venv
+    PETCARE_TEST_PYTHON: /tmp/venv/bin/python
+  before_script:
+    - curl -LsSf https://astral.sh/uv/install.sh | sh
+    - export PATH="$HOME/.local/bin:$PATH"
+    - uv sync --directory backend --frozen
+    - cd frontend
+    - npm ci --no-audit --no-fund
+  script:
+    - npm run test:integration
 
 build:backend:
   stage: build

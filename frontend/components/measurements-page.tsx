@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { MeasurementHistory } from "@/components/measurement-history";
 import { MeasurementEditor, type MeasurementDraft } from "@/components/measurement-editor";
 import { PetWeightChart } from "@/components/pet-weight-chart";
+import { PetInfoCard } from "@/components/pet-info-card";
 import { PageHeader } from "@/components/page-header";
 import { PageError, PageLoading } from "@/components/page-state";
 import { Button } from "@/components/ui/button";
@@ -115,7 +116,13 @@ function MeasurementsContent({ data, onUpdate, embedded, onPetChange }: { data: 
 
   return (
     <>
-      {!embedded && <PageHeader title="Измерения" description={pet.name} backHref={`/pet/${pet.id}`} />}
+      {!embedded && <>
+        <PageHeader title="Измерения" description={pet.name} backHref={`/pet/${pet.id}`} />
+        <PetInfoCard pet={pet} onPetChange={(updated) => {
+          onUpdate({ ...data, pet: updated });
+          onPetChange?.(updated);
+        }} />
+      </>}
       {refreshError && <div role="alert" className="rounded-xl border bg-card p-4 text-sm">Не удалось обновить список измерений. <Button type="button" variant="outline" size="sm" disabled={pending} onClick={retryRefresh}>Обновить</Button></div>}
       <Card role="region" aria-label="Измерения" className="flex min-w-0 flex-col px-4 py-5 sm:px-5">
         <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
