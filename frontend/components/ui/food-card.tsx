@@ -23,13 +23,13 @@ function formatWeight(grams: number) {
 
 export default function FoodCard({ food }: FoodCardProps) {
   const Icon = foodIcons[food.type];
-  const remainingPercent = food.total_g > 0
-    ? Math.min(100, Math.max(0, Math.round(food.remaining_g / food.total_g * 100)))
+  const remainingPercent = food.total_grams > 0
+    ? Math.min(100, Math.max(0, Math.round(food.remaining_grams / food.total_grams * 100)))
     : 0;
-  const stockDescription = `${formatWeight(food.remaining_g)} из ${formatWeight(food.total_g)}`;
+  const stockDescription = `${formatWeight(food.remaining_grams)} из ${formatWeight(food.total_grams)}`;
   const daysLeft = getDaysLeft(food);
   const lowStock = isLowStock(food);
-  const forecast = food.remaining_g <= 0
+  const forecast = food.remaining_grams <= 0
     ? "Закончился"
     : daysLeft === null
       ? "Расход пока не известен"

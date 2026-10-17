@@ -9,10 +9,13 @@ export const NETWORK_ERROR_STATUS = 0;
 
 const detailMessages: Record<string, string> = {
   "Invalid email or password": "Неверный email или пароль",
+  "Invalid email/username or password": "Неверный email или пароль",
   "A user with this email already exists": "Пользователь с таким email уже зарегистрирован",
+  "A user with this email or username already exists": "Пользователь с таким email уже зарегистрирован",
   "Could not validate credentials": "Сессия истекла. Войдите снова",
   "Pet not found": "Питомец не найден",
   "Meal not found": "Запись о кормлении не найдена",
+  "Feeding record not found": "Запись о кормлении не найдена",
   "Food not found": "Корм не найден",
   "Photo not found": "Фото не найдено",
   "At least one field is required": "Измените хотя бы одно поле",

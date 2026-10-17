@@ -12,11 +12,11 @@ export type Food = {
   fats: number;
   carbohydrates: number;
   calories: number;
-  total_g: number;
-  // Бэк списывает portion_g при создании приёма пищи и возвращает при удалении; ниже 0 не опускается
-  remaining_g: number;
-  // Средний суточный расход по всем питомцам за последние 14 дней; null, если приёмов не было
-  avg_daily_g: number | null;
+  total_grams: number;
+  // Остаток пока ведётся вручную: бэк не списывает корм при кормлении
+  remaining_grams: number;
+  // Средний суточный расход по всем питомцам за последние 14 дней; бэк пока не отдаёт
+  avg_daily_g?: number | null;
   created_at: string;
 };
 
@@ -32,14 +32,14 @@ export const foodTypeLabels: Record<FoodType, string> = {
 
 const LOW_STOCK_DAYS = 7;
 
-export function getDaysLeft(food: Pick<Food, "remaining_g" | "avg_daily_g">): number | null {
+export function getDaysLeft(food: Pick<Food, "remaining_grams" | "avg_daily_g">): number | null {
   if (!food.avg_daily_g) return null;
-  return Math.floor(food.remaining_g / food.avg_daily_g);
+  return Math.floor(food.remaining_grams / food.avg_daily_g);
 }
 
-export function isLowStock(food: Pick<Food, "remaining_g" | "avg_daily_g">): boolean {
+export function isLowStock(food: Pick<Food, "remaining_grams" | "avg_daily_g">): boolean {
   const daysLeft = getDaysLeft(food);
-  return food.remaining_g <= 0 || (daysLeft !== null && daysLeft < LOW_STOCK_DAYS);
+  return food.remaining_grams <= 0 || (daysLeft !== null && daysLeft < LOW_STOCK_DAYS);
 }
 
 const FOODS_PATH = "/api/v1/foods";

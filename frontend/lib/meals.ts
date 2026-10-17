@@ -4,14 +4,13 @@ import type { Food } from "@/lib/foods";
 export type Meal = {
   id: number;
   pet_id: number;
-  // null, если корм удалили из списка
+  // null, если корм удалили из списка; food_name при этом сохраняется
   food_id: number | null;
+  food_name: string;
   fed_at: string;
-  portion_g: number;
-  // 1–5: насколько понравилось
-  rate: number;
+  liked: boolean;
   tolerated: boolean;
-  reactions: string | null;
+  reaction_notes: string | null;
   notes: string | null;
   created_at: string;
 };
@@ -19,10 +18,9 @@ export type Meal = {
 export type MealCreate = {
   food_id: number;
   fed_at: string;
-  portion_g: number;
-  rate: number;
+  liked: boolean;
   tolerated: boolean;
-  reactions?: string | null;
+  reaction_notes?: string | null;
   notes?: string | null;
 };
 
@@ -32,11 +30,11 @@ export type MealSuggestion = {
   food_id: number;
   previously_tried: boolean;
   // Значения из последнего приёма этого корма питомцем
-  suggested_values: Pick<Meal, "rate" | "tolerated" | "portion_g"> | null;
+  suggested_values: Pick<Meal, "liked" | "tolerated"> | null;
 };
 
 function mealsPath(petId: number) {
-  return `/api/v1/pets/${petId}/meals`;
+  return `/api/v1/pets/${petId}/feeding-records`;
 }
 
 export function listMeals(petId: number) {
@@ -69,22 +67,23 @@ export function sortMeals(meals: Meal[]): Meal[] {
 
 export type RankedFood = {
   food: Food;
-  avgRate: number | null;
+  // Доля приёмов, когда корм понравился; null, если ещё не пробовал
+  likedShare: number | null;
   intolerant: boolean;
 };
 
-// Порядок в списке выбора: есть в наличии → нравится больше → ещё не пробовал → плохо переносит
+// Порядок в списке выбора: есть в наличии → нравится чаще → ещё не пробовал → плохо переносит
 export function rankFoods(foods: Food[], meals: Meal[]): RankedFood[] {
   const ranked = foods.map((food) => {
     const history = meals.filter((meal) => meal.food_id === food.id);
     return {
       food,
-      avgRate: history.length ? history.reduce((sum, meal) => sum + meal.rate, 0) / history.length : null,
+      likedShare: history.length ? history.filter((meal) => meal.liked).length / history.length : null,
       intolerant: history.some((meal) => !meal.tolerated),
     };
   });
-  const score = ({ food, avgRate, intolerant }: RankedFood) =>
-    (food.remaining_g > 0 ? 0 : 100) + (intolerant ? 50 : 0) + (avgRate === null ? 2.5 : 5 - avgRate);
+  const score = ({ food, likedShare, intolerant }: RankedFood) =>
+    (food.remaining_grams > 0 ? 0 : 100) + (intolerant ? 50 : 0) + (likedShare === null ? 0.5 : 1 - likedShare);
   return ranked.sort((a, b) => score(a) - score(b));
 }
 
