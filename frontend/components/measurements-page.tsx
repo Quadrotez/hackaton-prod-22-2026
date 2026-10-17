@@ -19,6 +19,7 @@ import { PageError, PageLoading } from "@/components/page-state";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { PetCard } from "./pet-card";
 
 type Editor = { kind: "weight" } | { kind: "parameter"; id: number; mode: "add" | "edit"; date: string };
 
@@ -117,17 +118,14 @@ function MeasurementsContent({ data, onUpdate, embedded, onPetChange }: { data: 
   return (
     <>
       {!embedded && <>
-        <PageHeader title="Измерения" description={pet.name} backHref={`/pet/${pet.id}`} />
-        <PetInfoCard pet={pet} onPetChange={(updated) => {
-          onUpdate({ ...data, pet: updated });
-          onPetChange?.(updated);
-        }} />
+        <PageHeader title="Измерения" backHref={`/pet/${pet.id}`} />
+        <PetCard pet={pet} />
       </>}
       {refreshError && <div role="alert" className="rounded-xl border bg-card p-4 text-sm">Не удалось обновить список измерений. <Button type="button" variant="outline" size="sm" disabled={pending} onClick={retryRefresh}>Обновить</Button></div>}
       <Card role="region" aria-label="Измерения" className="flex min-w-0 flex-col px-4 py-5 sm:px-5">
         <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-[17px] font-semibold">Измерения</h2>
-          <span className="text-xs text-muted-foreground">последние записи · <Link href={`/pet/${pet.id}/measurements/parameters`} className="font-semibold text-foreground underline underline-offset-4">параметры</Link></span>
+          <span className="text-xs text-muted-foreground"><Link href={`/pet/${pet.id}/measurements/parameters`} className="font-semibold text-foreground underline underline-offset-4">параметры</Link></span>
         </div>
         <div>
           <MeasurementRow name="Вес" unit="кг" history={weightHistory} currentValue={pet.weight_g == null ? null : pet.weight_g / 1000} pending={pending} onAdd={() => setEditor({ kind: "weight" })}>
