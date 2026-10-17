@@ -88,6 +88,9 @@ class FoodPublic(BaseModel):
     calories: float
     total_grams: int
     remaining_grams: int
+    out_of_stock: bool = Field(
+        description="True when remaining_grams is 0, i.e. the food has run out."
+    )
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

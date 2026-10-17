@@ -9,6 +9,7 @@ stages:
   - prepare
   - test
   - build
+  - docs
   - deploy
 
 include:
@@ -56,6 +57,33 @@ build:frontend:
     DOCKERFILE_PATH: $CI_PROJECT_DIR/frontend/Dockerfile
     IMAGE_NAME: $REGISTRY/frontend:${CI_COMMIT_SHORT_SHA}
 
+# Builds the OpenAPI schema + a static Swagger UI and exposes them as pipeline
+# artifacts for every branch (GitLab Pages is disabled in this environment).
+# Each pipeline keeps the docs for its own commit: use the "Swagger UI" artifact
+# link in the job/MR, or download the archive.
+docs:openapi:
+  stage: docs
+  image: python:3.12
+  variables:
+    UV_PROJECT_ENVIRONMENT: /tmp/docs-venv
+    JWT_SECRET_KEY: openapi-static-export
+    OPENAPI_SERVER_URL: https://petcare.quadrotez.com
+    OPENAPI_DOCS_LABEL: $CI_COMMIT_REF_NAME @ $CI_COMMIT_SHORT_SHA
+  before_script:
+    - pip install --quiet uv
+    - cd backend
+  script:
+    - uv sync --frozen
+    - uv run python scripts/export_openapi.py "$CI_PROJECT_DIR/openapi"
+  artifacts:
+    name: "openapi-$CI_COMMIT_REF_SLUG"
+    expire_in: 4 weeks
+    expose_as: "Swagger UI"
+    paths:
+      - openapi/
+  rules:
+    - if: $CI_COMMIT_BRANCH
+
 .ssh_setup:
   before_script:
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
@@ -65,6 +93,8 @@ build:frontend:
       if ! grep -q 'PRIVATE KEY' ~/.ssh/id_deploy; then
         base64 -d ~/.ssh/id_deploy > ~/.ssh/id_deploy.dec && mv ~/.ssh/id_deploy.dec ~/.ssh/id_deploy
       fi
+    # GitLab File variables drop the trailing newline; OpenSSH needs it.
+    - printf '\n' >> ~/.ssh/id_deploy
     - chmod 600 ~/.ssh/id_deploy
     - |
       echo "SSH key diag: lines=$(wc -l < ~/.ssh/id_deploy) bytes=$(wc -c < ~/.ssh/id_deploy) prefix=$(head -c 27 ~/.ssh/id_deploy | tr '\n' ' ')"
@@ -88,6 +118,21 @@ deploy:
       ssh $SSH_ADDRESS "bash /opt/petcare/registry-login.sh '$KEY_B64' ${DP_CLI_VERSION}"
     - scp docker-compose.yml "${SSH_ADDRESS}:/opt/petcare/docker-compose.yml"
     - ssh $SSH_ADDRESS "cd /opt/petcare && TAG=${TAG} docker compose pull && TAG=${TAG} docker compose up -d --remove-orphans"
+
+# Creates/refreshes the demo account (demo@quadrotez.com) inside the running API
+# container so the "Войти в демо" button keeps working. Idempotent.
+demo:account:
+  stage: deploy
+  image: kroniak/ssh-client:3.19
+  extends:
+    - .rules-master
+    - .ssh_setup
+  needs:
+    - deploy
+  variables:
+    TAG: ${CI_COMMIT_SHORT_SHA}
+  script:
+    - ssh $SSH_ADDRESS "cd /opt/petcare && TAG=${TAG} docker compose exec -T api python scripts/create_demo_user.py"
 
 prepare:docker:
   stage: prepare
