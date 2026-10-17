@@ -180,7 +180,6 @@ test("измерения: шаблонные параметры, CRUD серий
   const { load } = client(request, { session });
   const pets = load("lib/pets");
   const measurements = load("lib/measurements");
-  const petWeight = load("lib/pet-weight");
   const api = load("lib/api");
 
   await registerUser(request, "measurer@example.com", "measurer-pass-12", null);

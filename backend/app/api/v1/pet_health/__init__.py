@@ -13,7 +13,6 @@ from app.api.v1.pet_health import (
     visits,
 )
 
-
 router = APIRouter()
 for module in (
     overview,

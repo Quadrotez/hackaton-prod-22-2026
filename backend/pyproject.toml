@@ -28,4 +28,30 @@ dev = [
     "httpx>=0.28.1",
     "pytest>=9.1.1",
     "pytest-cov>=7.0.0",
+    "ruff>=0.14.0",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+exclude = ["alembic/versions"]
+# Пустой src: не считать каталог alembic/ исходником (иначе его импорты
+# группируются с app как first-party)
+src = []
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP"]
+ignore = [
+    # FastAPI: Depends()/File()/Query() в дефолтах аргументов — идиома фреймворка
+    "B008",
+    # PEP 695-дженерики: кодовая база на классическом TypeVar, миграция не окупается
+    "UP047",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.lint.per-file-ignores]
+# Многострочные тексты LLM-промптов: noqa внутри строк не работает,
+# а перенос меняет содержание промпта
+"app/integrations/llm/vet_document_analyzer.py" = ["E501"]

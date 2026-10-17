@@ -329,6 +329,13 @@ Frontend-тесты находятся в [`frontend/tests`](frontend/tests) (ю
 интеграционные против реального FastAPI — `npm run test:integration`,
 подробности — [`frontend/tests/README.md`](frontend/tests/README.md)).
 
+Линтеры (запускаются из пайплайна вместе с тестами):
+
+```bash
+cd backend && uv run ruff check .   # backend
+cd frontend && npm run lint         # frontend
+```
+
 ## Запуск через Docker Compose
 
 Production-подобный контур описан в [`docker-compose.yml`](docker-compose.yml:1). В нём используются:
@@ -354,12 +361,17 @@ TAG=<image-tag> docker compose up -d
 
 Pipeline описан в [`.gitlab-ci.yml`](.gitlab-ci.yml:1) и включает:
 
-1. запуск backend-тестов;
-2. сборку backend-образа;
-3. сборку frontend-образа;
-4. публикацию образов в registry;
-5. deployment на production из ветки `master`;
-6. применение Alembic-миграций перед запуском API.
+1. запуск backend-тестов (junit + cobertura-покрытие);
+2. запуск frontend юнит- и интеграционных тестов;
+3. линтеры backend (`ruff`) и frontend (`eslint`);
+4. экспорт OpenAPI-схемы и статического Swagger UI (артефакт пайплайна);
+5. сборку и публикацию backend/frontend-образов в registry;
+6. deployment на production из ветки `master`;
+7. применение Alembic-миграций перед запуском API;
+8. создание демо-аккаунта.
+
+Тесты и линтеры идут в стадии `test` до `build`/`deploy`: красный результат
+блокирует сборку и выкатку.
 
 Секреты CI и production-хоста передаются через переменные GitLab и внешний `.env`, а не через исходный код.
 

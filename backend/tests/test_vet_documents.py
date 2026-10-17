@@ -8,7 +8,6 @@ from PIL import Image
 
 from app.integrations.llm.vet_document_analyzer import analyze_veterinary_document
 
-
 EIGHT_FIELDS = {
     "animal_name": "Milo",
     "visit_at": "2026-10-10T00:00:00Z",

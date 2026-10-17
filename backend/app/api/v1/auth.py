@@ -16,7 +16,6 @@ from app.schemas.auth import (
 )
 from app.services.storage import FileTooLargeError, InvalidImageError, LocalMediaStorage
 
-
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 

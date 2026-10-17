@@ -1,11 +1,9 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
 from app.api.dependencies import AppSettings, CurrentUser, DbSession
 from app.models.pet import Pet
@@ -36,7 +34,7 @@ def create_pet(payload: PetCreate, current_user: CurrentUser, db: DbSession) -> 
         PetWeight(
             pet_id=pet.id,
             weight_g=pet.weight_g,
-            measured_at=datetime.now(timezone.utc),
+            measured_at=datetime.now(UTC),
         )
     )
     db.commit()
@@ -84,7 +82,7 @@ def update_pet(
             PetWeight(
                 pet=pet,
                 weight_g=changes["weight_g"],
-                measured_at=datetime.now(timezone.utc),
+                measured_at=datetime.now(UTC),
             )
         )
     db.commit()

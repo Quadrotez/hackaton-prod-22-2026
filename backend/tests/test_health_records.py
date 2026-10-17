@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 from app.models.health import Allergy, Symptom, Vaccination
 from tests.health_helpers import auth_headers, create_pet, local_today, pet_url
 
-
 RECORD_PAYLOADS = {
     "symptoms": {"description": "Sneezing twice a day", "observed_at": "2026-10-14T10:00:00Z"},
     "allergies": {"allergen": "Chicken", "reactions": "itching"},

@@ -18,7 +18,6 @@ from app.schemas.feeding import (
 )
 from app.services.feeding import clean_food_name, find_latest_matching_record
 
-
 router = APIRouter(prefix="/pets/{pet_id}/feeding-records", tags=["feeding records"])
 
 

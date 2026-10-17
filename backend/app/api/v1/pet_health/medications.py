@@ -28,7 +28,6 @@ from app.services.health.schedule import (
     load_medications,
 )
 
-
 router = APIRouter(prefix="/pets/{pet_id}/medications", tags=["pet health: medications"])
 NOT_FOUND = "Medication not found"
 DEFAULT_SCHEDULE_DAYS = 7

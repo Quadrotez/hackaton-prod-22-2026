@@ -19,7 +19,6 @@ from app.services.health.visits import (
     validate_referral,
 )
 
-
 router = APIRouter(prefix="/pets/{pet_id}/visits", tags=["pet health: vet visits"])
 NOT_FOUND = "Visit not found"
 

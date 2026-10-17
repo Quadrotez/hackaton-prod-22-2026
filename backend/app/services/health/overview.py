@@ -25,7 +25,6 @@ from app.services.health.pregnancy import active_pregnancy, to_public
 from app.services.health.schedule import build_schedule, load_medications
 from app.services.health.visits import list_topics, load_visits
 
-
 OVERVIEW_SYMPTOMS = 5
 UPCOMING_DAYS = 14
 UPCOMING_DOSES = 20

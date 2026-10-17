@@ -2,7 +2,6 @@
 
 from app.services.health.common import label_key
 
-
 BODY_PARAMETERS = (
     ("Рост в холке", "см"),
     ("Длина тела", "см"),
