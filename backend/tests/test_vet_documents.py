@@ -9,18 +9,20 @@ from PIL import Image
 from app.integrations.llm.vet_document_analyzer import analyze_veterinary_document
 
 
-SIX_FIELDS = {
+EIGHT_FIELDS = {
     "animal_name": "Milo",
     "visit_date": "2026-10-10",
     "visit_reason": "Routine examination",
     "visit_price": 1500,
     "veterinarian_name": "Dr. Smith",
-    "dentistry": "Dental cleaning",
+    "veterinarian_profession": "Veterinarian",
+    "vet": "Happy Paws Veterinary Clinic",
+    "post_visit_instructions": "Buy the prescribed food and give the medication for 5 days.",
 }
 EXPECTED_ANALYSIS = {
     "status": "success",
     "document_type": "veterinary_report",
-    **SIX_FIELDS,
+    **EIGHT_FIELDS,
     "warnings": [],
     "error_code": None,
 }
@@ -81,7 +83,7 @@ def test_analyze_endpoint_returns_exact_new_contract(
     assert set(response.json()) == {
         "status",
         "document_type",
-        *SIX_FIELDS,
+        *EIGHT_FIELDS,
         "warnings",
         "error_code",
     }
@@ -188,7 +190,9 @@ def test_llm_validation_rejects_invalid_strict_field_types() -> None:
     invalid_types = [
         {**EXPECTED_ANALYSIS, "visit_price": "1500"},
         {**EXPECTED_ANALYSIS, "veterinarian_name": 123},
-        {**EXPECTED_ANALYSIS, "dentistry": 123},
+        {**EXPECTED_ANALYSIS, "veterinarian_profession": 123},
+        {**EXPECTED_ANALYSIS, "vet": 123},
+        {**EXPECTED_ANALYSIS, "post_visit_instructions": 123},
     ]
 
     for payload in invalid_types:
@@ -204,7 +208,7 @@ def test_llm_validation_accepts_null_optional_values() -> None:
     payload = {
         **EXPECTED_ANALYSIS,
         "status": "error",
-        **{key: None for key in SIX_FIELDS},
+        **{key: None for key in EIGHT_FIELDS},
         "error_code": "UNSUPPORTED_DOCUMENT",
     }
     result = analyze_veterinary_document(

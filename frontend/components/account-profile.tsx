@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { useProtectedData, useRequireAuth } from "@/hooks/use-auth";
 import { getErrorMessage } from "@/lib/api";
-import { getMe, updateMe, uploadAvatar, type UserPublic } from "@/lib/auth";
+import { getMe, updateMe, updatePassword, uploadAvatar, type UserPublic } from "@/lib/auth";
 import { listPets, pluralize } from "@/lib/pets";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,8 +26,17 @@ import { PageError, PageLoading } from "@/components/page-state";
 import { PhotoUploadButton } from "@/components/photo-upload-button";
 import { UserAvatar } from "@/components/user-avatar";
 import Image from "next/image";
+import { clearAccessToken } from "@/lib/session";
+import { useRouter } from "next/navigation";
 
 const nameSchema = z.string().trim().min(1, "Введите имя").max(100, "Не больше 100 символов");
+
+const passwordSchema = z.object({
+  current_password: z.string().min(8, "Пароль должен содержать минимум 8 символов"),
+  new_password: z.string().min(8, "Пароль должен содержать минимум 8 символов"),
+});
+
+type PasswordErrors = Partial<Record<"current_password" | "new_password", string>>;
 
 const chipClass =
   "inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium";
@@ -219,6 +228,101 @@ function AccountDetails({ user }: { user: UserPublic }) {
   );
 }
 
+function PasswordChangeCard() {
+  const { handleAuthError } = useRequireAuth();
+  const [errors, setErrors] = useState<PasswordErrors>({});
+  const [pending, setPending] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const formData = new FormData(formElement);
+    const result = passwordSchema.safeParse({
+      current_password: formData.get("current_password"),
+      new_password: formData.get("new_password"),
+    });
+    if (!result.success) {
+      const fieldErrors: PasswordErrors = {};
+      for (const issue of result.error.issues) {
+        const key = issue.path[0] as keyof PasswordErrors;
+        if (!fieldErrors[key]) fieldErrors[key] = issue.message;
+      }
+      setErrors(fieldErrors);
+      return;
+    }
+    if (result.data.current_password === result.data.new_password) {
+      setErrors({ new_password: "Новый пароль должен отличаться от текущего" });
+      return;
+    }
+
+    setErrors({});
+    setPending(true);
+    try {
+      await updatePassword(result.data);
+      toast.success("Пароль изменён");
+      formElement.reset();
+    } catch (err) {
+      if (!handleAuthError(err)) toast.error(getErrorMessage(err, "Не удалось изменить пароль. Попробуйте ещё раз"));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Card className="flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary">
+          <LockIcon aria-hidden="true" className="size-4" strokeWidth={1.75} />
+        </span>
+        <h2>Пароль</h2>
+      </div>
+
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="current-password" className="text-xs text-muted-foreground">
+            Текущий пароль
+          </label>
+          <Input
+            id="current-password"
+            name="current_password"
+            type="password"
+            autoComplete="current-password"
+            aria-invalid={!!errors.current_password}
+            disabled={pending}
+            className="h-9 text-base md:text-base"
+          />
+          {errors.current_password && (
+            <p className="text-sm text-destructive">{errors.current_password}</p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="new-password" className="text-xs text-muted-foreground">
+            Новый пароль
+          </label>
+          <Input
+            id="new-password"
+            name="new_password"
+            type="password"
+            autoComplete="new-password"
+            aria-invalid={!!errors.new_password}
+            disabled={pending}
+            className="h-9 text-base md:text-base"
+          />
+          {errors.new_password && (
+            <p className="text-sm text-destructive">{errors.new_password}</p>
+          )}
+        </div>
+
+        <Button type="submit" size="sm" disabled={pending} variant="secondary" className="self-start">
+          {pending && <Spinner />}
+          Сохранить
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
 function GoogleCalendarCard() {
   return (
     <Card className="flex flex-col gap-4">
@@ -241,6 +345,7 @@ function GoogleCalendarCard() {
 }
 
 export function AccountProfile() {
+  const router = useRouter();
   const load = useCallback(() => Promise.all([getMe(), listPets().catch(() => null)]), []);
   const state = useProtectedData(load, "Не удалось загрузить профиль");
 
@@ -250,12 +355,19 @@ export function AccountProfile() {
   const [user, pets] = state.data;
   const handleUserChange = (updated: UserPublic) => state.update([updated, pets]);
 
+  function handleLogout() {
+    clearAccessToken();
+    router.push("/");
+  }
+
   return (
     <>
       <PageHeader title="Аккаунт" />
       <ProfileHero user={user} petCount={pets?.length ?? null} onUserChange={handleUserChange} />
       <AccountDetails user={user} />
+      <PasswordChangeCard />
       <GoogleCalendarCard />
+      <Button onClick={() => handleLogout()}>Выйти</Button>
     </>
   );
 }

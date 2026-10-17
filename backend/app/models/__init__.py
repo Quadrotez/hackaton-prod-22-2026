@@ -1,3 +1,4 @@
+from app.models.calendar import CalendarFeed
 from app.models.feeding import FeedingRecord
 from app.models.food import Food, FoodStock, FoodType
 from app.models.health import (
@@ -14,10 +15,12 @@ from app.models.health import (
     VetVisit,
 )
 from app.models.pet import Pet
+from app.models.pet_weight import PetWeight
 from app.models.user import User
 
 __all__ = [
     "Allergy",
+    "CalendarFeed",
     "FeedingRecord",
     "Food",
     "FoodStock",
@@ -29,6 +32,7 @@ __all__ = [
     "MedicationIntake",
     "MedicationTime",
     "Pet",
+    "PetWeight",
     "Pregnancy",
     "Symptom",
     "User",
