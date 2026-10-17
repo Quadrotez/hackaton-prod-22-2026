@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 const sans = Inter({
   subsets: ["cyrillic", "latin"],
-  variable: "--font-sans",
+  variable: "--font-inter",
   axes: ["opsz"],
 });
 

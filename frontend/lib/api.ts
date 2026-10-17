@@ -1,7 +1,9 @@
 import { getAccessToken } from "@/lib/session";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// Requests go to the same origin and are proxied by app/api/v1/[...path]/route.ts,
+// which reads API_URL at runtime (set in docker compose), so the image is not tied
+// to a backend address chosen at build time.
+const API_BASE_URL = "";
 
 export const NETWORK_ERROR_STATUS = 0;
 

@@ -12,10 +12,12 @@ export function PageLoading() {
 }
 
 export function PageError({
+  title = "Кажется, что-то пошло не так",
   message,
   onRetry,
   backToList,
 }: {
+  title?: string;
   message: string;
   onRetry?: () => void;
   backToList?: boolean;
@@ -27,7 +29,7 @@ export function PageError({
         className="size-12 bg-muted-foreground/60 [mask:url(/logo-mark.png)_center/contain_no-repeat]"
       />
       <div className="flex flex-col gap-1 text-muted-foreground">
-        <p className="font-medium">Кажется, что-то пошло не так</p>
+        <p className="font-medium">{title}</p>
         <p className="text-sm">{message}</p>
       </div>
       <div className="flex items-center gap-4">
