@@ -152,13 +152,19 @@ else
   echo "== MR !$mr_iid смёрджен =="
 fi
 
-# 5) Обновить локальный master до merge-коммита.
+# 5) Обновить локальный master (GitLab мёрджит MR squash-коммитом, поэтому
+#    fast-forward возможен не всегда; если tip локального master уже вышел
+#    в релиз через dev — безопасно синхронизироваться reset'ом).
 git fetch "$REMOTE" "$MASTER_BRANCH"
 git checkout "$MASTER_BRANCH"
-if ! git merge-base --is-ancestor "$MASTER_BRANCH" "$REMOTE/$MASTER_BRANCH"; then
+if git merge-base --is-ancestor "$MASTER_BRANCH" "$REMOTE/$MASTER_BRANCH"; then
+  git merge --ff-only "$REMOTE/$MASTER_BRANCH"
+elif git merge-base --is-ancestor "$MASTER_BRANCH" "$REMOTE/$DEV_BRANCH"; then
+  echo "== релиз вышел squash-коммитом, синхронизирую локальный $MASTER_BRANCH с $REMOTE/$MASTER_BRANCH =="
+  git reset --hard "$REMOTE/$MASTER_BRANCH"
+else
   echo "!! локальный $MASTER_BRANCH разошёлся с $REMOTE/$MASTER_BRANCH — обнови вручную." >&2
   exit 1
 fi
-git merge --ff-only "$REMOTE/$MASTER_BRANCH"
 git checkout "$DEV_BRANCH"
 echo "== done =="
