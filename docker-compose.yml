@@ -55,6 +55,7 @@ services:
         condition: service_completed_successfully
     networks:
       - internal
+      - proxy_network
 
   site:
     image: registry.spirit.t-education.com/hack-led-22/frontend:${TAG}
