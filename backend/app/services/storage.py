@@ -29,13 +29,7 @@ class LocalMediaStorage:
         self.media_dir.mkdir(parents=True, exist_ok=True)
 
     async def save_pet_photo(self, file: UploadFile) -> str:
-        return await self._save_image(file, "pets")
-
-    async def save_avatar(self, file: UploadFile) -> str:
-        return await self._save_image(file, "avatars")
-
-    async def _save_image(self, file: UploadFile, directory: str) -> str:
-        relative_path = Path(directory) / f"{uuid4().hex}.upload"
+        relative_path = Path("pets") / f"{uuid4().hex}.upload"
         temporary_path = self._safe_path(relative_path)
         temporary_path.parent.mkdir(parents=True, exist_ok=True)
         size = 0
@@ -65,9 +59,7 @@ class LocalMediaStorage:
         destination = self._safe_path(relative_path)
         if not destination.is_file():
             return None
-        media_type = SUPPORTED_IMAGE_FORMATS.get(
-            destination.suffix.upper().lstrip("."), ("", "application/octet-stream")
-        )[1]
+        media_type = SUPPORTED_IMAGE_FORMATS.get(destination.suffix.lower().lstrip("."), ("", "application/octet-stream"))[1]
         return destination, media_type
 
     def delete(self, photo_url: str | None) -> None:

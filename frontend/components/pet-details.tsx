@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import Link from "next/link";
 import { HeartPulseIcon, UtensilsIcon, type LucideIcon } from "lucide-react";
 import { useProtectedData } from "@/hooks/use-auth";
 import { useNow } from "@/hooks/use-now";
@@ -43,15 +44,17 @@ function QuickLinkTile({
   description,
   icon: Icon,
   accent,
+  href,
 }: {
+  href?: string;
   title: string;
   description: string;
   icon: LucideIcon;
   accent?: boolean;
 }) {
-  return (
+  const content = (
     <Card
-      aria-disabled="true"
+      aria-disabled={href ? undefined : true}
       variant={accent ? "accent" : "default"}
       className="flex h-32 flex-col justify-between"
     >
@@ -64,6 +67,7 @@ function QuickLinkTile({
       </div>
     </Card>
   );
+  return href ? <Link href={href} className="rounded-2xl outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-foreground">{content}</Link> : content;
 }
 
 export function PetDetails({ petId }: { petId: number }) {
@@ -120,6 +124,7 @@ export function PetDetails({ petId }: { petId: number }) {
 
       <section aria-label="Быстрые переходы" className="grid grid-cols-2 gap-3">
         <QuickLinkTile
+          href={`/pet/${petId}/health`}
           title="Здоровье"
           description="Вакцинации, визиты, заключения"
           icon={HeartPulseIcon}

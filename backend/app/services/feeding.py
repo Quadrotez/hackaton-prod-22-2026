@@ -19,11 +19,9 @@ def normalize_food_name(food_name: str) -> str:
 
 
 def find_latest_matching_record(
-    db: Session,
-    pet_id: int,
-    food_name: str | None = None,
-    food_id: int | None = None,
+    db: Session, pet_id: int, food_name: str
 ) -> FeedingRecord | None:
+    normalized_name = normalize_food_name(food_name)
     records = db.scalars(
         select(FeedingRecord)
         .where(FeedingRecord.pet_id == pet_id)
@@ -33,17 +31,11 @@ def find_latest_matching_record(
             FeedingRecord.id.desc(),
         )
     )
-    normalized_name = normalize_food_name(food_name) if food_name is not None else None
     return next(
         (
             record
             for record in records
-            if (food_id is not None and record.food_id == food_id)
-            or (
-                food_id is None
-                and normalized_name is not None
-                and normalize_food_name(record.food_name) == normalized_name
-            )
+            if normalize_food_name(record.food_name) == normalized_name
         ),
         None,
     )
