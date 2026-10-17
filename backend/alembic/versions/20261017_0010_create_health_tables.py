@@ -1,7 +1,7 @@
 """Create pet health tables.
 
-Revision ID: 20261017_0006
-Revises: 20261016_0005
+Revision ID: 20261017_0010
+Revises: 20261017_0009
 Create Date: 2026-10-17
 """
 from collections.abc import Sequence
@@ -10,8 +10,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "20261017_0006"
-down_revision: str | None = "20261016_0005"
+revision: str = "20261017_0010"
+down_revision: str | None = "20261017_0009"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -1,15 +1,11 @@
-import re
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
-USERNAME_PATTERN = re.compile(r"^[a-z0-9_]{3,30}$")
-
-
 class UserRegistration(BaseModel):
     email: EmailStr
-    username: str = Field(min_length=3, max_length=30)
+    name: str | None = Field(default=None, max_length=255)
     password: str = Field(min_length=8, max_length=128)
 
     @field_validator("email")
@@ -17,29 +13,29 @@ class UserRegistration(BaseModel):
     def normalize_email(cls, value: EmailStr) -> str:
         return str(value).strip().lower()
 
-    @field_validator("username")
+    @field_validator("name")
     @classmethod
-    def normalize_username(cls, value: str) -> str:
-        normalized = value.strip().lower()
-        if not USERNAME_PATTERN.fullmatch(normalized):
-            raise ValueError("Username must contain only lowercase letters, numbers, and underscores")
-        return normalized
+    def normalize_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
 
 class Credentials(BaseModel):
-    identifier: str = Field(min_length=3, max_length=320)
+    email: EmailStr
     password: str = Field(min_length=8, max_length=128)
 
-    @field_validator("identifier")
+    @field_validator("email")
     @classmethod
-    def normalize_identifier(cls, value: str) -> str:
-        return value.strip().lower()
+    def normalize_email(cls, value: EmailStr) -> str:
+        return str(value).strip().lower()
 
 
 class UserPublic(BaseModel):
     id: int
     email: EmailStr
-    username: str
+    name: str | None
     avatar_url: str | None
     created_at: datetime
 
