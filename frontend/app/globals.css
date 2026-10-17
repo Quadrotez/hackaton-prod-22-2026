@@ -79,9 +79,7 @@
   --sidebar-ring: oklch(0.708 0 0);
 
   --text-base: clamp(0.9375rem, 0.9rem + 0.15vw, 1rem);
-  /* Заголовок страницы */
   --text-h1: clamp(1.75rem, 1.45rem + 1.25vw, 2.5rem);
-  /* Заголовок карточки или секции */
   --text-h2: clamp(1.0625rem, 1rem + 0.3vw, 1.25rem);
   --text-h3: 1rem;
   --text-h4: 1rem;
@@ -93,8 +91,6 @@
   --leading-body: 1.55;
 }
 
-/* Базовая нейтральная палитра shadcn — для элементов, которые не должны
-   брать фирменные цвета (например, удаление и его подтверждение) */
 .theme-shadcn {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);

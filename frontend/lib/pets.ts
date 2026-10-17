@@ -1,10 +1,13 @@
 import { Cat, Dog, PawPrint, type LucideIcon } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
+export type PetSex = "boy" | "girl";
+
 export type Pet = {
   id: number;
   name: string;
   species: string;
+  sex: PetSex;
   breed: string | null;
   birth_date: string | null;
   approximate_age_years: number | null;
@@ -15,6 +18,7 @@ export type Pet = {
 export type PetCreate = {
   name: string;
   species: string;
+  sex: PetSex;
   breed?: string | null;
   birth_date?: string | null;
   approximate_age_years?: number | null;
@@ -24,6 +28,7 @@ export type PetCreate = {
 export type PetUpdate = {
   name?: string;
   species?: string;
+  sex?: PetSex;
   breed?: string | null;
   birth_date?: string | null;
   approximate_age_years?: number | null;
@@ -34,6 +39,11 @@ export const speciesOptions: { value: string; label: string; icon: LucideIcon }[
   { value: "cat", label: "Кошка", icon: Cat },
   { value: "dog", label: "Собака", icon: Dog },
   { value: "other", label: "Другой", icon: PawPrint },
+];
+
+export const sexOptions: { value: PetSex; label: string }[] = [
+  { value: "boy", label: "Мальчик" },
+  { value: "girl", label: "Девочка" },
 ];
 
 function findSpecies(species: string) {

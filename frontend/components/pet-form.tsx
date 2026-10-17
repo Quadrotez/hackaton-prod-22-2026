@@ -8,7 +8,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { useRequireAuth } from "@/hooks/use-auth";
 import { getErrorMessage } from "@/lib/api";
-import { createPet, getSpeciesOption, speciesOptions, updatePet, uploadPetPhoto, type Pet } from "@/lib/pets";
+import { createPet, getSpeciesOption, sexOptions, speciesOptions, updatePet, uploadPetPhoto, type Pet } from "@/lib/pets";
 import { PHOTO_TYPES, validatePhoto } from "@/lib/photos";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -43,6 +43,7 @@ type AgeMode = (typeof ageModes)[number]["value"];
 const petSchema = z.object({
   name: z.string().trim().min(1, "Введите имя питомца").max(255, "Не больше 255 символов"),
   species: z.string().trim().min(1, "Укажите вид питомца").max(100, "Не больше 100 символов"),
+  sex: z.enum(["boy", "girl"], "Укажите пол питомца"),
   breed: z.string().trim().max(255, "Не больше 255 символов"),
   weight: z.string().trim().min(1, "Укажите вес питомца")
     .transform((value) => Number(value.replace(",", ".")))
@@ -109,6 +110,7 @@ export function PetForm({ pet }: { pet?: Pet }) {
     const result = petSchema.safeParse({
       name: formData.get("name"),
       species: species === "other" ? formData.get("customSpecies") : species,
+      sex: formData.get("sex") ?? undefined,
       breed: formData.get("breed"),
       weight: formData.get("weight"),
       birth_date: ageMode === "birth_date" ? formData.get("birth_date") : "",
@@ -124,7 +126,10 @@ export function PetForm({ pet }: { pet?: Pet }) {
       setErrors(fieldErrors);
       const firstField = result.error.issues[0]?.path[0];
       const fieldName = firstField === "species" ? "customSpecies" : firstField;
-      const input = fieldName === "birth_date" ? form.querySelector("#pet-birth-date") : form.elements.namedItem(String(fieldName));
+      const input =
+        fieldName === "birth_date" ? form.querySelector("#pet-birth-date")
+        : fieldName === "sex" ? form.querySelector('input[name="sex"]')
+        : form.elements.namedItem(String(fieldName));
       if (input instanceof HTMLElement) input.focus();
       return;
     }
@@ -255,6 +260,28 @@ export function PetForm({ pet }: { pet?: Pet }) {
                     {errors.species && <FieldError id="pet-species-error">{errors.species}</FieldError>}
                   </Field>
                 )}
+              </FieldSet>
+
+              <FieldSet className="gap-2" data-invalid={!!errors.sex}>
+                <FieldLegend variant="label">Пол</FieldLegend>
+                <div className="grid grid-cols-2 gap-2">
+                  {sexOptions.map(({ value, label }) => (
+                    <label key={value} className="relative cursor-pointer">
+                      <input
+                        type="radio"
+                        name="sex"
+                        value={value}
+                        defaultChecked={pet?.sex === value}
+                        onChange={() => setErrors((current) => ({ ...current, sex: undefined }))}
+                        aria-invalid={!!errors.sex}
+                        aria-describedby={errors.sex ? "pet-sex-error" : undefined}
+                        className="peer sr-only"
+                      />
+                      <span className={choiceClass}>{label}</span>
+                    </label>
+                  ))}
+                </div>
+                {errors.sex && <FieldError id="pet-sex-error">{errors.sex}</FieldError>}
               </FieldSet>
 
               <Field data-invalid={!!errors.breed}>
