@@ -6,7 +6,14 @@ from sqlalchemy.exc import IntegrityError
 from app.api.dependencies import AppSettings, CurrentUser, DbSession
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
-from app.schemas.auth import Credentials, TokenResponse, UserPublic, UserRegistration
+from app.schemas.auth import (
+    Credentials,
+    PasswordUpdate,
+    TokenResponse,
+    UserPublic,
+    UserRegistration,
+    UserUpdate,
+)
 from app.services.storage import FileTooLargeError, InvalidImageError, LocalMediaStorage
 
 
@@ -79,6 +86,31 @@ def login(credentials: Credentials, db: DbSession, settings: AppSettings) -> Tok
 @router.get("/me", response_model=UserPublic)
 def me(current_user: CurrentUser) -> User:
     return current_user
+
+
+@router.patch("/me", response_model=UserPublic)
+def update_me(payload: UserUpdate, current_user: CurrentUser, db: DbSession) -> User:
+    current_user.name = payload.name
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.patch("/me/password", status_code=status.HTTP_204_NO_CONTENT)
+def update_password(payload: PasswordUpdate, current_user: CurrentUser, db: DbSession) -> None:
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+    if payload.current_password == payload.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from the current password",
+        )
+
+    current_user.password_hash = hash_password(payload.new_password)
+    db.commit()
 
 
 @router.post("/me/avatar", response_model=UserPublic)
