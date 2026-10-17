@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from app.api.v1 import auth, feeding, foods, health, pets, vet_documents
+from app.api.v1 import auth, feeding, foods, health, pet_health, pets, vet_documents
 
 logger = logging.getLogger(__name__)
 
@@ -70,3 +70,4 @@ app.include_router(pets.router, prefix="/api/v1")
 app.include_router(feeding.router, prefix="/api/v1")
 app.include_router(vet_documents.router, prefix="/api/v1")
 app.include_router(foods.router, prefix="/api/v1")
+app.include_router(pet_health.router, prefix="/api/v1")
