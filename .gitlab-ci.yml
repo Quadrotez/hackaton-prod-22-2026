@@ -70,22 +70,10 @@ deploy:
     TAG: ${CI_COMMIT_SHORT_SHA}
   script:
     # Idempotent: make sure the deploy user on the VM can pull from the private Registry.
+    - tsh scp scripts/registry-login.sh "${DEPLOY_SSH_USER}@${DEPLOY_VM}:/opt/petcare/registry-login.sh"
     - |
       KEY_B64=$(base64 -w0 "$SPIRIT_DOCKER_SA_KEY")
-      tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "
-        set -e
-        umask 077
-        mkdir -p \$HOME/bin
-        # Use Spirit's dp explicitly: a system 'dp' (dynamic programming tool) may be on PATH.
-        if [ ! -x \$HOME/bin/dp ]; then
-          wget -q https://spirit.t-education.com/cli/tedu/${DP_CLI_VERSION}/linux/dp -O \$HOME/bin/dp
-          chmod +x \$HOME/bin/dp
-        fi
-        echo $KEY_B64 | base64 -d > \$HOME/sa-key.json
-        \$HOME/bin/dp auth service-acc --key-file \$HOME/sa-key.json
-        \$HOME/bin/dp auth configure-kaniko
-        rm -f \$HOME/sa-key.json
-      "
+      tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "bash /opt/petcare/registry-login.sh '$KEY_B64' ${DP_CLI_VERSION}"
     - tsh scp docker-compose.yml "${DEPLOY_SSH_USER}@${DEPLOY_VM}:/opt/petcare/docker-compose.yml"
     - tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "cd /opt/petcare && TAG=${TAG} docker compose pull && TAG=${TAG} docker compose up -d --remove-orphans"
 
@@ -101,19 +89,7 @@ prepare:docker:
   variables:
     DP_CLI_VERSION: 14.1.3
   script:
+    - tsh scp scripts/registry-login.sh "${DEPLOY_SSH_USER}@${DEPLOY_VM}:/opt/petcare/registry-login.sh"
     - |
       KEY_B64=$(base64 -w0 "$SPIRIT_DOCKER_SA_KEY")
-      tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "
-        set -e
-        umask 077
-        mkdir -p \$HOME/bin
-        # Use Spirit's dp explicitly: a system 'dp' (dynamic programming tool) may be on PATH.
-        if [ ! -x \$HOME/bin/dp ]; then
-          wget -q https://spirit.t-education.com/cli/tedu/${DP_CLI_VERSION}/linux/dp -O \$HOME/bin/dp
-          chmod +x \$HOME/bin/dp
-        fi
-        echo $KEY_B64 | base64 -d > \$HOME/sa-key.json
-        \$HOME/bin/dp auth service-acc --key-file \$HOME/sa-key.json
-        \$HOME/bin/dp auth configure-kaniko
-        rm -f \$HOME/sa-key.json
-      "
+      tsh ssh "${DEPLOY_SSH_USER}@${DEPLOY_VM}" "bash /opt/petcare/registry-login.sh '$KEY_B64' ${DP_CLI_VERSION}"
