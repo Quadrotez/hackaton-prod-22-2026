@@ -45,6 +45,9 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://petcare:${DB_PASSWORD}@db:5432/petcare_db
+      MEDIA_DIR: /data/media
+    volumes:
+      - mediadata:/data/media
     expose:
       - "8000"
     depends_on:
@@ -57,6 +60,12 @@ services:
     image: registry.spirit.t-education.com/hack-led-22/frontend:${TAG}
     container_name: petcare-site
     restart: unless-stopped
+    environment:
+      API_URL: http://api:8000
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:3000:3000"
     expose:
       - "3000"
     networks:
@@ -65,6 +74,7 @@ services:
 
 volumes:
   pgdata:
+  mediadata:
 
 networks:
   internal:

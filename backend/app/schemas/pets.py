@@ -2,6 +2,8 @@ from datetime import date
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.models.pet import PetSex
+
 
 AGE_FIELDS_DESCRIPTION = (
     "Specify either birth_date or approximate_age_years, but not both. "
@@ -12,6 +14,7 @@ AGE_FIELDS_DESCRIPTION = (
 class PetCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     species: str = Field(min_length=1, max_length=100)
+    sex: PetSex = Field(description="Pet sex: boy or girl.")
     breed: str | None = Field(default=None, max_length=255)
     birth_date: date | None = Field(
         default=None,
@@ -68,6 +71,7 @@ class PetCreate(BaseModel):
 class PetUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     species: str | None = Field(default=None, min_length=1, max_length=100)
+    sex: PetSex | None = Field(default=None, description="Pet sex: boy or girl.")
     breed: str | None = Field(default=None, max_length=255)
     birth_date: date | None = Field(
         default=None,
@@ -99,6 +103,13 @@ class PetUpdate(BaseModel):
         value = value.strip()
         if not value:
             raise ValueError("must not be blank")
+        return value
+
+    @field_validator("sex")
+    @classmethod
+    def reject_null_sex(cls, value: PetSex | None) -> PetSex:
+        if value is None:
+            raise ValueError("must not be null")
         return value
 
     @field_validator("breed")
@@ -141,6 +152,7 @@ class PetPublic(BaseModel):
     id: int
     name: str
     species: str
+    sex: PetSex
     breed: str | None
     birth_date: date | None = Field(
         description="Exact date of birth, when known. Mutually exclusive with approximate_age_years."
