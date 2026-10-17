@@ -95,7 +95,6 @@ export function PetDetails({ petId }: { petId: number }) {
   async function handleMealsChange(next: Meal[]) {
     const sorted = sortMeals(next);
     update([pet, sorted, foods]);
-    // Остаток кормов пересчитывает бэк при каждом изменении приёма пищи
     const refreshed = await listFoods().catch(() => null);
     if (refreshed) update([pet, sorted, refreshed]);
   }

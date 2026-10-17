@@ -1,7 +1,5 @@
 import { NextRequest } from "next/server";
 
-// Proxies /api/v1/* to the backend. API_URL is read at runtime, so the same image
-// works in any environment (inside docker compose it is http://api:8000).
 const API_URL = process.env.API_URL ?? "http://localhost:8000";
 const MAX_REDIRECTS = 3;
 
@@ -15,9 +13,6 @@ async function proxy(request: NextRequest, { params }: { params: Promise<{ path:
   if (authorization) headers["authorization"] = authorization;
 
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
-  // Keep a private copy of the body so it can be sent again after an internal
-  // redirect (FastAPI redirects /pets -> /pets/). Passing the request buffer
-  // directly to fetch fails: undici detaches it after the first send.
   const body = hasBody
     ? new Uint8Array(await request.arrayBuffer()).slice()
     : undefined;

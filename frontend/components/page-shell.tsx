@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { Menu } from "@/components/menu";
 
-export function PageShell({ children, contentClassName = "max-w-sm" }: {
+export function PageShell({ children, contentClassName = "max-w-sm md:max-w-xl" }: {
   children: React.ReactNode;
   contentClassName?: string;
 }) {
