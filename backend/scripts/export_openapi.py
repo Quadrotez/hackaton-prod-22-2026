@@ -1,8 +1,8 @@
 """Export the OpenAPI schema and a standalone Swagger UI as static files.
 
 The API schema is generated from the FastAPI app without starting a server, so
-CI can publish browsable docs for any branch (see the ``pages`` job in
-``.gitlab-ci.yml``).
+CI can attach browsable docs to every branch as pipeline artifacts (see the
+``docs:openapi`` job in ``.gitlab-ci.yml``).
 
 Usage:
     python scripts/export_openapi.py [output_dir]
