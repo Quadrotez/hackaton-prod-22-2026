@@ -51,3 +51,7 @@ backend/test-media/
 
 # Opencode settings
 opencode.json
+
+# Local Docker setup
+/docker-compose.local.yml
+/local.sh
