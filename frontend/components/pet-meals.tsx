@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { useRequireAuth } from "@/hooks/use-auth";
 import { getErrorMessage } from "@/lib/api";
-import { getDaysLeft, isLowStock, type Food } from "@/lib/foods";
+import type { Food } from "@/lib/foods";
 import {
   createMeal,
   deleteMeal,
@@ -18,7 +18,7 @@ import {
   type Meal,
   type MealSuggestion,
 } from "@/lib/meals";
-import { formatWeight, pluralize } from "@/lib/pets";
+import { formatWeight } from "@/lib/pets";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 
 const RECENT_MEALS_LIMIT = 2;
+const DEFAULT_PORTION_GRAMS = 200;
 // Запас на расхождение часов клиента и сервера
 const FUTURE_TOLERANCE_MS = 5 * 60_000;
 const quickTimes = [
@@ -53,7 +54,7 @@ function formatFedAt(fedAt: string): string {
 
 const mealSchema = z.object({
   food_id: z.coerce.number().int().positive("Выберите корм"),
-  amount_grams: z.coerce.number().int("Граммы — целое число").positive("Укажите, сколько граммов дали"),
+  amount_grams: z.coerce.number().int("Укажите целое число граммов").positive("Укажите порцию больше 0 г"),
   fed_at: z.string().min(1, "Укажите время кормления")
     .transform((value) => new Date(value))
     .refine((date) => !Number.isNaN(date.getTime()), "Укажите корректное время")
@@ -104,6 +105,7 @@ function MealForm({
 
   async function handleFoodChange(value: string) {
     setFoodId(value);
+    setErrors((current) => ({ ...current, food_id: undefined, amount_grams: undefined }));
     latestFoodId.current = value;
     setSuggestion(null);
     if (isEdit || !value) return;
@@ -127,7 +129,7 @@ function MealForm({
     const formData = new FormData(event.currentTarget);
     const result = mealSchema.safeParse({
       food_id: foodId || 0,
-      amount_grams: formData.get("amount_grams") ?? "",
+      amount_grams: isEdit ? meal.amount_grams ?? DEFAULT_PORTION_GRAMS : formData.get("amount_grams"),
       fed_at: fedAt,
       liked,
       tolerated,
@@ -145,15 +147,21 @@ function MealForm({
       return;
     }
 
+    if (!isEdit && selected && result.data.amount_grams > selected.remaining_grams) {
+      setErrors({ amount_grams: `В наличии ${formatWeight(selected.remaining_grams)} — уменьшите порцию или пополните запас` });
+      return;
+    }
+
     setErrors({});
     setPending(true);
     try {
+      const { amount_grams, ...fields } = result.data;
       const data = {
-        ...result.data,
+        ...fields,
         reaction_notes: result.data.reaction_notes || null,
         notes: result.data.notes || null,
       };
-      const saved = isEdit ? await updateMeal(petId, meal.id, data) : await createMeal(petId, data);
+      const saved = isEdit ? await updateMeal(petId, meal.id, data) : await createMeal(petId, { ...data, amount_grams });
       toast.success(isEdit ? "Запись обновлена" : "Кормление записано");
       onSaved(saved);
     } catch (error) {
@@ -239,21 +247,27 @@ function MealForm({
             <FieldError>{errors.food_id}</FieldError>
           </Field>
 
-          <Field data-invalid={Boolean(errors.amount_grams)}>
-            <FieldLabel htmlFor="meal-amount">Сколько граммов</FieldLabel>
-            <Input
-              id="meal-amount"
-              name="amount_grams"
-              type="number"
-              min={1}
-              step={1}
-              inputMode="numeric"
-              defaultValue={meal?.amount_grams ?? ""}
-              placeholder={selected ? `В наличии ${formatWeight(selected.remaining_grams)}` : ""}
-              aria-invalid={Boolean(errors.amount_grams)}
-            />
-            <FieldError>{errors.amount_grams}</FieldError>
-          </Field>
+          {!isEdit && (
+            <Field data-invalid={Boolean(errors.amount_grams)}>
+              <FieldLabel htmlFor="meal-amount">Порция, г</FieldLabel>
+              <Input
+                id="meal-amount"
+                name="amount_grams"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                step={1}
+                defaultValue={DEFAULT_PORTION_GRAMS}
+                required
+                onChange={() => setErrors((current) => ({ ...current, amount_grams: undefined }))}
+                aria-invalid={Boolean(errors.amount_grams)}
+                aria-describedby="meal-amount-help meal-amount-error"
+              />
+              <p id="meal-amount-help" className="text-xs text-muted-foreground">Можно изменить перед сохранением.</p>
+              <FieldError id="meal-amount-error">{errors.amount_grams}</FieldError>
+            </Field>
+          )}
+          {isEdit && meal.amount_grams != null && <p className="text-sm text-muted-foreground">Порция: {formatWeight(meal.amount_grams)}</p>}
 
           <Field data-invalid={Boolean(errors.fed_at)}>
             <FieldLabel htmlFor="meal-fed-at">Когда покормили</FieldLabel>
@@ -360,33 +374,6 @@ function MealForm({
   );
 }
 
-function StockAlerts({ foods, meals }: { foods: Food[]; meals: Meal[] }) {
-  const eaten = new Set(meals.map((meal) => meal.food_id));
-  const low = foods.filter((food) => eaten.has(food.id) && isLowStock(food));
-  if (low.length === 0) return null;
-
-  return (
-    <Card role="status" className="flex flex-col gap-1.5 border-destructive/40">
-      <h2>Корм заканчивается</h2>
-      <ul className="flex flex-col gap-1 text-sm">
-        {low.map((food) => {
-          const daysLeft = getDaysLeft(food);
-          return (
-            <li key={food.id} className="flex justify-between gap-3">
-              <span className="truncate">{food.name}</span>
-              <span className="shrink-0 text-muted-foreground tabular-nums">
-                {food.remaining_grams <= 0
-                  ? "закончился"
-                  : `${formatWeight(food.remaining_grams)}${daysLeft !== null ? ` · ~${daysLeft} ${pluralize(daysLeft, "день", "дня", "дней")}` : ""}`}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </Card>
-  );
-}
-
 export function PetMeals({
   petId,
   meals,
@@ -407,8 +394,6 @@ export function PetMeals({
 
   return (
     <>
-      {meals && foods && <StockAlerts foods={foods} meals={meals} />}
-
       <Card className="flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-3">
           <h2>Приёмы пищи</h2>
@@ -454,6 +439,7 @@ export function PetMeals({
                     <p className="truncate font-medium">{foodName}</p>
                     <p className="truncate text-xs text-muted-foreground">
                       <span title={formatFedAt(meal.fed_at)}>{formatTimeAgo(meal.fed_at, now)}</span>
+                      {meal.amount_grams != null && ` · ${formatWeight(meal.amount_grams)}`}
                       {" · "}
                       {meal.liked ? "понравилось" : "не понравилось"}
                       {!meal.tolerated && (
