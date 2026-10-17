@@ -12,13 +12,15 @@ from app.services.transfers import add_months
 PASSWORD = "correct-horse-battery-staple"
 
 
-def auth_headers(client: TestClient, email: str) -> dict[str, str]:
-    username = email.split("@", 1)[0].replace("-", "_")
-    assert client.post(
+def auth_headers(client: TestClient, email: str, name: str | None = None) -> dict[str, str]:
+    if name is None:
+        name = email.split("@", 1)[0].replace("-", "_")
+    registration = client.post(
         "/api/v1/auth/register",
-        json={"email": email, "username": username, "password": PASSWORD},
-    ).status_code == 201
-    response = client.post("/api/v1/auth/login", json={"identifier": email, "password": PASSWORD})
+        json={"email": email, "name": name, "password": PASSWORD},
+    )
+    assert registration.status_code in (201, 409), registration.json()
+    response = client.post("/api/v1/auth/login", json={"email": email, "password": PASSWORD})
     assert response.status_code == 200
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
@@ -65,7 +67,7 @@ def test_full_lifecycle(client: TestClient, parties) -> None:
     assert body["recipient_email"] == "ivan@example.com"
     assert body["recipient"] is None
     assert body["pet"]["name"] == "Rex"
-    assert body["owner"]["username"] == "anna"
+    assert body["owner"]["name"] == "anna"
     transfer_id = body["id"]
 
     incoming = client.get("/api/v1/transfers/incoming", headers=recipient).json()
@@ -74,7 +76,7 @@ def test_full_lifecycle(client: TestClient, parties) -> None:
 
     accepted = act(client, recipient, transfer_id, "accept").json()
     assert accepted["status"] == "accepted"
-    assert accepted["recipient"]["username"] == "ivan"
+    assert accepted["recipient"]["name"] == "ivan"
     assert accepted["responded_at"] is not None
     assert client.get("/api/v1/transfers/incoming", headers=recipient).json() == []
     received = client.get("/api/v1/transfers/received", headers=recipient).json()

@@ -33,7 +33,7 @@ class TransferPet(BaseModel):
 
 class TransferUser(BaseModel):
     id: int
-    username: str
+    name: str | None
     email: str
 
     model_config = ConfigDict(from_attributes=True)
