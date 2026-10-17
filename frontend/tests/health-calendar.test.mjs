@@ -34,7 +34,7 @@ function clientModules(fetchImpl) {
 const pet = { id: 1, name: "Барсик" };
 const visit = { id: 7, pet_id: 1, title: "Осмотр", visit_at: "2026-10-22T11:30:00+03:00", status: "planned", reason: "illness" };
 
-test("сохранённый визит читается календарём; выполненный ведёт в историю, отменённый исчезает", async () => {
+test("сохранённый визит читается календарём и ведёт в раздел приёмов; отменённый исчезает", async () => {
   const records = [];
   const requests = [];
   const { events, health } = clientModules(async (url, init) => {
@@ -54,14 +54,14 @@ test("сохранённый визит читается календарём; �
   let result = await health.loadCalendar("2026-10-01", "2026-11-11");
   assert.equal(result.events.length, 1);
   const href = events.healthEventHref(result.events[0]);
-  assert.match(href, /^\/pet\/1\/health\?view=plan&event=visit-7#health-visit-7$/);
+  assert.equal(href, "/pet/1/health/visits#health-visit-7");
   const schedule = requests.find((url) => url.pathname.endsWith("/medications/schedule"));
   assert.equal(schedule.searchParams.get("from"), "2026-10-01");
   assert.equal(schedule.searchParams.get("to"), "2026-11-11");
   await health.saveHealth(1, "visits/7", { status: "completed" }, "PATCH");
   result = await health.loadCalendar("2026-10-01", "2026-11-11");
   assert.equal(result.events[0].completed, true);
-  assert.match(events.healthEventHref(result.events[0]), /view=history/);
+  assert.equal(events.healthEventHref(result.events[0]), "/pet/1/health/visits#health-visit-7");
   await health.saveHealth(1, "visits/7", { status: "cancelled" }, "PATCH");
   result = await health.loadCalendar("2026-10-01", "2026-11-11");
   assert.equal(result.events.length, 0);
@@ -77,7 +77,8 @@ test("дата прививки и локальное время лекарст�
   assert.equal(result[0].date, "2027-01-01");
   assert.equal(result[1].date, "2027-01-01");
   assert.equal(result[1].time, "00:15");
-  assert.match(events.healthEventHref(result[1]), /event=medicine-3/);
+  assert.equal(events.healthEventHref(result[0]), "/pet/1/health/vaccines#health-vaccine-2");
+  assert.equal(events.healthEventHref(result[1]), "/pet/1/health/medicines#health-medicine-3");
 });
 
 test("визит учитывает часовой пояс, а ключи одинаковых ID у разных питомцев уникальны", () => {
