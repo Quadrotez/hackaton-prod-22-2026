@@ -5,6 +5,7 @@ import {
   CalendarCheckIcon,
   CheckIcon,
   LockIcon,
+  LogOutIcon,
   MailIcon,
   PawPrintIcon,
   PencilIcon,
@@ -367,7 +368,7 @@ export function AccountProfile() {
       <AccountDetails user={user} />
       <PasswordChangeCard />
       <GoogleCalendarCard />
-      <Button onClick={() => handleLogout()}>Выйти</Button>
+      <Button variant="secondary" className="theme-shadcn" onClick={() => handleLogout()}><LogOutIcon />Выйти</Button>
     </>
   );
 }
