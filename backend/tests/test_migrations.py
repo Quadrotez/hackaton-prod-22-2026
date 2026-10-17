@@ -94,6 +94,65 @@ def test_feeding_records_migration_upgrade_and_downgrade(
         get_settings.cache_clear()
 
 
+def test_stock_checks_migration_adds_amount_and_constraints(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    database_path = tmp_path / "stock-checks-migration.sqlite"
+    database_url = f"sqlite+pysqlite:///{database_path}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+
+    config = Config("alembic.ini")
+    engine = create_engine(database_url)
+    try:
+        command.upgrade(config, "20261017_0009")
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO users (email, password_hash, created_at) "
+                    "VALUES ('stock@example.com', 'hash', CURRENT_TIMESTAMP)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO foods (user_id, name, type, protein, fats, carbohydrates, "
+                    "calories, created_at) VALUES (1, 'F', 'dry', 1, 1, 1, 1, CURRENT_TIMESTAMP)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO food_stocks (user_id, food_id, total_grams, remaining_grams, "
+                    "updated_at) VALUES (1, 1, 100, 250, CURRENT_TIMESTAMP)"
+                )
+            )
+
+        command.upgrade(config, "head")
+        inspector = inspect(engine)
+        columns = {c["name"]: c for c in inspector.get_columns("feeding_records")}
+        assert columns["amount_grams"]["nullable"] is True
+        check_names = {
+            c["name"] for c in inspector.get_check_constraints("food_stocks")
+        }
+        assert {
+            "ck_food_stocks_total_grams_positive",
+            "ck_food_stocks_remaining_grams_range",
+        }.issubset(check_names)
+        with engine.connect() as connection:
+            assert connection.execute(
+                text("SELECT remaining_grams FROM food_stocks")
+            ).scalar_one() == 100
+
+        command.downgrade(config, "20261017_0009")
+        inspector = inspect(engine)
+        assert "amount_grams" not in {
+            c["name"] for c in inspector.get_columns("feeding_records")
+        }
+        assert not inspector.get_check_constraints("food_stocks")
+    finally:
+        engine.dispose()
+        get_settings.cache_clear()
+
+
 def test_user_profile_migration_replaces_username_with_optional_name(
     tmp_path: Path, monkeypatch,
 ) -> None:
