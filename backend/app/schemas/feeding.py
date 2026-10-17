@@ -11,10 +11,16 @@ CREATE_RATINGS_DESCRIPTION = (
 
 
 class FeedingRecordCreate(BaseModel):
-    food_name: str = Field(
+    food_id: int | None = Field(
+        default=None,
+        gt=0,
+        description="Optional ID of a food from the authenticated user's catalog.",
+    )
+    food_name: str | None = Field(
+        default=None,
         min_length=1,
         max_length=255,
-        description="Required food name. Surrounding whitespace is removed before storage.",
+        description="Legacy/display food name. Required when food_id is omitted.",
     )
     fed_at: datetime = Field(description="Required date and time when the pet was fed.")
     liked: bool = Field(default=None, description=CREATE_RATINGS_DESCRIPTION)  # type: ignore[assignment]
@@ -26,11 +32,19 @@ class FeedingRecordCreate(BaseModel):
 
     @field_validator("food_name")
     @classmethod
-    def strip_food_name(cls, value: str) -> str:
+    def strip_food_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         value = value.strip()
         if not value:
             raise ValueError("must not be blank")
         return value
+
+    @model_validator(mode="after")
+    def require_food_reference(self) -> "FeedingRecordCreate":
+        if self.food_id is None and self.food_name is None:
+            raise ValueError("food_id or food_name is required")
+        return self
 
     model_config = ConfigDict(
         title="FeedingRecordCreate",
@@ -46,8 +60,13 @@ class FeedingRecordCreate(BaseModel):
 
 
 class FeedingRecordUpdate(BaseModel):
-    food_name: str = Field(
-        default=None,  # type: ignore[arg-type]
+    food_id: int | None = Field(
+        default=None,
+        gt=0,
+        description="New catalog food ID; send null to unlink while retaining food_name.",
+    )
+    food_name: str | None = Field(
+        default=None,
         min_length=1,
         max_length=255,
         description="New non-blank display name for this record only.",
@@ -71,7 +90,7 @@ class FeedingRecordUpdate(BaseModel):
 
     @field_validator("food_name")
     @classmethod
-    def strip_food_name(cls, value: str | None) -> str:
+    def strip_food_name(cls, value: str | None) -> str | None:
         if value is None:
             raise ValueError("must not be null")
         value = value.strip()
@@ -99,6 +118,7 @@ class FeedingRecordUpdate(BaseModel):
 class FeedingRecordPublic(BaseModel):
     id: int
     pet_id: int
+    food_id: int | None
     food_name: str
     fed_at: datetime
     liked: bool
@@ -116,6 +136,7 @@ class FeedingSuggestedValues(BaseModel):
 
 
 class FeedingSuggestionResponse(BaseModel):
+    food_id: int | None = None
     food_name: str
     previously_tried: bool
     suggested_values: FeedingSuggestedValues | None
