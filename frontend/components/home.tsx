@@ -1,37 +1,56 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { ChevronRightIcon, PlusIcon } from "lucide-react";
-import { cardVariants } from "@/components/ui/card";
-import { CalendarView, dateKey, type DayMarker } from "@/components/calendar-view";
+import { useCallback, useMemo, useState } from "react";
+import { PlusIcon } from "lucide-react";
+import { CalendarGrid, kindColor, monthGrid, type DayMarker } from "@/components/calendar-view";
+import { PetAvatar } from "@/components/pet-avatar";
+import { PageError } from "@/components/page-state";
+import { useProtectedData } from "@/hooks/use-auth";
+import { loadCalendar } from "@/lib/health";
+import { healthEventHref, toDateKey, type CalendarEvent } from "@/lib/health-events";
 import { cn } from "@/lib/utils";
 import type { Pet } from "@/lib/pets";
-import type { PetEvent } from "@/lib/events";
 
 const longDate = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", weekday: "long" });
 const shortDate = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" });
+const fromKey = (key: string) => new Date(`${key}T00:00:00`);
 
-// ПРОВЕРЬТЕ маршрут события
-const eventHref = (e: PetEvent) => `/pet/${e.petId}/event/${e.id}`;
+const kindLabels: Record<CalendarEvent["kind"], string> = {
+  visit: "Приём",
+  vaccine: "Прививка",
+  medicine: "Лекарство",
+};
 
-function EventItem({ event, pet, showDate }: { event: PetEvent; pet?: Pet; showDate?: boolean }) {
+function SectionTitle({ id, children }: { id: string; children: React.ReactNode }) {
+  return <h2 id={id}>{children}</h2>;
+}
+
+function EventRow({ event, pet, showDate }: { event: CalendarEvent; pet?: Pet; showDate?: boolean }) {
   return (
-    <li className={cn(cardVariants(), "flex items-center gap-3 p-3 transition-colors hover:bg-card/70")}>
+    <li className="flex items-start gap-3 py-2 last:pb-0">
+      <span
+        aria-hidden="true"
+        className={cn("w-1 self-stretch rounded-full", kindColor[event.kind])}
+      />
+      {pet && <PetAvatar pet={pet} size="xs" />}
       <Link
-        href={eventHref(event)}
-        className="flex min-w-0 flex-1 flex-col gap-0.5 outline-none focus-visible:underline"
+        href={healthEventHref(event)}
+        className="flex min-w-0 flex-1 flex-col outline-none focus-visible:underline"
       >
-        <span className={cn("truncate", event.done && "text-muted-foreground line-through")}>{event.title}</span>
-        <span className="truncate text-sm text-muted-foreground">
-          {showDate && `${shortDate.format(new Date(event.date))} · `}
-          {pet?.name ?? "Питомец"}
+        <span className={cn("truncate", event.completed && "text-muted-foreground line-through")}>
+          {event.title}
+        </span>
+        <span className="truncate text-xs text-muted-foreground">
+          {showDate && `${shortDate.format(fromKey(event.date))} · `}
+          {kindLabels[event.kind]}
+          {event.time && ` · ${event.time}`}
         </span>
       </Link>
       {pet && (
         <Link
           href={`/pet/${pet.id}`}
-          className="shrink-0 rounded-full border px-3 py-1 text-sm outline-none transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-foreground"
+          className="shrink-0 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:underline"
         >
           {pet.name}
         </Link>
@@ -40,115 +59,120 @@ function EventItem({ event, pet, showDate }: { event: PetEvent; pet?: Pet; showD
   );
 }
 
-export function HomeDashboard({ pets, events }: { pets: Pet[]; events: PetEvent[] }) {
+export function HomeDashboard({ pets }: { pets: Pet[] }) {
   const [today] = useState(() => new Date());
-  const [selectedDate, setSelectedDate] = useState(today);
+  const todayKey = toDateKey(today);
+  const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const [selectedKey, setSelectedKey] = useState(todayKey);
 
-  const petsById = useMemo(() => new Map(pets.map((p) => [p.id, p])), [pets]);
+  const days = useMemo(() => monthGrid(month), [month]);
+  const from = toDateKey(days[0]);
+  const to = toDateKey(days[41]);
+  const load = useCallback(() => loadCalendar(from, to), [from, to]);
+  const calendar = useProtectedData(load, "Не удалось загрузить события календаря");
+  const loading =
+    calendar.status === "loading" || (calendar.status === "ready" && calendar.data.range !== `${from}/${to}`);
+  const events = calendar.status === "ready" && !loading ? calendar.data.events : [];
 
-  const { eventsByDay, markers } = useMemo(() => {
-    const byDay = new Map<string, PetEvent[]>();
+  const pastFrom = toDateKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 30));
+  const loadPast = useCallback(() => loadCalendar(pastFrom, todayKey), [pastFrom, todayKey]);
+  const past = useProtectedData(loadPast, "Не удалось загрузить события");
+  const attention =
+    past.status === "ready"
+      ? past.data.events
+          .filter((e) => !e.completed && e.date <= todayKey)
+          .sort((a, b) => a.date.localeCompare(b.date))
+      : [];
+
+  const petsByName = useMemo(() => new Map(pets.map((p) => [p.name, p])), [pets]);
+
+  const markers = useMemo(() => {
     const marks = new Map<string, DayMarker>();
     for (const event of events) {
-      const key = dateKey(new Date(event.date));
-      byDay.set(key, [...(byDay.get(key) ?? []), event]);
-      const prev = marks.get(key) ?? { total: 0, pending: 0 };
-      marks.set(key, { total: prev.total + 1, pending: prev.pending + (event.done ? 0 : 1) });
+      const marker = marks.get(event.date) ?? { total: 0, kinds: [] };
+      marker.total += 1;
+      const existing = marker.kinds.find((k) => k.kind === event.kind);
+      if (existing) existing.pending ||= !event.completed;
+      else marker.kinds.push({ kind: event.kind, pending: !event.completed });
+      marks.set(event.date, marker);
     }
-    return { eventsByDay: byDay, markers: marks };
+    return marks;
   }, [events]);
 
-  // просроченные и сегодняшние невыполненные
-  const attention = useMemo(() => {
-    const todayKey = dateKey(today);
-    return events
-      .filter((e) => !e.done && dateKey(new Date(e.date)) <= todayKey)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [events, today]);
-
-  const dayEvents = eventsByDay.get(dateKey(selectedDate)) ?? [];
+  const dayEvents = events.filter((e) => e.date === selectedKey);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-      <aside className="order-first flex min-w-0 flex-col gap-6 lg:order-last">
-        <section aria-labelledby="attention-title" className="flex flex-col gap-3">
-          <h2 id="attention-title">Требует внимания</h2>
-          {attention.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Всё в порядке — просроченных дел нет.</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {attention.slice(0, 5).map((event) => (
-                <EventItem key={event.id} event={event} pet={petsById.get(event.petId)} showDate />
-              ))}
-            </ul>
-          )}
-          {attention.length > 5 && (
-            <p className="text-sm text-muted-foreground">И ещё {attention.length - 5}…</p>
-          )}
-        </section>
-
-        <section aria-labelledby="pets-title" className="flex flex-col gap-3">
-          <h2 id="pets-title">Питомцы</h2>
-          <ul
-            aria-label="Мои питомцы"
-            className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0"
-          >
-            {pets.map((pet) => (
-              <li key={pet.id} className="shrink-0 lg:shrink">
-                <Link
-                  href={`/pet/${pet.id}`}
-                  className={cn(
-                    cardVariants(),
-                    "flex items-center gap-3 p-3 outline-none transition-colors hover:bg-card/70 focus-visible:ring-2 focus-visible:ring-foreground",
-                  )}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary"
-                  >
-                    {pet.name.charAt(0).toUpperCase()}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{pet.name}</span>
-                  <ChevronRightIcon aria-hidden="true" className="hidden size-5 shrink-0 text-muted-foreground lg:block" />
-                </Link>
-              </li>
-            ))}
-            <li className="shrink-0 lg:shrink">
+    <div className="flex max-w-md flex-col gap-8">
+      <section aria-labelledby="pets-title" className="flex flex-col gap-3">
+        <SectionTitle id="pets-title">Питомцы</SectionTitle>
+        <ul
+          aria-labelledby="pets-title"
+          className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {pets.map((pet) => (
+            <li key={pet.id} className="shrink-0">
               <Link
-                href="/pet/create"
-                className={cn(
-                  cardVariants(),
-                  "flex items-center gap-3 p-3 outline-none transition-colors hover:bg-card/70 focus-visible:ring-2 focus-visible:ring-foreground",
-                )}
+                href={`/pet/${pet.id}`}
+                className="group flex w-20 flex-col items-center gap-1.5 outline-none"
               >
-                <PlusIcon aria-hidden="true" className="size-5" />
-                <span>Добавить</span>
+                <PetAvatar
+                  pet={pet}
+                  size="md"
+                  className="bg-white group-focus-visible:ring-2 group-focus-visible:ring-foreground group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background"
+                />
+                <span className="w-full truncate text-center text-sm font-medium text-foreground">{pet.name}</span>
               </Link>
             </li>
-          </ul>
-        </section>
-      </aside>
+          ))}
+          <li className="shrink-0">
+            <Link
+              href="/pet/create"
+              className="group flex w-20 flex-col items-center gap-1.5 outline-none"
+            >
+              <span className="flex size-16 items-center justify-center rounded-full border border-dashed border-zinc-600 text-zinc-600 transition group-hover:border-foreground group-hover:text-foreground group-focus-visible:border-solid group-focus-visible:border-foreground group-focus-visible:text-foreground group-focus-visible:ring-2 group-focus-visible:ring-foreground group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background group-active:scale-95 motion-reduce:transition-none motion-reduce:group-active:scale-100">
+                <PlusIcon aria-hidden="true" className="size-6" />
+              </span>
+              <span className="w-full truncate text-center text-sm text-zinc-600 transition-colors group-hover:text-foreground group-focus-visible:text-foreground">
+                Добавить
+              </span>
+            </Link>
+          </li>
+        </ul>
+      </section>
 
-      <div className="flex min-w-0 flex-col gap-6">
-        <CalendarView
-          today={today}
-          selectedDate={selectedDate}
-          onSelectDate={setSelectedDate}
-          markers={markers}
-        />
-        <section aria-labelledby="day-title" className="flex flex-col gap-3">
-          <h2 id="day-title" className="capitalize">{longDate.format(selectedDate)}</h2>
-          {dayEvents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">На этот день событий нет.</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {dayEvents.map((event) => (
-                <EventItem key={event.id} event={event} pet={petsById.get(event.petId)} />
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
+      <CalendarGrid
+        days={days}
+        month={month}
+        onMonthChange={(date) => {
+          setMonth(date);
+          setSelectedKey(toDateKey(date));
+        }}
+        todayKey={todayKey}
+        selectedKey={selectedKey}
+        onSelectKey={setSelectedKey}
+        markers={markers}
+        busy={loading}
+      />
+
+      {calendar.status === "error" && <PageError message={calendar.error} onRetry={calendar.retry} />}
+
+      <section
+        aria-labelledby="day-title"
+        className="flex flex-col gap-1 rounded-2xl border bg-card p-4"
+      >
+        <h2 id="day-title" className="capitalize">{longDate.format(fromKey(selectedKey))}</h2>
+        {dayEvents.length === 0 ? (
+          <p className="pt-2 text-sm text-muted-foreground">
+            {loading ? "Загрузка…" : selectedKey === todayKey ? "Сегодня событий нет" : "Событий нет"}
+          </p>
+        ) : (
+          <ul className="flex flex-col mt-2">
+            {dayEvents.map((event) => (
+              <EventRow key={event.key} event={event} pet={petsByName.get(event.petName)} />
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
