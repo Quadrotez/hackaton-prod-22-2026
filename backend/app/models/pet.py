@@ -48,6 +48,7 @@ class Pet(Base):
     allergies = relationship("Allergy", cascade="all, delete-orphan")
     pregnancies = relationship("Pregnancy", cascade="all, delete-orphan")
     vaccinations = relationship("Vaccination", cascade="all, delete-orphan")
+    parasite_treatments = relationship("ParasiteTreatment", cascade="all, delete-orphan")
     medications = relationship("Medication", cascade="all, delete-orphan")
     vet_visits = relationship("VetVisit", back_populates="pet", cascade="all, delete-orphan")
     measurement_parameters = relationship("MeasurementParameter", cascade="all, delete-orphan")
