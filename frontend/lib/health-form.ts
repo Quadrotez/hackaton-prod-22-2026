@@ -8,13 +8,20 @@ const date = z.string().refine((value) => {
   const parsed = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }, "Укажите корректную дату");
-const datetime = z.string().refine((value) => value.length > 0 && !Number.isNaN(new Date(value).getTime()), "Укажите дату и время").transform((value) => new Date(value).toISOString());
+const validDatetime = (value: string) => value.length > 0 && !Number.isNaN(new Date(value).getTime());
+const datetime = z.string().refine(validDatetime, "Укажите дату и время").transform((value) => new Date(value).toISOString());
+// Бэкенд считает событие в 00:00 событием на весь день, поэтому явно выбранное 00:00 отправляем как 00:00:10.
+const eventDatetime = z.string().refine(validDatetime, "Укажите дату и время").transform((value) => {
+  const date = new Date(value);
+  if (date.getHours() === 0 && date.getMinutes() === 0) date.setSeconds(10);
+  return date.toISOString();
+});
 const optionalIntervalDays = z.union([z.coerce.number().int("Введите целое число дней").min(1, "Минимум один день").max(365, "Не больше 365 дней"), z.literal("")]).optional().transform((value) => (typeof value === "number" ? value : null));
 const optionalDate = z.union([date, z.literal("")]).optional().transform((value) => (value ? value : null));
 export const healthSchemas = {
   vaccinations: z.object({ name: requiredText(255), scheduled_on: date, status: z.enum(["planned", "done"]), clinic: optionalText(255), notes: optionalText(2000), interval_days: optionalIntervalDays, next_due_on: optionalDate }),
   visits: z.object({
-    title: requiredText(255), visit_at: datetime, reason: z.enum(["illness", "examination", "vaccination", "checkup"]),
+    title: requiredText(255), visit_at: eventDatetime, reason: z.enum(["illness", "examination", "vaccination", "checkup"]),
     status: z.enum(["planned", "completed", "cancelled"]), doctor_name: optionalText(255), doctor_specialty: optionalText(255),
     topic: optionalText(255), diagnosis: optionalText(5000), notes: optionalText(5000),
   }),

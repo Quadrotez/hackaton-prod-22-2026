@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react"; 
 import { useProtectedData } from "@/hooks/use-auth";
 import { getErrorMessage } from "@/lib/api";
 import {
@@ -41,6 +41,37 @@ function placeTransfer(lists: TransferLists, updated: PetTransfer): TransferList
       : [incoming, [updated, ...received], outgoing];
   }
   return [incoming, received, [updated, ...outgoing]];
+}
+
+function TransferSection({
+  id,
+  title,
+  empty,
+  items,
+  children,
+}: {
+  id: string;
+  title: string;
+  empty: string;
+  items: PetTransfer[];
+  children: (transfer: PetTransfer) => ReactNode;
+}) {
+  return (
+    <Card aria-labelledby={id} className="flex flex-col gap-4">
+      <h2 id={id}>{title}</h2>
+      {items.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{empty}</p>
+      ) : (
+        <ul className="divide-y">
+          {items.map((transfer) => (
+            <TransferEntry key={transfer.id} transfer={transfer}>
+              {children(transfer)}
+            </TransferEntry>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
 }
 
 export function TransfersManager() {
@@ -89,123 +120,101 @@ export function TransfersManager() {
         </Card>
       )}
 
-      <section aria-labelledby="incoming-title" className="flex flex-col gap-3">
-        <h2 id="incoming-title">Входящие заявки</h2>
-        {incoming.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Новых заявок нет</p>
-        ) : (
-          <Card>
-            <ul className="divide-y">
-              {incoming.map((transfer) => (
-                <TransferEntry key={transfer.id} transfer={transfer}>
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={busy(transfer.id)}
-                    onClick={() => handleAction(transfer.id, acceptTransfer, "Не удалось принять заявку")}
-                  >
-                    Принять
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={busy(transfer.id)}
-                    onClick={() => handleAction(transfer.id, declineTransfer, "Не удалось отклонить заявку")}
-                  >
-                    Отклонить
-                  </Button>
-                </TransferEntry>
-              ))}
-            </ul>
-          </Card>
+      <TransferSection
+        id="incoming-title"
+        title="Входящие заявки"
+        empty="Новых заявок нет"
+        items={incoming}
+      >
+        {(transfer) => (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              disabled={busy(transfer.id)}
+              onClick={() => handleAction(transfer.id, acceptTransfer, "Не удалось принять заявку")}
+            >
+              Принять
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={busy(transfer.id)}
+              onClick={() => handleAction(transfer.id, declineTransfer, "Не удалось отклонить заявку")}
+            >
+              Отклонить
+            </Button>
+          </>
         )}
-      </section>
+      </TransferSection>
 
-      <section aria-labelledby="received-title" className="flex flex-col gap-3">
-        <h2 id="received-title">У меня</h2>
-        {received.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Вы сейчас не присматриваете ни за одним питомцем</p>
-        ) : (
-          <Card>
-            <ul className="divide-y">
-              {received.map((transfer) => (
-                <TransferEntry key={transfer.id} transfer={transfer}>
-                  {transfer.status === "accepted" ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={busy(transfer.id)}
-                      onClick={() =>
-                        handleAction(transfer.id, requestTransferReturn, "Не удалось запросить возврат")
-                      }
-                    >
-                      Передать обратно
-                    </Button>
-                  ) : (
-                    <>
-                      <p className="text-xs text-muted-foreground">
-                        Возврат запрошен — ждём подтверждения владельца
-                      </p>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        disabled={busy(transfer.id)}
-                        onClick={() =>
-                          handleAction(transfer.id, cancelTransferReturn, "Не удалось отменить возврат")
-                        }
-                      >
-                        Отменить возврат
-                      </Button>
-                    </>
-                  )}
-                </TransferEntry>
-              ))}
-            </ul>
-          </Card>
-        )}
-      </section>
+      <TransferSection
+        id="received-title"
+        title="У меня"
+        empty="Вы сейчас не присматриваете ни за одним питомцем"
+        items={received}
+      >
+        {(transfer) =>
+          transfer.status === "accepted" ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={busy(transfer.id)}
+              onClick={() => handleAction(transfer.id, requestTransferReturn, "Не удалось запросить возврат")}
+            >
+              Передать обратно
+            </Button>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">Возврат запрошен — ждём подтверждения владельца</p>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={busy(transfer.id)}
+                onClick={() => handleAction(transfer.id, cancelTransferReturn, "Не удалось отменить возврат")}
+              >
+                Отменить возврат
+              </Button>
+            </>
+          )
+        }
+      </TransferSection>
 
-      <section aria-labelledby="outgoing-title" className="flex flex-col gap-3">
-        <h2 id="outgoing-title">Переданные мной</h2>
-        {outgoing.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Активных передач нет</p>
-        ) : (
-          <Card>
-            <ul className="divide-y">
-              {outgoing.map((transfer) => (
-                <TransferEntry key={transfer.id} transfer={transfer}>
-                  {transfer.status === "pending" && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={busy(transfer.id)}
-                      onClick={() => handleAction(transfer.id, cancelTransfer, "Не удалось отменить заявку")}
-                    >
-                      Отменить заявку
-                    </Button>
-                  )}
-                  {transfer.status === "return_requested" && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={busy(transfer.id)}
-                      onClick={() =>
-                        handleAction(transfer.id, confirmTransferReturn, "Не удалось подтвердить возврат")
-                      }
-                    >
-                      Подтвердить возврат
-                    </Button>
-                  )}
-                </TransferEntry>
-              ))}
-            </ul>
-          </Card>
+      <TransferSection
+        id="outgoing-title"
+        title="Переданные мной"
+        empty="Активных передач нет"
+        items={outgoing}
+      >
+        {(transfer) => (
+          <>
+            {transfer.status === "pending" && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={busy(transfer.id)}
+                onClick={() => handleAction(transfer.id, cancelTransfer, "Не удалось отменить заявку")}
+              >
+                Отменить заявку
+              </Button>
+            )}
+            {transfer.status === "return_requested" && (
+              <Button
+                type="button"
+                size="sm"
+                disabled={busy(transfer.id)}
+                onClick={() => handleAction(transfer.id, confirmTransferReturn, "Не удалось подтвердить возврат")}
+              >
+                Подтвердить возврат
+              </Button>
+            )}
+          </>
         )}
-      </section>
+      </TransferSection>
 
       {incoming.length === 0 && received.length === 0 && outgoing.length === 0 && (
         <Card>
