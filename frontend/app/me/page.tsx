@@ -11,7 +11,7 @@ export default function MePage() {
   const { pets, status, error, refreshPets } = useActivePet();
 
   return (
-    <PageShell>
+    <PageShell contentClassName="max-w-sm md:max-w-xl my-auto">
       {(!authorized || status === "loading") && <PageLoading />}
       {authorized && status === "error" && <PageError message={error ?? "Не удалось загрузить питомцев"} onRetry={refreshPets} />}
       {authorized && status === "ready" && <HomeDashboard pets={pets} />}
