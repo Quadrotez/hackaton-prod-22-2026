@@ -140,8 +140,10 @@ export type VetDocumentAnalysis = {
   error_code: "UNREADABLE_IMAGE" | "UNSUPPORTED_DOCUMENT" | "INSUFFICIENT_INPUT" | null;
 };
 
-export function analyzeVetDocument(petId: number, image: File): Promise<VetDocumentAnalysis> {
+export function analyzeVetDocument(petId: number, image: File, userText = ""): Promise<VetDocumentAnalysis> {
   const body = new FormData();
   body.append("image", image);
+  // Расшифровка, которую пользователь ввёл сам, уходит вместе с фото как контекст (лимит бэкенда — 4000 символов).
+  if (userText.trim()) body.append("pet_context", userText.trim().slice(0, 4000));
   return apiFetch<VetDocumentAnalysis>(healthPath(petId, "vet-documents/analyze"), { method: "POST", body, auth: true });
 }

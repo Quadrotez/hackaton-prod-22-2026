@@ -21,6 +21,8 @@ export function HealthSectionForm({ data, resource, record, history, pending, on
   const [scanning, setScanning] = useState(false);
   const [scanNote, setScanNote] = useState("");
   const diagnosisRef = useRef<HTMLTextAreaElement | null>(null);
+  // Доп. расшифровка не входит в healthFields, поэтому на сохранение не попадает — только в запрос анализа фото.
+  const userTranscriptionRef = useRef<HTMLTextAreaElement | null>(null);
   const defaults = healthFormDefaults(data, resource, record, history);
   // Чекбоксы, от которых зависят другие поля (например, «Время не указано» отключает время).
   const [checked, setChecked] = useState<Record<string, boolean>>(() => Object.fromEntries(
@@ -36,7 +38,7 @@ export function HealthSectionForm({ data, resource, record, history, pending, on
     setScanNote("");
     setScanning(true);
     try {
-      const result = await analyzeVetDocument(data.pet.id, file);
+      const result = await analyzeVetDocument(data.pet.id, file, userTranscriptionRef.current?.value ?? "");
       if (result.status === "error" || !result.post_visit_instructions) {
         setScanNote(result.error_code === "UNREADABLE_IMAGE" ? "Не удалось прочитать текст на фото. Попробуйте сделать снимок чётче" : "В документе не найдено заключение. Введите его вручную");
       } else if (diagnosisRef.current) {
@@ -83,6 +85,8 @@ export function HealthSectionForm({ data, resource, record, history, pending, on
               {field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select> : field.type === "textarea" ? <textarea id={fieldId} name={field.name} ref={field.name === "diagnosis" ? diagnosisRef : undefined} defaultValue={defaults[field.name] ?? ""} rows={3} required={field.required} maxLength={field.maxLength} autoFocus={index === 0} aria-invalid={Boolean(errors[field.name])} aria-describedby={errors[field.name] ? `${fieldId}-error` : undefined} className="min-h-24 w-full resize-y rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50" /> : <Input id={fieldId} name={field.name} type={field.type ?? "text"} required={field.required} maxLength={field.maxLength} min={field.min} max={field.max} step={field.type === "number" ? 1 : undefined} placeholder={field.placeholder} defaultValue={defaults[field.name] ?? ""} disabled={disabled} autoFocus={index === 0} aria-invalid={Boolean(errors[field.name])} aria-describedby={errors[field.name] ? `${fieldId}-error` : undefined} />}
             {resource === "visits" && field.name === "diagnosis" && <div className="flex flex-col gap-2">
+              <FieldLabel htmlFor={`${id}-user-transcription`} className="font-normal">Доп. расшифровка</FieldLabel>
+              <textarea id={`${id}-user-transcription`} ref={userTranscriptionRef} rows={2} maxLength={4000} placeholder="Ваши пометки к эпикризу. Отправляются вместе с фото и не сохраняются" disabled={scanning} className="min-h-16 w-full resize-y rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50" />
               <label className="relative inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-input bg-card px-3 text-sm has-focus-visible:ring-3 has-focus-visible:ring-ring/50 has-disabled:cursor-default has-disabled:opacity-50 sm:w-auto">
                 <input type="file" accept={PHOTO_TYPES.filter((type) => type !== "image/gif").join(",")} disabled={scanning} onChange={scanDocument} className="sr-only" />
                 {scanning ? <><Spinner />Читаем документ…</> : <><FileScanIcon size={14} />Прочитать с фото эпикриза</>}
