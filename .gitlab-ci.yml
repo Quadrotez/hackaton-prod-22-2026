@@ -229,6 +229,9 @@ deploy:
     # on the command line), so secrets do not leak into `ps` or logs.
     - |
       cat <<ENV_EOF | ssh $SSH_ADDRESS "cat > /opt/petcare/.env && chmod 600 /opt/petcare/.env"
+      # Last deployed image tag: docker compose reads it from .env, so manual
+      # `docker compose logs/ps/top` work without exporting TAG by hand.
+      TAG=${TAG}
       DB_PASSWORD=${DB_PASSWORD}
       JWT_SECRET_KEY=${JWT_SECRET_KEY}
       ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
