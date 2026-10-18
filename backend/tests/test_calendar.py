@@ -201,6 +201,52 @@ def test_ics_export(client: TestClient, household) -> None:
     assert client.get(f"{CALENDAR}/export.ics").status_code == 401
 
 
+def vevent(body: str, uid: str) -> str:
+    start = body.index(f"UID:{uid}@petcare")
+    return body[start:body.index("END:VEVENT", start)]
+
+
+def test_ics_reminders(client: TestClient, household) -> None:
+    headers = household["headers"]
+    body = client.get(f"{CALENDAR}/export.ics", headers=headers, params=OCTOBER).text
+
+    # Visit: a day before and an hour before.
+    visit = vevent(body, f"visit-{household['visit']['id']}")
+    assert visit.count("BEGIN:VALARM") == 2
+    assert "TRIGGER:-P1D" in visit and "TRIGGER:-PT1H" in visit
+    assert "ACTION:DISPLAY\r\nTRIGGER:-PT1H\r\nDESCRIPTION:Рекс: Плановый осмотр" in visit
+    # All-day vaccination: 09:00 the day before and 09:00 on the day.
+    vaccination = vevent(body, f"vaccination-{household['vaccination']['id']}")
+    assert "TRIGGER:-PT15H" in vaccination and "TRIGGER:PT9H" in vaccination
+    # Medication dose: right at dose time.
+    assert "TRIGGER:PT0M" in body
+
+    # A dose already taken gets no reminder.
+    medication = household["praziquantel"]["id"]
+    intake = {"scheduled_for": "2026-10-16T18:00:00", "status": "taken"}
+    intakes = pet_url(household["barsik"], f"medications/{medication}/intakes")
+    response = client.put(intakes, headers=headers, json=intake)
+    assert response.status_code == 200, response.json()
+    body = client.get(f"{CALENDAR}/export.ics", headers=headers, params=OCTOBER).text
+    assert "TRIGGER:PT0M" in body  # the flea dose is still pending
+    dose = body[body.index("SUMMARY:Барсик: Празиквантел"):]
+    assert "BEGIN:VALARM" not in dose[:dose.index("END:VEVENT")]
+
+
+def test_ics_parasite_treatment(client: TestClient, household) -> None:
+    headers = household["headers"]
+    treatment = post(client, headers, pet_url(household["rex"], "parasite-treatments"), {
+        "kind": "external", "product_name": "Бравекто", "treated_on": "2026-07-20",
+        "interval_days": 90,
+    })
+    response = client.get(f"{CALENDAR}/export.ics", headers=headers, params=OCTOBER)
+    assert response.status_code == 200
+    event = vevent(response.text, f"parasite-{treatment['id']}")
+    assert "DTSTART;VALUE=DATE:20261018" in event
+    assert "CATEGORIES:Обработка от паразитов" in event
+    assert "TRIGGER:-PT15H" in event and "TRIGGER:PT9H" in event
+
+
 def test_long_lines_are_folded_on_character_boundaries() -> None:
     line = "DESCRIPTION:" + "Празиквантел " * 20
     chunks = fold(line)
