@@ -30,7 +30,7 @@ export function BackgroundArt() {
       aria-hidden="true"
       viewBox="0 0 1280 880"
       preserveAspectRatio="xMidYMid slice"
-      className="pointer-events-none fixed inset-0 -z-10 hidden size-full text-[#b9b99a] lg:block"
+      className="pointer-events-none fixed inset-0 -z-10 hidden size-full text-[#b9b99a] lg:block dark:text-[#4a4d38]"
     >
       {PLACEMENTS.map(([shape, x, y, rotate, scale], index) => (
         <path

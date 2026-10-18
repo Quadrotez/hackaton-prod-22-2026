@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useCallback, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from "react";
 import {
   CalendarCheckIcon,
   CalendarSyncIcon,
@@ -11,8 +11,10 @@ import {
   LockIcon,
   LogOutIcon,
   MailIcon,
+  MoonIcon,
   PawPrintIcon,
   PencilIcon,
+  SunIcon,
   XIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -40,6 +42,7 @@ import { PageError, PageLoading } from "@/components/page-state";
 import { PhotoUploadButton } from "@/components/photo-upload-button";
 import { UserAvatar } from "@/components/user-avatar";
 import { clearAccessToken } from "@/lib/session";
+import { getTheme, setTheme, subscribeToTheme, type Theme } from "@/lib/theme";
 import { useRouter } from "next/navigation";
 
 const nameSchema = z.string().trim().min(1, "Введите имя").max(100, "Не больше 100 символов");
@@ -237,6 +240,33 @@ function AccountDetails({ user }: { user: UserPublic }) {
         <InfoRow icon={MailIcon} label="Email" value={user.email} locked="Email нельзя изменить" />
         <InfoRow icon={CalendarCheckIcon} label="Дата регистрации" value={formatDate(user.created_at)} />
       </ul>
+    </Card>
+  );
+}
+
+function ThemeCard() {
+  const theme = useSyncExternalStore(subscribeToTheme, getTheme, (): Theme => "light");
+  const dark = theme === "dark";
+  const nextTheme: Theme = dark ? "light" : "dark";
+
+  return (
+    <Card className="flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary">
+          {dark ? (
+            <SunIcon aria-hidden="true" className="size-4" strokeWidth={1.75} />
+          ) : (
+            <MoonIcon aria-hidden="true" className="size-4" strokeWidth={1.75} />
+          )}
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <h2>Тема оформления</h2>
+          <p className="text-sm text-muted-foreground">{dark ? "Сейчас тёмная" : "Сейчас светлая"}</p>
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={() => setTheme(nextTheme)}>
+          {dark ? "Светлая тема" : "Тёмная тема"}
+        </Button>
+      </div>
     </Card>
   );
 }
@@ -498,6 +528,7 @@ export function AccountProfile() {
       <PageHeader title="Аккаунт" />
       <ProfileHero user={user} petCount={pets ? pets.length + received.length : null} onUserChange={handleUserChange} />
       <AccountDetails user={user} />
+      <ThemeCard />
       <PasswordChangeCard />
       <CalendarFeedCard />
       <Button onClick={() => handleLogout()}><LogOutIcon />Выйти</Button>

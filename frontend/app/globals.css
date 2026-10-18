@@ -2,6 +2,8 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -45,6 +47,7 @@
 }
 
 :root {
+  color-scheme: light;
   --background: #f7f7e8;
   --foreground: #2b2d1f;
   --card: oklch(1 0 0);
@@ -91,6 +94,41 @@
   --leading-body: 1.55;
 }
 
+.dark {
+  color-scheme: dark;
+  --background: #1c1e14;
+  --foreground: #e8efd6;
+  --card: #22301a;
+  --card-foreground: #e8efd6;
+  --popover: #22301a;
+  --popover-foreground: #e8efd6;
+  --primary: #6b7230;
+  --primary-foreground: #f4f5dc;
+  --secondary: #2e3e23;
+  --secondary-foreground: #e8efd6;
+  --muted: #2e3e23;
+  --muted-foreground: #a3b68a;
+  --accent: #2e3e23;
+  --accent-foreground: #e8efd6;
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: #3d5030;
+  --input: #3d5030;
+  --ring: #86a464;
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: #22301a;
+  --sidebar-foreground: #e8efd6;
+  --sidebar-primary: #6b7230;
+  --sidebar-primary-foreground: #f4f5dc;
+  --sidebar-accent: #2e3e23;
+  --sidebar-accent-foreground: #e8efd6;
+  --sidebar-border: #3d5030;
+  --sidebar-ring: #86a464;
+}
+
 .theme-shadcn {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -110,6 +148,28 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+}
+
+/* Нейтральная палитра для элементов с theme-shadcn в тёмной теме: зелёные оттенки в тон меню вместо чистого серого.
+   --background светлее --secondary, чтобы hover:bg-background и активный таб «поднимались», как в светлой теме. */
+.dark .theme-shadcn {
+  --background: #46603a;
+  --foreground: #e8efd6;
+  --card: #26351d;
+  --card-foreground: #e8efd6;
+  --popover: #26351d;
+  --popover-foreground: #e8efd6;
+  --primary: #e8efd6;
+  --primary-foreground: #182213;
+  --secondary: #33452a;
+  --secondary-foreground: #e8efd6;
+  --muted: #33452a;
+  --muted-foreground: #a3b68a;
+  --accent: #33452a;
+  --accent-foreground: #e8efd6;
+  --border: #46603a;
+  --input: #50683f;
+  --ring: #86a464;
 }
 
 @layer base {
