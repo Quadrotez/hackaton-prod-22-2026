@@ -17,7 +17,17 @@ export function yearsWord(age: number) {
 }
 
 export function birthdayTitle(age: number) {
-  return `День рождения, ${age} ${yearsWord(age)}`;
+  return age === 0 ? "День рождения" : `День рождения, ${age} ${yearsWord(age)}`;
+}
+
+/** Праздничная аватарка нужна и в сам день рождения, до первой годовщины. */
+export function birthdayOnDate(birthDate: string, today: string): Birthday | null {
+  if (birthDate > today) return null;
+  const [birthYear, month, day] = birthDate.split("-").map(Number);
+  const year = Number(today.slice(0, 4));
+  const actualDay = month === 2 && day === 29 && !isLeap(year) ? 28 : day;
+  const date = `${year}-${String(month).padStart(2, "0")}-${String(actualDay).padStart(2, "0")}`;
+  return date === today ? { date, age: year - birthYear } : null;
 }
 
 /** Дни рождения в диапазоне дат YYYY-MM-DD (включительно). */
