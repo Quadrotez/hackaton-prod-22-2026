@@ -1,4 +1,5 @@
 import type { Dose, HealthView, ParasiteTreatment, Visit, Vaccination } from "./health";
+import { visitDateKey, visitTimeText } from "@/lib/visit-time";
 
 export type CalendarEvent = {
   key: string; recordKey: string; petId: number; petName: string;
@@ -8,22 +9,17 @@ export type CalendarEvent = {
 export function toDateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
-export function localDateTime(value: string) {
-  // API возвращает даты визитов в UTC, расписание доз — в местном времени без offset.
-  return new Date(value);
-}
 export function calendarEvents(
   pet: { id: number; name: string }, visits: Visit[], vaccinations: Vaccination[], doses: Dose[],
   parasites: ParasiteTreatment[] = [],
 ): CalendarEvent[] {
   const common = { petId: pet.id, petName: pet.name };
   return [
-    ...visits.filter((visit) => visit.status !== "cancelled").map((visit): CalendarEvent => {
-      const date = localDateTime(visit.visit_at);
-      return { ...common, key: `${pet.id}-visit-${visit.id}`, recordKey: `visit-${visit.id}`, kind: "visit", title: visit.title,
-        date: toDateKey(date), time: date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
-        completed: visit.status === "completed", view: visit.status === "completed" ? "history" : "plan" };
-    }),
+    // Визит без времени (00:00:00 UTC) — событие на весь день: дата по UTC, время пустое.
+    ...visits.filter((visit) => visit.status !== "cancelled").map((visit): CalendarEvent => ({
+      ...common, key: `${pet.id}-visit-${visit.id}`, recordKey: `visit-${visit.id}`, kind: "visit", title: visit.title,
+      date: visitDateKey(visit.visit_at), time: visitTimeText(visit.visit_at),
+      completed: visit.status === "completed", view: visit.status === "completed" ? "history" : "plan" })),
     ...vaccinations.map((vaccine): CalendarEvent => ({ ...common, key: `${pet.id}-vaccine-${vaccine.id}`, recordKey: `vaccine-${vaccine.id}`,
       kind: "vaccine", title: vaccine.name, date: vaccine.scheduled_on, time: "", completed: vaccine.status === "done", view: vaccine.status === "done" ? "history" : "plan" })),
     ...doses.filter((dose) => dose.status !== "skipped").map((dose): CalendarEvent => ({ ...common,

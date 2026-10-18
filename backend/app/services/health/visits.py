@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from datetime import UTC, datetime, time
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,6 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.health import VetVisit, VisitStatus
 from app.schemas.health import VetVisitPublic, VisitEdge, VisitTopic, VisitTopicGraph
 from app.services.health.common import label_key, unprocessable
+
+
+def is_date_only(visit_at: datetime) -> bool:
+    """A visit at exactly 00:00:00 UTC has a known date but no time. The document analyzer
+    writes this when a document has no time; the frontend sends it for "time not set"
+    (a real time that lands on 00:00:00 UTC is sent as 00:00:01)."""
+    # SQLite hands timezone-aware columns back naive; values are written in UTC.
+    moment = visit_at if visit_at.tzinfo is not None else visit_at.replace(tzinfo=UTC)
+    return moment.astimezone(UTC).time() == time.min
 
 
 async def load_visits(db: AsyncSession, pet_id: int) -> Sequence[VetVisit]:
