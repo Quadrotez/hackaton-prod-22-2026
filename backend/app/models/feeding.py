@@ -9,6 +9,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    false,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -40,6 +41,13 @@ class FeedingRecord(Base):
     fed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     liked: Mapped[bool] = mapped_column(Boolean, nullable=False)
     tolerated: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    # Reaction types; only meaningful when tolerated is false (enforced by the API).
+    digestive_reaction: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    allergic_reaction: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     reaction_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

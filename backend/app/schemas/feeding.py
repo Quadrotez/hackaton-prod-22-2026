@@ -10,6 +10,14 @@ CREATE_RATINGS_DESCRIPTION = (
 )
 
 
+REACTION_RULE = (
+    " Can be true only when tolerated is false; if tolerated is omitted on creation, "
+    "a true reaction type sets it to false."
+)
+DIGESTIVE_DESCRIPTION = "Digestive (GI) reaction: vomiting, diarrhea, bloating." + REACTION_RULE
+ALLERGIC_DESCRIPTION = "Allergic reaction: itching, rash, swelling." + REACTION_RULE
+
+
 class FeedingRecordCreate(BaseModel):
     food_id: int | None = Field(
         default=None,
@@ -37,6 +45,8 @@ class FeedingRecordCreate(BaseModel):
     fed_at: datetime = Field(description="Required date and time when the pet was fed.")
     liked: bool = Field(default=None, description=CREATE_RATINGS_DESCRIPTION)  # type: ignore[assignment]
     tolerated: bool = Field(default=None, description=CREATE_RATINGS_DESCRIPTION)  # type: ignore[assignment]
+    digestive_reaction: bool = Field(default=False, description=DIGESTIVE_DESCRIPTION)
+    allergic_reaction: bool = Field(default=False, description=ALLERGIC_DESCRIPTION)
     reaction_notes: str | None = Field(
         default=None, description="Optional adverse reaction observations."
     )
@@ -95,6 +105,12 @@ class FeedingRecordUpdate(BaseModel):
         default=None,
         description="New tolerance rating; true and false are valid, null is not allowed.",
     )  # type: ignore[assignment]
+    digestive_reaction: bool = Field(
+        default=None, description=DIGESTIVE_DESCRIPTION + " Null is not allowed."
+    )  # type: ignore[assignment]
+    allergic_reaction: bool = Field(
+        default=None, description=ALLERGIC_DESCRIPTION + " Null is not allowed."
+    )  # type: ignore[assignment]
     reaction_notes: str | None = Field(
         default=None, description="Adverse reaction observations; send null to clear."
     )
@@ -140,6 +156,8 @@ class FeedingRecordPublic(BaseModel):
     fed_at: datetime
     liked: bool
     tolerated: bool
+    digestive_reaction: bool
+    allergic_reaction: bool
     reaction_notes: str | None
     notes: str | None
     created_at: datetime
