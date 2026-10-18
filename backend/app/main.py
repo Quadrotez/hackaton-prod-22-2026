@@ -15,6 +15,9 @@ configure_logging(
     settings.sage_log_url,
     settings.sage_api_token,
     settings.sage_log_timeout_seconds,
+    settings.sage_env,
+    settings.sage_system,
+    settings.sage_inst,
 )
 
 SWAGGER_REQUEST_INTERCEPTOR_PLACEHOLDER = "__petcare_request_interceptor__"

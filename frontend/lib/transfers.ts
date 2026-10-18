@@ -145,6 +145,13 @@ export function isOpenTransfer(transfer: Pick<PetTransfer, "status">): boolean {
   return OPEN_TRANSFER_STATUSES.includes(transfer.status);
 }
 
+export function currentTransfer(transfer: PetTransfer, now: number): PetTransfer {
+  if (isOpenTransfer(transfer) && transfer.ends_at && new Date(transfer.ends_at).getTime() <= now) {
+    return { ...transfer, status: "expired", ended_at: transfer.ends_at };
+  }
+  return transfer;
+}
+
 export function transferDurationLabel(duration: TransferDuration): string {
   return durationLabels[duration] ?? duration;
 }
@@ -154,7 +161,9 @@ export function formatTransferDate(iso: string): string {
 }
 
 export function formatTransferEndsAt(transfer: Pick<PetTransfer, "duration" | "ends_at">): string {
-  return transfer.ends_at ? `до ${formatTransferDate(transfer.ends_at)}` : "бессрочно";
+  return transfer.ends_at ? `до ${new Date(transfer.ends_at).toLocaleString("ru-RU", {
+    day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
+  })}` : "бессрочно";
 }
 
 export function transferPersonLabel(user: TransferUser | null, fallbackEmail: string): string {
@@ -177,6 +186,10 @@ export function createTransfer(petId: number, data: TransferCreate): Promise<Pet
 
 export function listPetTransfers(petId: number): Promise<PetTransfer[]> {
   return apiFetch<PetTransfer[]>(`/api/v1/pets/${petId}/transfers`, { method: "GET", auth: true });
+}
+
+export function getTransfer(transferId: number): Promise<PetTransfer> {
+  return apiFetch<PetTransfer>(`/api/v1/transfers/${transferId}`, { method: "GET", auth: true });
 }
 
 export function listIncomingTransfers(): Promise<PetTransfer[]> {

@@ -8,7 +8,13 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 from app.api.v1 import vet_documents
-from app.core.log import JsonFormatter, TextFormatter, mask_path, start_request_context
+from app.core.log import (
+    JsonFormatter,
+    SageJsonFormatter,
+    TextFormatter,
+    mask_path,
+    start_request_context,
+)
 from app.core.sage_logging import SageMultilineHandler
 from app.integrations.llm.vet_document_analyzer import analyze_veterinary_document
 from app.main import app
@@ -247,6 +253,20 @@ def test_log_settings_accept_any_case(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LOG_LEVEL", " debug ")
     settings = Settings(jwt_secret_key="test")
     assert (settings.log_format, settings.log_level) == ("json", "DEBUG")
+
+
+def test_sage_formatter_sets_required_fields_and_warn_level() -> None:
+    start_request_context("req-sage")
+    record = logging.getLogger("app.test").makeRecord(
+        "app.test", logging.WARNING, __file__, 1, "hi %s", ("there",), None, extra={"event": "x.y"}
+    )
+    entry = json.loads(SageJsonFormatter("prod", "petcare", "host-1").format(record))
+    assert (entry["env"], entry["system"], entry["inst"]) == ("prod", "petcare", "host-1")
+    assert entry["level"] == "WARN"
+    assert entry["message"] == "hi there"
+    assert entry["request_id"] == "req-sage"
+    assert entry["@timestamp"].endswith("+00:00")
+    assert "ts" not in entry
 
 
 def test_sage_handler_posts_one_formatted_record(monkeypatch: pytest.MonkeyPatch) -> None:

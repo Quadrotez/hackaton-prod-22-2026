@@ -14,7 +14,8 @@ export type Vaccine = { id: number; name: string; scheduled_on: string; status: 
 export type Visit = {
   id: number; title: string; visit_at: string; status: "planned" | "completed" | "cancelled";
   reason: "illness" | "examination" | "vaccination" | "checkup"; topic: string | null;
-  doctor_name: string | null; doctor_specialty: string | null; diagnosis: string | null; notes: string | null;
+  doctor_name: string | null; doctor_specialty: string | null; vet: string | null; visit_price: number | null;
+  diagnosis: string | null; notes: string | null;
 };
 export type Medication = { id: number; name: string; dose: string; start_date: string; end_date: string | null; interval_days: number; times: string[]; notes: string | null };
 export type Symptom = { id: number; description: string; observed_at: string };
@@ -29,8 +30,8 @@ export type Dose = { medication_id: number; name: string; dose: string; schedule
 export type ResourceMap = { vaccinations: Vaccine; visits: Visit; medications: Medication; symptoms: Symptom; allergies: Allergy; parasites: ParasiteTreatment };
 export type HealthResource = keyof ResourceMap;
 
-// A temporary caretaker may add these records (and mark doses) but edit or delete nothing.
-export const CARETAKER_ADDABLE: readonly HealthResource[] = ["symptoms", "visits"];
+// The caretaker UI only adds observations; treatment and appointments stay read-only.
+export const CARETAKER_ADDABLE: readonly HealthResource[] = ["symptoms"];
 
 export function canAddHealthRecord(pet: { access?: "owner" | "caretaker" }, resource: HealthResource): boolean {
   return pet.access !== "caretaker" || CARETAKER_ADDABLE.includes(resource);
@@ -158,6 +159,12 @@ export function recordIsHistory(record: HealthRecord, today: string) {
 
 export type VetDocumentAnalysis = {
   status: "success" | "partial" | "error";
+  visit_at: string | null;
+  visit_reason: string | null;
+  visit_price: number | null;
+  veterinarian_name: string | null;
+  veterinarian_profession: string | null;
+  vet: string | null;
   post_visit_instructions: string | null;
   warnings: string[];
   error_code: "UNREADABLE_IMAGE" | "UNSUPPORTED_DOCUMENT" | "INSUFFICIENT_INPUT" | null;
