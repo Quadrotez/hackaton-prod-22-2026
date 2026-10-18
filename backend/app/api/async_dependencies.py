@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import AppSettings, authentication_error, bearer_scheme
+from app.core.log import bind_user
 from app.core.security import decode_access_token
 from app.db.async_session import get_async_db
 from app.models.pet import Pet
@@ -37,6 +38,7 @@ async def get_current_user(
     user = await db.get(User, user_id)
     if user is None:
         raise authentication_error()
+    bind_user(user.id)
     return user
 
 

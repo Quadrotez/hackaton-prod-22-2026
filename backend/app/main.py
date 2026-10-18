@@ -1,13 +1,15 @@
-import logging
-
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 
 from app.api.v1 import auth, calendar, feeding, foods, health, pet_health, pets, transfers, vet_documents
+from app.core.config import get_settings
+from app.core.log import configure_logging
+from app.core.request_logging import register_request_logging
 
-logger = logging.getLogger(__name__)
+settings = get_settings()
+configure_logging(settings.log_level, settings.log_format)
 
 SWAGGER_REQUEST_INTERCEPTOR_PLACEHOLDER = "__petcare_request_interceptor__"
 SWAGGER_REQUEST_INTERCEPTOR = """request => {
@@ -43,18 +45,7 @@ async def swagger_ui() -> HTMLResponse:
     return HTMLResponse(content=body, status_code=response.status_code)
 
 
-@app.exception_handler(Exception)
-async def unexpected_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception(
-        "Unhandled exception while processing %s %s",
-        request.method,
-        request.url.path,
-        exc_info=(type(exc), exc, exc.__traceback__),
-    )
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "Internal server error"},
-    )
+register_request_logging(app)
 
 app.add_middleware(
     CORSMiddleware,
