@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -169,6 +170,17 @@ class PetPublic(BaseModel):
         description="Pet weight in grams. May be null only for records created before weight was added.",
     )
     photo_url: str | None
+    access: Literal["owner", "caretaker"] = Field(
+        default="owner",
+        description="caretaker: the pet is in the caller's temporary care (read and add care records only).",
+    )
+    care_transfer_id: int | None = Field(
+        default=None, description="For a caretaker: the transfer that gives access."
+    )
+    care_ends_at: datetime | None = Field(
+        default=None, description="For a caretaker: when access ends; null if open-ended."
+    )
+    owner_name: str | None = Field(default=None, description="For a caretaker: whose pet it is.")
 
     model_config = ConfigDict(from_attributes=True)
 

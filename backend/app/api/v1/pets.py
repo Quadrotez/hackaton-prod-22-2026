@@ -9,7 +9,15 @@ from sqlalchemy import select
 from app.api.dependencies import AppSettings, CurrentUser, DbSession
 from app.models.pet import Pet
 from app.models.pet_weight import PetWeight
+from app.models.transfer import PetTransfer
 from app.schemas.pets import PetCreate, PetPublic, PetUpdate, PetWeightPublic
+from app.services.pet_access import (
+    PetAccess,
+    active_care,
+    get_visible_pet,
+    require_owner,
+    visible_pet_condition,
+)
 from app.services.storage import FileTooLargeError, InvalidImageError, LocalMediaStorage
 
 router = APIRouter(prefix="/pets", tags=["pets"])
@@ -17,10 +25,41 @@ logger = logging.getLogger(__name__)
 
 
 def get_owned_pet(pet_id: int, current_user: CurrentUser, db: DbSession) -> Pet:
-    pet = db.scalar(select(Pet).where(Pet.id == pet_id, Pet.user_id == current_user.id))
-    if pet is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pet not found")
-    return pet
+    """The caller's own pet: 404 for strangers, 403 for a temporary caretaker."""
+    return require_owner(get_visible_pet(db, pet_id, current_user.id), current_user.id)
+
+
+def get_cared_pet(pet_id: int, current_user: CurrentUser, db: DbSession) -> Pet:
+    """The caller's own pet or one in their temporary care, else 404."""
+    return get_visible_pet(db, pet_id, current_user.id)
+
+
+def care_transfers(db: DbSession, user_id: int, pet_ids: list[int]) -> dict[int, PetTransfer]:
+    if not pet_ids:
+        return {}
+    transfers = db.scalars(
+        select(PetTransfer).where(PetTransfer.pet_id.in_(pet_ids), active_care(user_id))
+    ).unique()
+    return {transfer.pet_id: transfer for transfer in transfers}
+
+
+def to_public(db: DbSession, pets: list[Pet], user_id: int) -> list[PetPublic]:
+    cared = care_transfers(db, user_id, [pet.id for pet in pets if pet.user_id != user_id])
+    result = []
+    for pet in pets:
+        public = PetPublic.model_validate(pet)
+        transfer = cared.get(pet.id)
+        if transfer is not None:
+            public.access = PetAccess.CARETAKER.value
+            public.care_transfer_id = transfer.id
+            public.care_ends_at = transfer.ends_at
+            public.owner_name = transfer.owner.name or transfer.owner.email
+        result.append(public)
+    return result
+
+
+def pet_public(db: DbSession, pet: Pet, user_id: int) -> PetPublic:
+    return to_public(db, [pet], user_id)[0]
 
 
 def storage_for(settings: AppSettings) -> LocalMediaStorage:
@@ -45,27 +84,42 @@ def create_pet(payload: PetCreate, current_user: CurrentUser, db: DbSession) -> 
     return pet
 
 
-@router.get("/", response_model=list[PetPublic])
-def list_pets(current_user: CurrentUser, db: DbSession) -> list[Pet]:
-    return list(db.scalars(select(Pet).where(Pet.user_id == current_user.id).order_by(Pet.id)).all())
+@router.get(
+    "/",
+    response_model=list[PetPublic],
+    description="The caller's own pets first, then pets in their temporary care.",
+)
+def list_pets(current_user: CurrentUser, db: DbSession) -> list[PetPublic]:
+    pets = db.scalars(
+        select(Pet)
+        .where(visible_pet_condition(current_user.id))
+        .order_by((Pet.user_id != current_user.id), Pet.id)
+    ).all()
+    return to_public(db, list(pets), current_user.id)
 
 
 @router.get("/{pet_id}", response_model=PetPublic)
-def get_pet(pet_id: int, current_user: CurrentUser, db: DbSession) -> Pet:
-    return get_owned_pet(pet_id, current_user, db)
+def get_pet(pet_id: int, current_user: CurrentUser, db: DbSession) -> PetPublic:
+    return pet_public(db, get_cared_pet(pet_id, current_user, db), current_user.id)
 
 
-@router.patch("/{pet_id}", response_model=PetPublic)
+@router.patch(
+    "/{pet_id}",
+    response_model=PetPublic,
+    description="A temporary caretaker may only send weight_g (weighing the pet).",
+)
 def update_pet(
     pet_id: int, payload: PetUpdate, current_user: CurrentUser, db: DbSession
-) -> Pet:
-    pet = get_owned_pet(pet_id, current_user, db)
+) -> PetPublic:
+    pet = get_cared_pet(pet_id, current_user, db)
     changes = payload.model_dump(exclude_unset=True)
     if not changes:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="At least one field is required",
         )
+    if set(changes) != {"weight_g"}:
+        require_owner(pet, current_user.id)
 
     resulting_birth_date = changes.get("birth_date", pet.birth_date)
     resulting_approximate_age = changes.get(
@@ -90,14 +144,14 @@ def update_pet(
         )
     db.commit()
     db.refresh(pet)
-    return pet
+    return pet_public(db, pet, current_user.id)
 
 
 @router.get("/{pet_id}/weight", response_model=list[PetWeightPublic])
 def get_pet_weight_history(
     pet_id: int, current_user: CurrentUser, db: DbSession
 ) -> list[PetWeight]:
-    get_owned_pet(pet_id, current_user, db)
+    get_cared_pet(pet_id, current_user, db)
     return list(
         db.scalars(
             select(PetWeight)
@@ -175,7 +229,7 @@ async def upload_pet_photo(
 def get_pet_photo(
     pet_id: int, current_user: CurrentUser, db: DbSession, settings: AppSettings
 ) -> Response:
-    pet = get_owned_pet(pet_id, current_user, db)
+    pet = get_cared_pet(pet_id, current_user, db)
     resolved = storage_for(settings).resolve_photo(pet.photo_url)
     if resolved is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found")

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query, status
 from sqlalchemy import select
 
-from app.api.async_dependencies import AsyncDbSession, OwnedPet
+from app.api.async_dependencies import AsyncDbSession, CaredPet, OwnedPet
 from app.models.health import ParasiteKind, ParasiteTreatment
 from app.schemas.health import (
     ParasiteTreatmentCreate,
@@ -31,7 +31,7 @@ async def create_parasite_treatment(
 
 @router.get("", response_model=list[ParasiteTreatmentPublic], summary="List parasite treatments")
 async def list_parasite_treatments(
-    pet: OwnedPet,
+    pet: CaredPet,
     db: AsyncDbSession,
     kind: ParasiteKind | None = Query(default=None),
 ) -> list[ParasiteTreatment]:
@@ -45,7 +45,7 @@ async def list_parasite_treatments(
 
 @router.get("/{treatment_id}", response_model=ParasiteTreatmentPublic)
 async def get_parasite_treatment(
-    pet: OwnedPet, treatment_id: int, db: AsyncDbSession
+    pet: CaredPet, treatment_id: int, db: AsyncDbSession
 ) -> ParasiteTreatment:
     return await get_pet_child(db, ParasiteTreatment, pet.id, treatment_id, NOT_FOUND)
 

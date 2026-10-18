@@ -21,6 +21,7 @@ from app.services.birthdays import birthday_events
 from app.services.health.common import local_now, local_today
 from app.services.health.schedule import build_schedule
 from app.services.health.visits import is_date_only
+from app.services.pet_access import visible_pet_condition
 
 MAX_RANGE_DAYS = 400
 
@@ -39,8 +40,13 @@ def visit_detail(visit: VetVisit) -> str | None:
     return " · ".join(parts) or None
 
 
-async def load_pets(db: AsyncSession, user_id: int, pet_id: int | None = None) -> list[Pet]:
-    query = select(Pet).where(Pet.user_id == user_id)
+async def load_pets(
+    db: AsyncSession, user_id: int, pet_id: int | None = None, *, with_cared: bool = False
+) -> list[Pet]:
+    """The user's pets; with_cared adds pets in their temporary care."""
+    query = select(Pet).where(
+        visible_pet_condition(user_id) if with_cared else Pet.user_id == user_id
+    )
     if pet_id is not None:
         query = query.where(Pet.id == pet_id)
     return list(await db.scalars(query.order_by(Pet.id)))

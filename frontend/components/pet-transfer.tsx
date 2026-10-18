@@ -8,15 +8,20 @@ import {
   cancelTransfer,
   confirmTransferReturn,
   createTransfer,
+  customEndDateError,
+  endTransfer,
   formatTransferDate,
   isOpenTransfer,
   listPetTransfers,
-  transferDurationLabel,
+  MAX_TRANSFER_DAYS,
+  toDateInput,
+  transferCreatePayload,
   transferDurationOptions,
+  transferEndDate,
   transferPersonLabel,
   transferStatusLabels,
   type PetTransfer as TransferRecord,
-  type TransferDuration,
+  type TransferPeriodChoice,
 } from "@/lib/transfers";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -47,8 +52,10 @@ export function PetTransfer({ petId }: { petId: number }) {
   const state = useProtectedData(load, "Не удалось загрузить передачу");
 
   const [email, setEmail] = useState("");
-  const [duration, setDuration] = useState<TransferDuration>("week");
+  const [duration, setDuration] = useState<TransferPeriodChoice>("week");
+  const [customDate, setCustomDate] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [endOpen, setEndOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -63,15 +70,21 @@ export function PetTransfer({ petId }: { petId: number }) {
   const history = transfers.filter((item) => !isOpenTransfer(item));
   const cleanEmail = email.trim().toLowerCase();
   const isValidEmail = EMAIL_RE.test(cleanEmail);
-  const durationLabel = transferDurationLabel(duration);
+  const now = new Date();
+  const endDate = transferEndDate(duration, customDate, now);
+  const periodError = duration === "custom" ? customEndDateError(endDate, now) : null;
+  const endLabel = endDate ? formatTransferDate(endDate.toISOString()) : null;
+  const canSend = isValidEmail && !periodError;
 
   const handleCreate = async () => {
-    if (!isValidEmail) return;
+    if (!canSend) return;
     setConfirmOpen(false);
     setSubmitting(true);
     setError(null);
     try {
-      const created = await createTransfer(petId, { recipient_email: cleanEmail, duration });
+      // Re-read the clock: the dialog may have stayed open for a while.
+      const end = duration === "custom" ? transferEndDate("custom", customDate, new Date()) : null;
+      const created = await createTransfer(petId, transferCreatePayload(cleanEmail, duration, end));
       state.update([pet, [created, ...transfers]]);
       setEmail("");
     } catch (e) {
@@ -129,7 +142,9 @@ export function PetTransfer({ petId }: { petId: number }) {
           )}
           {current.status === "accepted" && (
             <p className="text-sm text-muted-foreground">
-              Когда питомец вернётся, получатель запросит возврат — подтвердить его можно будет здесь.
+              Пока передача действует, получатель видит питомца, может кормить его и добавлять симптомы, замеры
+              и визиты, но не может ничего менять или удалять. Когда питомец вернётся, получатель запросит
+              возврат — подтвердить его можно будет здесь.
             </p>
           )}
 
@@ -157,6 +172,16 @@ export function PetTransfer({ petId }: { petId: number }) {
                 onClick={() => handleAction(current.id, confirmTransferReturn, "Не удалось подтвердить возврат")}
               >
                 Подтвердить возврат
+              </Button>
+            )}
+            {current.status === "accepted" && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busyId === current.id}
+                onClick={() => setEndOpen(true)}
+              >
+                Забрать досрочно
               </Button>
             )}
           </div>
@@ -191,7 +216,7 @@ export function PetTransfer({ petId }: { petId: number }) {
           </div>
 
           <div className="flex flex-col gap-2">
-            <p className="text-sm text-muted-foreground">На сколько</p>
+            <p className="text-sm text-muted-foreground">На какой срок</p>
             <div role="radiogroup" aria-label="Срок передачи" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {transferDurationOptions.map((option) => (
                 <button
@@ -211,6 +236,21 @@ export function PetTransfer({ petId }: { petId: number }) {
                 </button>
               ))}
             </div>
+            {duration === "custom" && (
+              <Input
+                type="date"
+                aria-label="Дата окончания передачи"
+                value={customDate}
+                min={toDateInput(now)}
+                max={toDateInput(new Date(now.getTime() + MAX_TRANSFER_DAYS * 86_400_000))}
+                onChange={(e) => setCustomDate(e.target.value)}
+              />
+            )}
+            <p className={cn("text-sm", periodError && customDate ? "text-destructive" : "text-muted-foreground")}>
+              {periodError
+                ? (customDate ? periodError : "Выберите, до какого дня питомец будет у получателя")
+                : `Доступ закроется ${endLabel}`}
+            </p>
           </div>
 
           {error && (
@@ -221,7 +261,7 @@ export function PetTransfer({ petId }: { petId: number }) {
 
           <Button
             type="button"
-            disabled={!isValidEmail || submitting}
+            disabled={!canSend || submitting}
             onClick={() => setConfirmOpen(true)}
           >
             {submitting ? "Отправляем…" : "Отправить заявку"}
@@ -250,14 +290,37 @@ export function PetTransfer({ petId }: { petId: number }) {
           <DialogHeader>
             <DialogTitle>Отправить заявку?</DialogTitle>
             <DialogDescription>
-              Заявка на передачу питомца {pet.name} для {cleanEmail} на срок {durationLabel}. Человек должен
-              принять заявку, а вы потом подтвердите возврат питомца.
+              {pet.name} будет у {cleanEmail} до {endLabel}. Человек должен принять заявку; после этого он
+              сможет кормить питомца и добавлять записи о здоровье, но не менять и не удалять данные.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline">Отмена</Button>} />
             <Button type="button" onClick={handleCreate} disabled={submitting}>
               Отправить заявку
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={endOpen} onOpenChange={setEndOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Забрать питомца досрочно?</DialogTitle>
+            <DialogDescription>
+              Передача завершится сразу, и получатель потеряет доступ к {pet.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline">Отмена</Button>} />
+            <Button
+              type="button"
+              onClick={() => {
+                setEndOpen(false);
+                if (current) void handleAction(current.id, endTransfer, "Не удалось завершить передачу");
+              }}
+            >
+              Забрать
             </Button>
           </DialogFooter>
         </DialogContent>

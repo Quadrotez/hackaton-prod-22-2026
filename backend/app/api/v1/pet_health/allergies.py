@@ -1,7 +1,7 @@
 from fastapi import APIRouter, status
 from sqlalchemy import select
 
-from app.api.async_dependencies import AsyncDbSession, OwnedPet
+from app.api.async_dependencies import AsyncDbSession, CaredPet, OwnedPet
 from app.models.health import Allergy
 from app.schemas.health import AllergyCreate, AllergyPublic, AllergyUpdate
 from app.services.health.common import get_pet_child, patch_changes, save
@@ -16,14 +16,14 @@ async def create_allergy(pet: OwnedPet, payload: AllergyCreate, db: AsyncDbSessi
 
 
 @router.get("", response_model=list[AllergyPublic])
-async def list_allergies(pet: OwnedPet, db: AsyncDbSession) -> list[Allergy]:
+async def list_allergies(pet: CaredPet, db: AsyncDbSession) -> list[Allergy]:
     return list(
         await db.scalars(select(Allergy).where(Allergy.pet_id == pet.id).order_by(Allergy.id))
     )
 
 
 @router.get("/{allergy_id}", response_model=AllergyPublic)
-async def get_allergy(pet: OwnedPet, allergy_id: int, db: AsyncDbSession) -> Allergy:
+async def get_allergy(pet: CaredPet, allergy_id: int, db: AsyncDbSession) -> Allergy:
     return await get_pet_child(db, Allergy, pet.id, allergy_id, NOT_FOUND)
 
 
