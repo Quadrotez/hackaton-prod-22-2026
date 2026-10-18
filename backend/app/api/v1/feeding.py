@@ -49,6 +49,17 @@ FOOD_OUT_OF_STOCK_EXAMPLE = {
 }
 
 
+REACTION_CONFLICT = "Reaction types require tolerated to be false"
+
+
+def check_reaction_types(tolerated: bool, digestive: bool, allergic: bool) -> None:
+    """A food that caused a GI or allergic reaction cannot be rated as tolerated."""
+    if tolerated and (digestive or allergic):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=REACTION_CONFLICT
+        )
+
+
 def food_out_of_stock_response(
     food: Food, requested_grams: int, remaining_grams: int
 ) -> JSONResponse:
@@ -135,6 +146,8 @@ def create_feeding_record(
 
     liked = payload.liked
     tolerated = payload.tolerated
+    if tolerated is None and (payload.digestive_reaction or payload.allergic_reaction):
+        tolerated = False
     if previous is None and (liked is None or tolerated is None):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -147,6 +160,7 @@ def create_feeding_record(
             liked = previous.liked
         if tolerated is None:
             tolerated = previous.tolerated
+    check_reaction_types(tolerated, payload.digestive_reaction, payload.allergic_reaction)
 
     stock_status: FeedingStockStatus | None = None
     food_id = food.id if food is not None else None
@@ -183,6 +197,8 @@ def create_feeding_record(
         fed_at=payload.fed_at,
         liked=liked,
         tolerated=tolerated,
+        digestive_reaction=payload.digestive_reaction,
+        allergic_reaction=payload.allergic_reaction,
         reaction_notes=payload.reaction_notes,
         notes=payload.notes,
     )
@@ -301,6 +317,7 @@ def update_feeding_record(
         changes["food_name"] = clean_food_name(changes["food_name"])
     for field, value in changes.items():
         setattr(record, field, value)
+    check_reaction_types(record.tolerated, record.digestive_reaction, record.allergic_reaction)
     db.commit()
     db.refresh(record)
     return record
