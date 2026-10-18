@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
@@ -16,6 +18,7 @@ from app.services.transfers import (
 
 pet_router = APIRouter(prefix="/pets/{pet_id}/transfers", tags=["transfers"])
 router = APIRouter(prefix="/transfers", tags=["transfers"])
+logger = logging.getLogger(__name__)
 
 ALREADY_OPEN = "This pet already has an unfinished transfer"
 
@@ -65,6 +68,15 @@ async def create_transfer(
     except IntegrityError:
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=ALREADY_OPEN) from None
+    logger.info(
+        "Transfer requested",
+        extra={
+            "event": "transfer.requested",
+            "transfer_id": transfer.id,
+            "pet_id": pet.id,
+            "duration": payload.duration.value,
+        },
+    )
     return to_public(await get_visible_transfer(db, transfer.id, current_user), current_user)
 
 
@@ -145,6 +157,16 @@ async def get_transfer(
 
 async def finish(db: AsyncDbSession, transfer: PetTransfer, current_user) -> TransferPublic:
     await db.commit()
+    logger.info(
+        "Transfer is now %s",
+        transfer.status.value,
+        extra={
+            "event": "transfer.status_changed",
+            "transfer_id": transfer.id,
+            "pet_id": transfer.pet_id,
+            "status": transfer.status.value,
+        },
+    )
     return to_public(transfer, current_user)
 
 
