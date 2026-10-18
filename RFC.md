@@ -240,36 +240,88 @@ API публикует OpenAPI-схему и Swagger UI. Контракты сх
 Документ покрывает все обязательные этапы проектирования; каждый этап раскрыт в
 отдельном разделе и связан с кодом репозитория:
 
-| Этап | Раздел документа |
+| Этап (system design) | Артефакт в документе |
 |---|---|
-| 1. Сбор и анализ требований | §2 Контекст, §4 Требования, §13 Нефункциональные требования |
-| 2. Проектирование архитектуры | §5 Общая схема и стек, §16 Архитектурные решения и альтернативы |
-| 3. Модель данных | §7 Модель данных, §7.8 Миграции |
-| 4. Контракты API | §6 API-контракт, публикуемая OpenAPI-схема и Swagger UI |
-| 5. Эксплуатация и качество | §11 Конфигурация, §12 Развёртывание и CI/CD, §14 Стратегия тестирования |
+| 1. Сбор и анализ требований | §2 Контекст, §4 Функциональные требования (use cases), §13 НФТ и §13.1 целевые показатели (RPS, SLA, объём данных, availability) |
+| 2. Определение границ системы | §5.2.1 System Context (C4) |
+| 3. Компоненты и потоки данных | §5.2.2 Containers (C4), §5.5 Механизмы масштабирования, sequence-диаграммы в §9.1 и §9.4 |
+| 4. Проектирование API и модели данных | §6 API-контракт, §7 Модель данных и §7.9 ER-диаграмма, публикуемая OpenAPI-схема и Swagger UI |
+| 5. Выбор технологий | §5.3 Технологический стек, §16 Архитектурные решения и альтернативы |
 
-Сводное обоснование соответствия полученного решения требованиям приведено в §21.
+Дополнительно документ фиксирует эксплуатацию и качество: §11 Конфигурация,
+§12 Развёртывание и CI/CD, §14 Стратегия тестирования. Сводное обоснование
+соответствия решения требованиям приведено в §21.
 
 ### 5.2. Общая схема
 
-Система состоит из четырёх логических частей:
+#### 5.2.1. System Context (C4)
+
+Границы системы и её окружение. Внутри границы — только PetCare; всё остальное —
+акторы и внешние системы, с которыми PetCare обменивается данными.
+
+```mermaid
+C4Context
+    title System Context — PetCare
+
+    Person(owner, "Владелец питомца", "Ведёт уход за питомцами через браузер")
+    Person(demo, "Демо-пользователь", "Пробует систему на демо-аккаунте")
+
+    System(petcare, "PetCare", "Веб-приложение для организации ухода за питомцами")
+
+    System_Ext(yandex, "Yandex AI", "Мультимодальная LLM для разбора фото ветдокументов")
+    System_Ext(calendars, "Внешние календари", "Google / Apple / Outlook, читают .ics-подписку")
+    System_Ext(proxy, "Nginx Proxy Manager", "TLS и reverse proxy для petcare.quadrotez.com")
+    System_Ext(ci, "GitLab CI и Registry", "Сборка образов и деплой на VM")
+
+    Rel(owner, petcare, "Использует", "HTTPS")
+    Rel(demo, petcare, "Использует", "HTTPS")
+    Rel(petcare, yandex, "Анализирует изображение документа", "HTTPS/JSON")
+    Rel(calendars, petcare, "Запрашивает .ics-подписку", "HTTPS")
+    Rel(proxy, petcare, "Маршрутизирует трафик", "HTTP")
+    Rel(ci, petcare, "Собирает и разворачивает", "Docker/SSH")
+```
+
+#### 5.2.2. Containers (C4)
+
+Логические контейнеры, из которых состоит PetCare, и потоки данных между ними.
+Все контейнеры запускаются из одного [`docker-compose.yml`](docker-compose.yml:1)
+на одной виртуальной машине.
+
+```mermaid
+C4Container
+    title Containers — PetCare
+
+    Person(owner, "Владелец питомца", "Браузер")
+
+    System_Boundary(petcare, "PetCare") {
+        Container(site, "Frontend", "Next.js / React", "Страницы питомцев, здоровья, кормления и календаря")
+        Container(api, "Backend API", "FastAPI / Python 3.12", "Бизнес-правила, аутентификация, ownership, REST /api/v1")
+        Container(migrate, "Миграции", "Alembic", "Одноразовый контейнер: upgrade head до старта API")
+        ContainerDb(db, "База данных", "PostgreSQL 16", "Пользователи, питомцы, записи здоровья, фиды")
+        ContainerDb(media, "Media volume", "Docker volume", "Фото питомцев, аватары, ветдокументы")
+    }
+
+    System_Ext(yandex, "Yandex AI", "LLM-анализ документов")
+    System_Ext(calendars, "Внешние календари", "Google / Apple / Outlook")
+    System_Ext(proxy, "Nginx Proxy Manager", "TLS и reverse proxy")
+
+    Rel(owner, proxy, "Открывает сайт", "HTTPS")
+    Rel(proxy, site, "Проксирует страницы", "HTTP")
+    Rel(proxy, api, "Проксирует /api и /docs", "HTTP")
+    Rel(site, api, "Запросы данных", "HTTP/JSON, multipart")
+    Rel(api, db, "Читает и пишет", "SQL")
+    Rel(api, media, "Читает и пишет файлы", "FS")
+    Rel(migrate, db, "Применяет схему", "SQL")
+    Rel(api, yandex, "Анализ изображения", "HTTPS/JSON")
+    Rel(calendars, api, "Тянет .ics", "HTTPS")
+```
+
+Упрощённо потоки данных выглядят так:
 
 ```text
-Браузер
-   |
-   v
-Next.js frontend
-   |
-   | HTTP/JSON, multipart, iCalendar
-   v
-FastAPI backend
-   |----------- JWT и зависимости авторизации
-   |----------- SQLAlchemy + Alembic
-   |----------- PostgreSQL в эксплуатации / SQLite в тестах
-   |----------- файловое хранилище изображений
-   |----------- Yandex AI API для анализа документов
-   v
-PostgreSQL + volume с media
+Браузер -> Next.js -> FastAPI -> PostgreSQL + media
+                          |
+                          +-> Yandex AI (анализ документов)
 ```
 
 Backend является источником бизнес-правил и контроля доступа. Frontend не считается доверенной стороной и не может самостоятельно определять владельца данных.
@@ -307,6 +359,34 @@ Backend является источником бизнес-правил и ко�
 - [`backend/tests`](backend/tests) — автоматические тесты.
 
 Это разделение выбрано для того, чтобы HTTP-слой не содержал всю бизнес-логику, а интеграции можно было тестировать отдельно.
+
+### 5.5. Механизмы масштабирования
+
+Текущий контур рассчитан на показатели из §13.1. Ниже — что уже заложено под рост
+и что вынесено в дорожную карту (§19).
+
+Уже заложено:
+
+- **Stateless API.** Backend не хранит состояние сессии: аутентификация построена
+  на JWT, поэтому инстанс `api` можно масштабировать горизонтально за Nginx Proxy
+  Manager без sticky-сессий.
+- **Индексы и фильтры.** Все выборки ограничены владельцем и питомцем, по внешним
+  ключам стоят индексы; календарь ограничен диапазоном 400 дней — это удерживает
+  latency при пиковом RPS.
+- **Разделение чтения и записи.** Тяжёлые внешние вызовы (LLM) изолированы и
+  ограничены таймаутом и повторной попыткой, чтобы не блокировать обычные запросы.
+- **Артефакты в registry.** Образы неизменяемы и тегированы SHA, поэтому откат и
+  запуск нескольких инстансов сводятся к запуску того же тега.
+
+Дорожная карта до целевого продукта:
+
+- read-replica PostgreSQL и пул соединений (PgBouncer) для роста чтения;
+- вынос медиа в объектное хранилище с приватными подписанными URL вместо
+  локального volume;
+- асинхронная очередь для анализа документов (вместо синхронного вызова в
+  HTTP-маршруте) со статусом обработки;
+- кэширование часто запрашиваемых сводок (`/health`, `/calendar/upcoming`);
+- rate limiting для `login` и анализа документов.
 
 ---
 
@@ -491,6 +571,71 @@ Multipart-поля:
 
 Миграции применяются перед запуском API в production-контуре.
 
+### 7.9. ER-диаграмма основных сущностей
+
+Связи между основными таблицами (медицинские сущности показаны выборочно;
+полный список приведён в §7.5).
+
+```mermaid
+erDiagram
+    USERS ||--o{ PETS : "владеет"
+    USERS ||--o{ FOODS : "владеет"
+    USERS ||--o{ CALENDAR_FEEDS : "владеет"
+    USERS ||--o{ PET_TRANSFERS : "инициирует"
+
+    PETS ||--o{ FEEDING_RECORDS : "имеет"
+    PETS ||--o{ PET_WEIGHTS : "имеет"
+    PETS ||--o{ VET_VISITS : "имеет"
+    PETS ||--o{ VACCINATIONS : "имеет"
+    PETS ||--o{ PARASITE_TREATMENTS : "имеет"
+    PETS ||--o{ SYMPTOMS : "имеет"
+    PETS ||--o{ ALLERGIES : "имеет"
+    PETS ||--o{ PREGNANCIES : "имеет"
+    PETS ||--o{ MEDICATIONS : "имеет"
+    PETS ||--o{ MEASUREMENTS : "имеет"
+    PETS ||--o{ PET_TRANSFERS : "передаётся"
+
+    FOODS ||--|| FOOD_STOCKS : "запас"
+    FOODS ||--o{ FEEDING_RECORDS : "указывается"
+
+    MEDICATIONS ||--o{ MEDICATION_TIMES : "расписание"
+    MEDICATION_TIMES ||--o{ MEDICATION_INTAKES : "отметки"
+
+    USERS {
+        int id PK
+        string email UK
+        string password_hash
+        string name
+        string avatar_url
+        datetime created_at
+    }
+    PETS {
+        int id PK
+        int user_id FK
+        string name
+        string species
+        string sex
+        date birth_date
+        int weight_g
+        string photo_url
+    }
+    PET_TRANSFERS {
+        int id PK
+        int pet_id FK
+        int owner_id FK
+        string recipient_email
+        int recipient_id FK
+        string status
+        datetime ends_at
+    }
+    CALENDAR_FEEDS {
+        int id PK
+        int user_id FK
+        string token_hash UK
+        string name
+    }
+```
+
 ---
 
 ## 8. Безопасность и приватность
@@ -567,6 +712,37 @@ LLM используется только как средство извлече
 6. Добавляет корм, запас и первую запись кормления.
 7. Заполняет базовые медицинские сведения.
 
+Регистрация, вход и выдача JWT:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Пользователь
+    participant FE as Next.js
+    participant API as FastAPI
+    participant DB as PostgreSQL
+
+    U->>FE: email, имя и пароль
+    FE->>API: POST /api/v1/auth/register
+    API->>DB: INSERT users (Argon2-хеш)
+    DB-->>API: id пользователя
+    API-->>FE: 201 {id, email, name}
+
+    U->>FE: email и пароль
+    FE->>API: POST /api/v1/auth/login
+    API->>DB: SELECT users WHERE email
+    DB-->>API: password_hash
+    API->>API: verify пароля (Argon2)
+    alt пароль верный
+        API-->>FE: 200 {access_token}
+        FE->>API: GET /api/v1/auth/me (Bearer token)
+        API->>API: проверить подпись и срок JWT
+        API-->>FE: 200 профиль
+    else пароль неверный
+        API-->>FE: 401
+    end
+```
+
 ### 9.2. Запись визита
 
 1. Пользователь открывает раздел здоровья питомца.
@@ -593,6 +769,39 @@ LLM используется только как средство извлече
 3. Добавляет ссылку в Google Calendar, Apple Calendar или Outlook.
 4. Внешний календарь периодически запрашивает ссылку.
 5. При компрометации пользователь удаляет feed и создаёт новую.
+
+Создание, чтение и отзыв подписки:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Пользователь
+    participant FE as Next.js
+    participant API as FastAPI
+    participant DB as PostgreSQL
+    actor C as Внешний календарь
+
+    U->>FE: создать ссылку календаря
+    FE->>API: POST /api/v1/calendar/feed (Bearer)
+    API->>API: сгенерировать токен, посчитать SHA-256
+    API->>DB: INSERT calendar_feeds (token_hash)
+    DB-->>API: ok
+    API-->>FE: 201 {url с токеном} (показывается один раз)
+    U->>C: добавить URL в календарь
+
+    loop периодически
+        C->>API: GET /api/v1/calendar/feed/{token}.ics
+        API->>DB: SELECT calendar_feeds WHERE token_hash
+        DB-->>API: feed
+        API->>API: собрать события (визиты, дозы, прививки, обработки)
+        API-->>C: 200 text/calendar
+    end
+
+    U->>FE: отозвать ссылку
+    FE->>API: DELETE /api/v1/calendar/feed (Bearer)
+    API->>DB: DELETE calendar_feeds
+    API-->>FE: 204
+```
 
 ---
 
@@ -727,6 +936,29 @@ Pipeline в [`.gitlab-ci.yml`](.gitlab-ci.yml:1) разделён на этап�
 - Изменения схемы базы оформляются миграциями.
 - Интеграция LLM изолирована от HTTP-маршрута.
 - Каждая важная бизнес-гарантия должна иметь тест.
+
+### 13.1. Целевые показатели (MVP)
+
+Ниже — расчётные ориентиры для хакатонного контура: одна виртуальная машина за
+Nginx Proxy Manager. Это допущения для проектирования, а не измеренные гарантии;
+при росте нагрузки они уточняются, а механизмы масштабирования описаны в §5.5.
+
+| Показатель | Целевое значение | Комментарий |
+|---|---|---|
+| Средняя нагрузка | ~5 RPS чтение, ~1 RPS запись | один инстанс API |
+| Пиковая нагрузка | до 50 RPS чтение, до 5 RPS запись | всплески в дашборде и календаре |
+| Анализ документа (LLM) | ~0.5 RPS | внешний вызов, ограничен таймаутом |
+| Latency API | p95 < 300 мс, p99 < 800 мс | без учёта вызова LLM |
+| Latency анализа документа | p95 < 8 с | зависит от Yandex AI |
+| SLA (доступность) | 99.5% в месяц (~3.6 ч простоя) | error budget 0.5% |
+| RTO / RPO | RTO ≤ 15 мин, RPO ≤ 24 ч | восстановление из бэкапа, §18 |
+| Конкурентные сессии | ~100 одновременных | |
+| Пользователи | ~10 000, ~3 питомца на пользователя | оценка целевого продукта |
+| Объём записей | ~50 записей на питомца в месяц, ~1 KB на запись | рост БД — единицы GB/год |
+| Объём медиа | ~1 MB на питомца | рост — десятки GB/год, вынос в объектное хранилище |
+
+Ориентиры связаны с NFR-003: фильтры по владельцу и питомцу, индексы по внешним
+ключам и ограничение диапазона календаря удерживают latency при заявленном RPS.
 
 ---
 
