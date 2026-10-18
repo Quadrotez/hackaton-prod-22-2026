@@ -213,7 +213,8 @@ export function PetForm({ pet }: { pet?: Pet }) {
             return;
           }
         }
-        router.replace("/me");
+        toast.success("Питомец добавлен");
+        router.replace(`/pet/${created.id}`);
       }
     } catch (error) {
       if (!handleAuthError(error)) {
