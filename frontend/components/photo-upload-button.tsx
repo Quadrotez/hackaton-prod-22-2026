@@ -47,7 +47,7 @@ export function PhotoUploadButton({
   return (
     <label
       title={label}
-      className="absolute -bottom-1 -right-1 flex size-8 cursor-pointer items-center justify-center rounded-full border-2 border-card bg-secondary text-primary-foreground transition-colors hover:bg-[color-mix(in_oklch,var(--primary),var(--foreground)_8%)] has-focus-visible:ring-2 has-focus-visible:ring-foreground has-disabled:cursor-default"
+      className="absolute -bottom-1 -right-1 flex size-8 cursor-pointer items-center justify-center rounded-full border-2 border-card bg-secondary text-primary-foreground transition-colors dark:bg-primary hover:bg-[color-mix(in_oklch,var(--primary),var(--foreground)_8%)] has-focus-visible:ring-2 has-focus-visible:ring-foreground has-disabled:cursor-default"
     >
       <input
         type="file"

@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ActivityIcon,
   BugIcon,
+  ClipboardListIcon,
   PillIcon,
   StethoscopeIcon,
   SyringeIcon,
@@ -156,6 +157,12 @@ function HealthContent({ pet, overview, onUpdate }: { pet: Pet; overview: Health
           description="Наблюдения и аллергии"
           icon={ActivityIcon}
           accent
+        />
+        <QuickLinkTile
+          href={`${base}/summary`}
+          title="Для врача"
+          description="Сводка для приёма"
+          icon={ClipboardListIcon}
         />
       </section>
     </>
