@@ -21,7 +21,7 @@ function formatWeight(grams: number) {
     : `${numberFormat.format(grams)} г`;
 }
 
-export default function FoodCard({ food }: FoodCardProps) {
+export default function FoodCard({ food, children }: FoodCardProps & { children?: React.ReactNode }) {
   const Icon = foodIcons[food.type];
   const remainingPercent = food.total_grams > 0
     ? Math.min(100, Math.max(0, Math.round(food.remaining_grams / food.total_grams * 100)))
@@ -102,6 +102,10 @@ export default function FoodCard({ food }: FoodCardProps) {
           {forecast}
         </p>
       </div>
+
+      {children && (
+        <div className="flex flex-wrap items-center gap-2 border-t pt-3">{children}</div>
+      )}
     </article>
   );
 }
