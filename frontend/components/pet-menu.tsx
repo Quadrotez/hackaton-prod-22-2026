@@ -107,7 +107,6 @@ function PetMenuWithPath() {
                     <button type="button" aria-label={`Выбрать питомца: ${pet.name}${isCaretaker(pet) ? " (у вас на время)" : ""}`} aria-pressed={pet.id === activePet?.id} onClick={() => choosePet(pet.id)} className="pet-menu-petLink">
                       <PetAvatar pet={pet} size="md" className="pet-menu-avatar" />
                       <span className="pet-menu-petName" title={pet.name}>{pet.name}</span>
-                      {isCaretaker(pet) && <span className="pet-menu-careBadge">под присмотром</span>}
                     </button>
                   </li>
                 ))}
