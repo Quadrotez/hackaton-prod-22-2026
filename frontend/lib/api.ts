@@ -43,6 +43,8 @@ const detailMessages: Record<string, string> = {
   "Transfer not found": "Передача не найдена",
   "This pet already has an unfinished transfer": "У питомца уже есть незавершённая передача",
   "You cannot transfer a pet to yourself": "Нельзя передать питомца самому себе",
+  "Only the owner can do this; the pet is in your temporary care":
+    "Питомец у вас на время: это может сделать только владелец",
 };
 
 // Детали, которые бэкенд собирает динамически (роль, статус), — локализуем по префиксу.

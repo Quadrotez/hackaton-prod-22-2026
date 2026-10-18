@@ -1,5 +1,5 @@
-"""Pet transfer workflow. Formal only for now: a transfer records who has the pet and
-until when, but does not yet change who may read or edit the pet's data."""
+"""Pet transfer workflow: who has the pet and until when. What an accepted transfer lets
+the recipient do with the pet is decided in app.services.pet_access."""
 
 import calendar
 import logging
@@ -40,7 +40,7 @@ def ends_at_for(duration: TransferDuration, start: datetime) -> datetime | None:
             return add_months(start, 1)
         case TransferDuration.THREE_MONTHS:
             return add_months(start, 3)
-        case TransferDuration.INDEFINITE:
+        case TransferDuration.INDEFINITE | TransferDuration.CUSTOM:
             return None
 
 

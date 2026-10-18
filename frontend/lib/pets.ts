@@ -1,5 +1,6 @@
 import { Cat, Dog, PawPrint, type LucideIcon } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { notifyPetsChanged, PETS_CHANGED_EVENT } from "@/lib/pets-changed";
 
 export type PetSex = "boy" | "girl";
 
@@ -13,12 +14,20 @@ export type Pet = {
   approximate_age_years: number | null;
   weight_g: number | null;
   photo_url: string | null;
+  // "caretaker": the pet is in the user's temporary care — reading and adding care records only.
+  access?: PetAccess;
+  care_transfer_id?: number | null;
+  care_ends_at?: string | null;
+  owner_name?: string | null;
 };
 
-export const PETS_CHANGED_EVENT = "petcare:pets-changed";
-function notifyPetsChanged() {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event(PETS_CHANGED_EVENT));
+export type PetAccess = "owner" | "caretaker";
+
+export function isCaretaker(pet: Pick<Pet, "access">): boolean {
+  return pet.access === "caretaker";
 }
+
+export { PETS_CHANGED_EVENT };
 
 export type PetCreate = {
   name: string;

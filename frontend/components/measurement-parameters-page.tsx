@@ -5,6 +5,7 @@ import { LockKeyholeIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useProtectedData, useRequireAuth } from "@/hooks/use-auth";
 import { getErrorMessage } from "@/lib/api";
+import { isCaretaker } from "@/lib/pets";
 import { addMeasurementParameter, deleteMeasurementParameter, loadMeasurementParameters, type MeasurementParameter, type MeasurementParametersData } from "@/lib/measurements";
 import { PageHeader } from "@/components/page-header";
 import { PageError, PageLoading } from "@/components/page-state";
@@ -25,6 +26,7 @@ export function MeasurementParametersPage({ petId }: { petId: number }) {
 
 function ParametersContent({ data, onUpdate }: { data: MeasurementParametersData; onUpdate: (data: MeasurementParametersData) => void }) {
   const { pet, parameters } = data;
+  const caretaker = isCaretaker(pet);
   const id = useId();
   const { handleAuthError } = useRequireAuth();
   const [pending, setPending] = useState(false);
@@ -83,10 +85,10 @@ function ParametersContent({ data, onUpdate }: { data: MeasurementParametersData
         </div>
         {parameters.map((parameter) => <div key={parameter.id} className="flex items-center justify-between gap-3 border-t py-3">
           <div className="min-w-0"><p className="break-words font-semibold">{parameter.name}</p><p className="text-xs text-muted-foreground">{parameter.unit || "без единиц"}</p></div>
-          <Button type="button" variant="outline" size="sm" className="shrink-0 text-destructive hover:text-destructive" disabled={pending} onClick={() => setDeleting(parameter)} aria-label={`Удалить ${parameter.name}`}>Удалить</Button>
+          {!caretaker && <Button type="button" variant="outline" size="sm" className="shrink-0 text-destructive hover:text-destructive" disabled={pending} onClick={() => setDeleting(parameter)} aria-label={`Удалить ${parameter.name}`}>Удалить</Button>}
         </div>)}
       </Card>
-      <Card role="region" aria-label="Новый параметр" className="flex flex-col gap-4 px-4 py-5 sm:px-5">
+      {!caretaker && <Card role="region" aria-label="Новый параметр" className="flex flex-col gap-4 px-4 py-5 sm:px-5">
         <h2 className="text-[17px] font-semibold">Новый параметр</h2>
         <form onSubmit={add} noValidate aria-busy={pending}>
           <fieldset disabled={pending} className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -102,7 +104,7 @@ function ParametersContent({ data, onUpdate }: { data: MeasurementParametersData
           </fieldset>
           {error && <FieldError id={`${id}-error`} className="mt-3">{error}</FieldError>}
         </form>
-      </Card>
+      </Card>}
       <AlertDialog open={deleting !== null} onOpenChange={(open) => { if (!open && !pending) setDeleting(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>

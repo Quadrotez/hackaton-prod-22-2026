@@ -2,8 +2,8 @@ from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, update
 
-from app.api.dependencies import CurrentUser, DbSession, get_owned_food
-from app.api.v1.pets import get_owned_pet
+from app.api.dependencies import CurrentUser, DbSession, get_owned_food, get_user_food
+from app.api.v1.pets import get_cared_pet, get_owned_pet
 from app.models.feeding import FeedingRecord
 from app.models.food import Food, FoodStock
 from app.schemas.feeding import (
@@ -22,9 +22,12 @@ router = APIRouter(prefix="/pets/{pet_id}/feeding-records", tags=["feeding recor
 
 
 def get_pet_feeding_record(
-    pet_id: int, record_id: int, current_user: CurrentUser, db: DbSession
+    pet_id: int, record_id: int, current_user: CurrentUser, db: DbSession, *, owner: bool
 ) -> FeedingRecord:
-    get_owned_pet(pet_id, current_user, db)
+    if owner:
+        get_owned_pet(pet_id, current_user, db)
+    else:
+        get_cared_pet(pet_id, current_user, db)
     record = db.scalar(
         select(FeedingRecord).where(
             FeedingRecord.id == record_id,
@@ -133,11 +136,12 @@ def food_out_of_stock_response(
 def create_feeding_record(
     pet_id: int, payload: FeedingRecordCreate, current_user: CurrentUser, db: DbSession
 ) -> FeedingRecordCreated | JSONResponse:
-    get_owned_pet(pet_id, current_user, db)
+    pet = get_cared_pet(pet_id, current_user, db)
 
     food: Food | None = None
     if payload.food_id is not None:
-        food = get_owned_food(payload.food_id, current_user, db)
+        # A temporary caretaker feeds from the owner's catalog and stock.
+        food = get_user_food(payload.food_id, pet.user_id, db)
         food_name = food.name
         previous = find_latest_matching_record(db, pet_id, food_id=food.id)
     else:
@@ -229,7 +233,7 @@ def get_feeding_suggestions(
     food_id: int | None = Query(default=None, gt=0),
     food_name: str | None = Query(default=None, min_length=1, max_length=255),
 ) -> FeedingSuggestionResponse:
-    get_owned_pet(pet_id, current_user, db)
+    pet = get_cared_pet(pet_id, current_user, db)
     if food_id is None and food_name is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -238,7 +242,7 @@ def get_feeding_suggestions(
 
     food: Food | None = None
     if food_id is not None:
-        food = get_owned_food(food_id, current_user, db)
+        food = get_user_food(food_id, pet.user_id, db)
         cleaned_name = food.name
         previous = find_latest_matching_record(db, pet_id, food_id=food.id)
     else:
@@ -266,7 +270,7 @@ def get_feeding_suggestions(
 def list_feeding_records(
     pet_id: int, current_user: CurrentUser, db: DbSession
 ) -> list[FeedingRecord]:
-    get_owned_pet(pet_id, current_user, db)
+    get_cared_pet(pet_id, current_user, db)
     return list(
         db.scalars(
             select(FeedingRecord)
@@ -284,7 +288,7 @@ def list_feeding_records(
 def get_feeding_record(
     pet_id: int, record_id: int, current_user: CurrentUser, db: DbSession
 ) -> FeedingRecord:
-    return get_pet_feeding_record(pet_id, record_id, current_user, db)
+    return get_pet_feeding_record(pet_id, record_id, current_user, db, owner=False)
 
 
 @router.patch("/{record_id}", response_model=FeedingRecordPublic)
@@ -295,7 +299,7 @@ def update_feeding_record(
     current_user: CurrentUser,
     db: DbSession,
 ) -> FeedingRecord:
-    record = get_pet_feeding_record(pet_id, record_id, current_user, db)
+    record = get_pet_feeding_record(pet_id, record_id, current_user, db, owner=True)
     changes = payload.model_dump(exclude_unset=True)
     if not changes:
         raise HTTPException(
@@ -327,6 +331,6 @@ def update_feeding_record(
 def delete_feeding_record(
     pet_id: int, record_id: int, current_user: CurrentUser, db: DbSession
 ) -> None:
-    record = get_pet_feeding_record(pet_id, record_id, current_user, db)
+    record = get_pet_feeding_record(pet_id, record_id, current_user, db, owner=True)
     db.delete(record)
     db.commit()
