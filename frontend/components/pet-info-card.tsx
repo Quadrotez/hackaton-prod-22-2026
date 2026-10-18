@@ -27,6 +27,7 @@ export function PetInfoCard({ pet, onPetChange }: { pet: Pet; onPetChange: (pet:
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 pr-8">
         <p className="font-medium">{formatPetSummary(pet)}</p>
+        {!editable && <p className="text-xs text-muted-foreground">Под присмотром · профиль изменяет владелец</p>}
         {pet.birth_date && (
           <p className="text-sm text-muted-foreground">Дата рождения: {formatDate(pet.birth_date)}</p>
         )}

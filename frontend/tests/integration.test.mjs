@@ -284,7 +284,7 @@ test("дашборд: календарь собирает визиты, прив
   assert.equal(medicationResponse.status, 201, await medicationResponse.clone().text());
 
   const from = `${today.slice(0, 7)}-01`;
-  const to = `${today.slice(0, 7)}-31`;
+  const to = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0)).toISOString().slice(0, 10);
   const calendar = await health.loadCalendar(from, to);
   assert.equal(calendar.pets.length, 1);
   assert.equal(calendar.range, `${from}/${to}`);
@@ -322,7 +322,10 @@ test("обработки от паразитов: CRUD, авторасчёт с�
   const dashboard = await sections.loadHealthDashboard(pet.id);
   assert.equal(dashboard.overview.next_parasite.id, created.id);
 
-  const calendar = await health.loadCalendar(`${today.slice(0, 7)}-01`, `${today.slice(0, 7)}-28`);
+  const currentMonth = await health.loadCalendar(`${today.slice(0, 7)}-01`, `${today.slice(0, 7)}-28`);
+  assert.equal(currentMonth.events.some((event) => event.kind === "parasite"), false, "будущая обработка не попадает в календарь текущего месяца");
+
+  const calendar = await health.loadCalendar(due, due, pet.id);
   const parasiteEvent = calendar.events.find((event) => event.kind === "parasite");
   assert.ok(parasiteEvent, "событие обработки попадает в календарь");
   assert.equal(parasiteEvent.date, due);
