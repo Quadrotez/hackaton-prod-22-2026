@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
+from app.core.log import bind_user
 from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models.food import Food
@@ -45,6 +46,7 @@ def get_current_user(
     user = db.get(User, user_id)
     if user is None:
         raise authentication_error()
+    bind_user(user.id)
     return user
 
 

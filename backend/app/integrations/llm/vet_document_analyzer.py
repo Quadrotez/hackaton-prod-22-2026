@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import base64
+import logging
 import os
+import time
 from typing import Any
 
 from openai import OpenAI
@@ -12,6 +14,7 @@ from app.integrations.llm.response import checked_message
 from app.schemas.vet_documents import VeterinaryDocumentAnalysis
 
 MODEL_NAME = os.getenv("YANDEX_MODEL", "deepseek-v4.1-flash")
+logger = logging.getLogger(__name__)
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 SYSTEM_PROMPT = """
@@ -126,6 +129,7 @@ def analyze_veterinary_document(
     context = normalized_text or "Текстовый комментарий отсутствует. Используй только фотографию."
 
     model_client = client or build_client()
+    started = time.perf_counter()
     response = model_client.chat.completions.create(
         model=f"gpt://{FOLDER_ID}/{MODEL_NAME}",
         messages=[
@@ -150,10 +154,27 @@ def analyze_veterinary_document(
         max_tokens=900,
     )
 
+    usage = getattr(response, "usage", None)
+    # Never log the document text or the model output: they hold personal data.
+    llm_fields = {
+        "event": "llm.response",
+        "model": MODEL_NAME,
+        "duration_ms": round((time.perf_counter() - started) * 1000, 1),
+        "image_bytes": len(image_bytes),
+        "prompt_tokens": getattr(usage, "prompt_tokens", None),
+        "completion_tokens": getattr(usage, "completion_tokens", None),
+        "finish_reason": response.choices[0].finish_reason if response.choices else None,
+    }
+    logger.info("LLM answered", extra=llm_fields)
+
     raw_content = checked_message(response).content
     try:
         parsed = VeterinaryDocumentAnalysis.model_validate_json(raw_content)
     except ValidationError as exc:
+        logger.warning(
+            "LLM answer does not match the contract",
+            extra={"event": "llm.invalid_answer", "errors": exc.error_count()},
+        )
         raise ValueError(
             "The model returned an invalid veterinary-document analysis"
         ) from exc
