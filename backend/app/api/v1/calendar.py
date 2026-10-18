@@ -41,7 +41,7 @@ def check_range(start: date, end: date) -> None:
 
 
 async def pets_for(db: AsyncDbSession, user_id: int, pet_id: int | None) -> list[Pet]:
-    pets = await load_pets(db, user_id, pet_id)
+    pets = await load_pets(db, user_id, pet_id, with_cared=True)
     if pet_id is not None and not pets:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pet not found")
     return pets

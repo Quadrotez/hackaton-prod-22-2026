@@ -1,17 +1,50 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.models.pet import PetSex
 from app.models.transfer import TransferDuration, TransferStatus
 
+MAX_TRANSFER_DAYS = 366
+
 
 class TransferCreate(BaseModel):
     recipient_email: EmailStr = Field(description="Who should take care of the pet.")
-    duration: TransferDuration = Field(
-        description="Counted from the moment the request is sent; indefinite has no end."
+    duration: TransferDuration | None = Field(
+        default=None,
+        description=(
+            "A preset counted from the moment the request is sent; indefinite has no end. "
+            "Omit it (or send custom) when ends_at is given."
+        ),
     )
+    ends_at: AwareDatetime | None = Field(
+        default=None,
+        description=f"Chosen end of the care, in the future and at most {MAX_TRANSFER_DAYS} days ahead.",
+    )
+
+    @model_validator(mode="after")
+    def check_period(self) -> "TransferCreate":
+        if self.ends_at is not None:
+            if self.duration not in (None, TransferDuration.CUSTOM):
+                raise ValueError("Send either a duration preset or ends_at, not both")
+            now = datetime.now(UTC)
+            if self.ends_at <= now:
+                raise ValueError("ends_at must be in the future")
+            if self.ends_at > now + timedelta(days=MAX_TRANSFER_DAYS):
+                raise ValueError(f"ends_at must be within {MAX_TRANSFER_DAYS} days")
+            self.duration = TransferDuration.CUSTOM
+        elif self.duration in (None, TransferDuration.CUSTOM):
+            raise ValueError("ends_at is required for a custom duration")
+        return self
 
     @field_validator("recipient_email")
     @classmethod

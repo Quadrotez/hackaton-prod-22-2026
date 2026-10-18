@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select, update
 
 from app.api.dependencies import CurrentUser, DbSession, get_owned_food
 from app.models.feeding import FeedingRecord
 from app.models.food import Food, FoodStock
 from app.schemas.foods import FoodCreate, FoodPublic, FoodUpdate
+from app.services.pet_access import get_visible_pet
 
 router = APIRouter(prefix="/foods", tags=["foods"])
 
@@ -46,10 +47,19 @@ def create_food(payload: FoodCreate, current_user: CurrentUser, db: DbSession) -
 
 
 @router.get("", response_model=list[FoodPublic])
-def list_foods(current_user: CurrentUser, db: DbSession) -> list[FoodPublic]:
-    foods = db.scalars(
-        select(Food).where(Food.user_id == current_user.id).order_by(Food.id)
-    ).all()
+def list_foods(
+    current_user: CurrentUser,
+    db: DbSession,
+    pet_id: int | None = Query(
+        default=None,
+        gt=0,
+        description="List the catalog of this pet's owner, e.g. for a temporary caretaker.",
+    ),
+) -> list[FoodPublic]:
+    owner_id = current_user.id
+    if pet_id is not None:
+        owner_id = get_visible_pet(db, pet_id, current_user.id).user_id
+    foods = db.scalars(select(Food).where(Food.user_id == owner_id).order_by(Food.id)).all()
     return [public_food(food) for food in foods]
 
 

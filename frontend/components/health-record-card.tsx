@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 
 const reasonLabels = { illness: "Болезнь или жалоба", examination: "Осмотр", vaccination: "Вакцинация", checkup: "Контрольный приём" };
 const parasiteLabels = { internal: "Внутренние паразиты", external: "Наружные (блохи, клещи)" };
-export function HealthRecordCard({ record, today, pending, onEdit, onDelete, onComplete }: {
-  record: HealthRecord; today: string; pending: boolean; onEdit: () => void; onDelete: () => void; onComplete: () => void;
+export function HealthRecordCard({ record, today, pending, readOnly = false, onEdit, onDelete, onComplete }: {
+  record: HealthRecord; today: string; pending: boolean; readOnly?: boolean; onEdit: () => void; onDelete: () => void; onComplete: () => void;
 }) {
   const status = record.resource === "visits" ? { planned: "Запланирован", completed: "Состоялся", cancelled: "Отменён" }[record.value.status]
     : record.resource === "vaccinations" ? record.value.status === "done" ? "Сделана" : "Запланирована"
@@ -24,10 +24,10 @@ export function HealthRecordCard({ record, today, pending, onEdit, onDelete, onC
     {record.resource === "parasites" && <div className="space-y-1 break-words text-sm"><p>{parasiteLabels[record.value.kind]}</p>{record.value.interval_days && <p><span className="font-semibold">Интервал:</span> {record.value.interval_days} дн.</p>}{record.value.next_due_on && <p><span className="font-semibold">Следующая обработка:</span> {formatHealthDate(record.value.next_due_on)}</p>}{record.value.clinic && <p>{record.value.clinic}</p>}{record.value.notes && <p className="text-muted-foreground">{record.value.notes}</p>}</div>}
     {record.resource === "medications" && <div className="space-y-1 break-words text-sm"><p className="font-semibold">{record.value.dose}</p><p><span className="font-semibold">Время:</span> {record.value.times.map((time) => time.slice(0, 5)).join(", ")}</p><p>{record.value.interval_days === 1 ? "Ежедневно" : `Каждые ${record.value.interval_days} дн.`}{record.value.end_date ? ` · до ${formatHealthDate(record.value.end_date)}` : " · без даты окончания"}</p>{record.value.notes && <p className="text-muted-foreground">{record.value.notes}</p>}</div>}
     {record.resource === "allergies" && <div className="space-y-1 break-words text-sm">{record.value.reactions && <p><span className="font-semibold">Реакция:</span> {record.value.reactions}</p>}{record.value.notes && <p className="text-muted-foreground">{record.value.notes}</p>}</div>}
-    <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+    {!readOnly && <div className="flex flex-wrap items-center gap-2 border-t pt-3">
       {canComplete && <Button type="button" variant="secondary" className="" disabled={pending} onClick={onComplete}><CheckIcon aria-hidden="true" />{record.resource === "visits" ? "Приём состоялся" : "Прививка сделана"}</Button>}
       <Button type="button" variant="secondary" className="" size="sm" disabled={pending} onClick={onEdit}><PencilIcon aria-hidden="true" />Изменить</Button>
       <Button type="button" variant="secondary" className=" ml-auto" size="icon" disabled={pending} onClick={onDelete} aria-label={`Удалить: ${recordTitle(record)}`}><Trash2Icon aria-hidden="true" /></Button>
-    </div>
+    </div>}
   </Card>;
 }

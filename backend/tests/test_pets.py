@@ -59,6 +59,10 @@ def test_create_and_list_only_current_users_pets(client: TestClient) -> None:
         "approximate_age_years": None,
         "weight_g": 4500,
         "photo_url": None,
+        "access": "owner",
+        "care_transfer_id": None,
+        "care_ends_at": None,
+        "owner_name": None,
     }
     listed = client.get("/api/v1/pets/", headers=owner_headers)
     assert listed.status_code == 200
