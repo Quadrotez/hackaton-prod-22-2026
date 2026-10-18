@@ -44,27 +44,75 @@ test("сохранённый визит читается календарём и
     if (url === "/api/v1/pets/") return Response.json([pet]);
     if (parsed.pathname.endsWith("/visits")) {
       if (init.method === "POST") { records.push({ ...JSON.parse(init.body), id: 7, pet_id: 1 }); return Response.json(records[0]); }
-      return Response.json(records);
     }
     if (parsed.pathname.endsWith("/visits/7")) { Object.assign(records[0], JSON.parse(init.body)); return Response.json(records[0]); }
-    if (parsed.pathname.endsWith("/vaccinations") || parsed.pathname.endsWith("/medications/schedule") || parsed.pathname.endsWith("/parasite-treatments")) return Response.json([]);
+    if (parsed.pathname === "/api/v1/calendar/events") {
+      assert.equal(init.method ?? "GET", "GET");
+      return Response.json(records.filter((record) => record.status !== "cancelled").map((record) => ({
+        id: `visit-${record.id}`, type: "visit", source_id: record.id,
+        pet_id: record.pet_id, pet_name: pet.name, title: record.title, detail: null,
+        date: "2026-10-22", time: "11:30:00", status: record.status,
+      })));
+    }
     throw new Error(`Unexpected request ${url}`);
   });
   await health.saveHealth(1, "visits", visit);
   let result = await health.loadCalendar("2026-10-01", "2026-11-11");
   assert.equal(result.events.length, 1);
+  assert.equal(result.events[0].completed, false);
+  assert.equal(result.events[0].date, "2026-10-22");
+  assert.equal(result.events[0].time, "11:30");
   const href = events.healthEventHref(result.events[0]);
   assert.equal(href, "/pet/1/health/visits#health-visit-7");
-  const schedule = requests.find((url) => url.pathname.endsWith("/medications/schedule"));
-  assert.equal(schedule.searchParams.get("from"), "2026-10-01");
-  assert.equal(schedule.searchParams.get("to"), "2026-11-11");
+  const calendar = requests.find((url) => url.pathname === "/api/v1/calendar/events");
+  assert.equal(calendar.searchParams.get("from"), "2026-10-01");
+  assert.equal(calendar.searchParams.get("to"), "2026-11-11");
+  assert.equal(calendar.searchParams.get("tz"), health.timezone());
+  assert.equal(calendar.searchParams.has("pet_id"), false);
   await health.saveHealth(1, "visits/7", { status: "completed" }, "PATCH");
   result = await health.loadCalendar("2026-10-01", "2026-11-11");
   assert.equal(result.events[0].completed, true);
+  assert.equal(result.events[0].view, "history");
   assert.equal(events.healthEventHref(result.events[0]), "/pet/1/health/visits#health-visit-7");
   await health.saveHealth(1, "visits/7", { status: "cancelled" }, "PATCH");
   result = await health.loadCalendar("2026-10-01", "2026-11-11");
   assert.equal(result.events.length, 0);
+});
+
+test("единый API календаря получает активного питомца и сохраняет даты, время и ссылки событий", async () => {
+  const records = [
+    { id: "vaccination-2", type: "vaccination", source_id: 2, title: "Прививка", date: "2027-01-01", time: null, status: "done" },
+    { id: "dose-3-20270101T0015", type: "medication", source_id: 3, title: "Лекарство", date: "2027-01-01", time: "00:15:00", status: "taken" },
+    { id: "dose-3-20270101T1200", type: "medication", source_id: 3, title: "Лекарство", date: "2027-01-01", time: "12:00:00", status: "skipped" },
+    { id: "parasite-5", type: "parasite", source_id: 5, title: "Обработка", date: "2027-01-02", time: null, status: "planned" },
+    { id: "birthday-1-2027", type: "birthday", source_id: 1, title: "День рождения", date: "2027-01-03", time: null, status: "planned" },
+  ];
+  const { events, health } = clientModules(async (url, init) => {
+    assert.equal(init.headers.get("Authorization"), "Bearer test-token");
+    if (url === "/api/v1/pets/") return Response.json([pet]);
+    const parsed = new URL(url, "http://test.local");
+    assert.equal(parsed.pathname, "/api/v1/calendar/events");
+    assert.equal(parsed.searchParams.get("pet_id"), "1");
+    assert.equal(parsed.searchParams.get("from"), "2027-01-01");
+    assert.equal(parsed.searchParams.get("to"), "2027-01-31");
+    assert.equal(parsed.searchParams.get("tz"), health.timezone());
+    return Response.json(records.map((record) => ({ ...record, pet_id: pet.id, pet_name: pet.name, detail: null })));
+  });
+  const result = await health.loadCalendar("2027-01-01", "2027-01-31", pet.id);
+  assert.equal(result.petId, pet.id);
+  assert.equal(result.range, "2027-01-01/2027-01-31");
+  assert.deepEqual(result.events.map((event) => [event.kind, event.date, event.time, event.completed, event.view]), [
+    ["vaccine", "2027-01-01", "", true, "history"],
+    ["medicine", "2027-01-01", "00:15", true, "plan"],
+    ["parasite", "2027-01-02", "", false, "plan"],
+    ["birthday", "2027-01-03", "", false, "plan"],
+  ]);
+  assert.deepEqual(result.events.map(events.healthEventHref), [
+    "/pet/1/health/vaccines#health-vaccine-2",
+    "/pet/1/health/medicines#health-medicine-3",
+    "/pet/1/health/parasites#health-parasite-5",
+    "/pet/1",
+  ]);
 });
 
 test("дата прививки и локальное время лекарства не сдвигаются; пропущенная доза скрыта", () => {
