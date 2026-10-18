@@ -3,12 +3,13 @@ import { getPet } from "@/lib/pets";
 
 export const healthSections = {
   vaccines: { title: "Прививки", resource: "vaccinations" },
+  parasites: { title: "Обработки", resource: "parasites" },
   visits: { title: "Приёмы", resource: "visits" },
   medicines: { title: "Лекарства", resource: "medications" },
   symptoms: { title: "Симптомы", resource: "symptoms" },
 } as const;
 export type HealthSection = keyof typeof healthSections;
-export type Vaccine = { id: number; name: string; scheduled_on: string; status: "planned" | "done"; clinic: string | null; notes: string | null };
+export type Vaccine = { id: number; name: string; scheduled_on: string; status: "planned" | "done"; clinic: string | null; notes: string | null; interval_days: number | null; next_due_on: string | null };
 export type Visit = {
   id: number; title: string; visit_at: string; status: "planned" | "completed" | "cancelled";
   reason: "illness" | "examination" | "vaccination" | "checkup"; topic: string | null;
@@ -16,14 +17,25 @@ export type Visit = {
 };
 export type Medication = { id: number; name: string; dose: string; start_date: string; end_date: string | null; interval_days: number; times: string[]; notes: string | null };
 export type Symptom = { id: number; description: string; observed_at: string };
+export type ParasiteKind = "internal" | "external";
+export type ParasiteTreatment = {
+  id: number; pet_id: number; kind: ParasiteKind; product_name: string;
+  treated_on: string; interval_days: number | null; next_due_on: string | null;
+  clinic: string | null; notes: string | null; created_at: string;
+};
 export type Allergy = { id: number; allergen: string; reactions: string | null; notes: string | null; created_at: string };
 export type Dose = { medication_id: number; name: string; dose: string; scheduled_for: string; status: "pending" | "taken" | "skipped" };
-export type ResourceMap = { vaccinations: Vaccine; visits: Visit; medications: Medication; symptoms: Symptom; allergies: Allergy };
+export type ResourceMap = { vaccinations: Vaccine; visits: Visit; medications: Medication; symptoms: Symptom; allergies: Allergy; parasites: ParasiteTreatment };
 export type HealthResource = keyof ResourceMap;
 export type HealthRecord = { [R in HealthResource]: { resource: R; value: ResourceMap[R] } }[HealthResource];
 export type HealthSectionData = Awaited<ReturnType<typeof loadHealthSection>>;
-export type HealthOverview = { planned_visits: Visit[]; planned_vaccinations: Vaccine[]; symptoms_total: number };
+export type HealthOverview = { planned_visits: Visit[]; planned_vaccinations: Vaccine[]; symptoms_total: number; next_vaccination: Vaccine | null; next_parasite: ParasiteTreatment | null };
 export const healthPath = (petId: number, path: string) => `/api/v1/pets/${petId}/${path}`;
+// URL-сегмент для каждого ресурса: у обработок он отличается от ключа ("parasites" → "parasite-treatments").
+export const healthEndpoints: Record<HealthResource, string> = {
+  vaccinations: "vaccinations", visits: "visits", medications: "medications",
+  symptoms: "symptoms", allergies: "allergies", parasites: "parasite-treatments",
+};
 export const localTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 export function dateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -37,8 +49,16 @@ export function formatHealthDate(value: string, time = false) {
     day: "numeric", month: "long", year: "numeric", ...(time ? { hour: "2-digit", minute: "2-digit" } : {}),
   });
 }
+const DAY_MS = 24 * 60 * 60 * 1000;
+export function dueBadge(next: string | null, today: string): string | null {
+  if (!next) return null;
+  const days = Math.round((new Date(`${next}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / DAY_MS);
+  if (days < 0) return `просрочено ${-days} дн.`;
+  if (days === 0) return "сегодня";
+  return `через ${days} дн.`;
+}
 export async function listHealthRecords<R extends HealthResource>(petId: number, resource: R) {
-  return apiFetch<ResourceMap[R][]>(healthPath(petId, resource), { auth: true });
+  return apiFetch<ResourceMap[R][]>(healthPath(petId, healthEndpoints[resource]), { auth: true });
 }
 export async function loadHealthDashboard(petId: number) {
   const [pet, overview] = await Promise.all([
@@ -63,10 +83,10 @@ export async function loadHealthSection(petId: number, section: HealthSection) {
   return { pet, section, records, doses, today, now: now.toISOString() };
 }
 export function saveHealthRecord(petId: number, resource: HealthResource, body: unknown, id?: number) {
-  return apiFetch(healthPath(petId, `${resource}${id === undefined ? "" : `/${id}`}`), { method: id === undefined ? "POST" : "PATCH", body, auth: true });
+  return apiFetch(healthPath(petId, `${healthEndpoints[resource]}${id === undefined ? "" : `/${id}`}`), { method: id === undefined ? "POST" : "PATCH", body, auth: true });
 }
 export function deleteHealthRecord(petId: number, record: HealthRecord) {
-  return apiFetch<void>(healthPath(petId, `${record.resource}/${record.value.id}`), { method: "DELETE", auth: true });
+  return apiFetch<void>(healthPath(petId, `${healthEndpoints[record.resource]}/${record.value.id}`), { method: "DELETE", auth: true });
 }
 export function markHealthDose(petId: number, dose: Dose, status: "taken" | "skipped") {
   return apiFetch(healthPath(petId, `medications/${dose.medication_id}/intakes?tz=${encodeURIComponent(localTimezone())}`), {
@@ -81,6 +101,7 @@ export function recordTitle(record: HealthRecord) {
     case "visits": return record.value.title;
     case "symptoms": return record.value.description;
     case "allergies": return record.value.allergen;
+    case "parasites": return record.value.product_name;
     default: return record.value.name;
   }
 }
@@ -91,6 +112,7 @@ export function recordDate(record: HealthRecord) {
     case "medications": return record.value.start_date;
     case "symptoms": return record.value.observed_at;
     case "allergies": return record.value.created_at;
+    case "parasites": return record.value.treated_on;
   }
 }
 export function recordIsHistory(record: HealthRecord, today: string) {
@@ -98,6 +120,7 @@ export function recordIsHistory(record: HealthRecord, today: string) {
     case "visits": return record.value.status !== "planned";
     case "vaccinations": return record.value.status === "done";
     case "medications": return record.value.end_date !== null && record.value.end_date < today;
+    case "parasites": return true;
     default: return false;
   }
 }

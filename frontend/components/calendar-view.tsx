@@ -13,6 +13,7 @@ export const kindColor: Record<EventKind, string> = {
   visit: "bg-emerald-600",
   vaccine: "bg-sky-500",
   medicine: "bg-violet-500",
+  parasite: "bg-amber-500",
 };
 
 export type DayMarker = {
