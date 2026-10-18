@@ -8,8 +8,8 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 from app.api.v1 import vet_documents
-from app.core.sage_logging import SageMultilineHandler
 from app.core.log import JsonFormatter, TextFormatter, mask_path, start_request_context
+from app.core.sage_logging import SageMultilineHandler
 from app.integrations.llm.vet_document_analyzer import analyze_veterinary_document
 from app.main import app
 from tests.health_helpers import PASSWORD, auth_headers, create_pet, pet_url
