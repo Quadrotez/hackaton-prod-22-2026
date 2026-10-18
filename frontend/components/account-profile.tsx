@@ -3,7 +3,11 @@
 import { useCallback, useState, type FormEvent, type KeyboardEvent } from "react";
 import {
   CalendarCheckIcon,
+  CalendarSyncIcon,
   CheckIcon,
+  CopyIcon,
+  DownloadIcon,
+  LinkIcon,
   LockIcon,
   LogOutIcon,
   MailIcon,
@@ -18,7 +22,15 @@ import { useProtectedData, useRequireAuth } from "@/hooks/use-auth";
 import { getErrorMessage } from "@/lib/api";
 import { getMe, updateMe, updatePassword, uploadAvatar, type UserPublic } from "@/lib/auth";
 import { listPets, pluralize } from "@/lib/pets";
-import { Button } from "@/components/ui/button";
+import {
+  createCalendarFeed,
+  deleteCalendarFeed,
+  downloadCalendarFile,
+  feedUrls,
+  getCalendarFeed,
+} from "@/lib/calendar-feed";
+import { cn } from "@/lib/utils";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
@@ -26,7 +38,6 @@ import { PageHeader } from "@/components/page-header";
 import { PageError, PageLoading } from "@/components/page-state";
 import { PhotoUploadButton } from "@/components/photo-upload-button";
 import { UserAvatar } from "@/components/user-avatar";
-import Image from "next/image";
 import { clearAccessToken } from "@/lib/session";
 import { useRouter } from "next/navigation";
 
@@ -324,24 +335,144 @@ function PasswordChangeCard() {
   );
 }
 
-function GoogleCalendarCard() {
+function CalendarFeedCard() {
+  const { handleAuthError } = useRequireAuth();
+  const load = useCallback(() => getCalendarFeed(), []);
+  const state = useProtectedData(load, "Не удалось загрузить настройки календаря");
+  // Ссылка приходит только в ответе на создание: бэкенд хранит лишь хеш токена.
+  const [link, setLink] = useState<string | null>(null);
+  const [pending, setPending] = useState<"create" | "delete" | "download" | null>(null);
+
+  async function run(action: NonNullable<typeof pending>, task: () => Promise<void>, fallback: string) {
+    setPending(action);
+    try {
+      await task();
+    } catch (err) {
+      if (!handleAuthError(err)) toast.error(getErrorMessage(err, fallback));
+    } finally {
+      setPending(null);
+    }
+  }
+
+  const create = () =>
+    run("create", async () => {
+      const feed = await createCalendarFeed();
+      setLink(feed.path);
+      if (state.status === "ready") state.update(feed);
+    }, "Не удалось создать ссылку. Попробуйте ещё раз");
+
+  const remove = () =>
+    run("delete", async () => {
+      await deleteCalendarFeed();
+      setLink(null);
+      if (state.status === "ready") state.update({ active: false, timezone: null, created_at: null });
+      toast.success("Подписка отключена");
+    }, "Не удалось отключить подписку. Попробуйте ещё раз");
+
+  const download = () =>
+    run("download", downloadCalendarFile, "Не удалось скачать календарь. Попробуйте ещё раз");
+
+  const active = state.status === "ready" && state.data.active;
+
   return (
     <Card className="flex flex-col gap-4">
-      <div className="flex items-start gap-4">
-        <div className="">
-          <Image src="/google_calendar.webp" width={32} height={32} alt="Google Calendar" />
-        </div>
+      <div className="flex items-start gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary">
+          <CalendarSyncIcon aria-hidden="true" className="size-4" strokeWidth={1.75} />
+        </span>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h2>Google Календарь</h2>
+          <h2>Календарь на телефоне</h2>
           <p className="text-sm text-muted-foreground">
-            Кормления, прививки и визиты к ветеринару появятся в вашем календаре с напоминаниями
+            Визиты, прививки, обработки от паразитов и приёмы лекарств — в Google, Apple или Outlook
+            Календаре. Подключается по ссылке-подписке, входить в Google не нужно.
           </p>
         </div>
       </div>
-      <Button type="button" variant="outline" disabled className="h-9 w-full">
-        Подключить Google Календарь
-      </Button>
+
+      {state.status === "loading" && <Spinner />}
+      {state.status === "error" && <p className="text-sm text-destructive">{state.error}</p>}
+
+      {link && <FeedLink path={link} />}
+
+      {active && !link && (
+        <p className="text-sm text-muted-foreground">
+          Подписка активна (с {formatDate(state.data.created_at!)}). Ссылка показывается один раз —
+          если потеряли, получите новую: старая перестанет работать.
+        </p>
+      )}
+
+      {state.status === "ready" && (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {!link && (
+            <Button type="button" onClick={create} disabled={pending !== null} className="h-9 sm:flex-1">
+              {pending === "create" ? <Spinner /> : <LinkIcon aria-hidden="true" />}
+              {active ? "Получить новую ссылку" : "Получить ссылку для подписки"}
+            </Button>
+          )}
+          <Button type="button" variant="outline" onClick={download} disabled={pending !== null} className="h-9 sm:flex-1">
+            {pending === "download" ? <Spinner /> : <DownloadIcon aria-hidden="true" />}
+            Скачать .ics
+          </Button>
+          {active && (
+            <Button type="button" variant="destructive" onClick={remove} disabled={pending !== null} className="h-9">
+              {pending === "delete" && <Spinner />}
+              Отключить
+            </Button>
+          )}
+        </div>
+      )}
     </Card>
+  );
+}
+
+function FeedLink({ path }: { path: string }) {
+  const { https, webcal } = feedUrls(path);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(https);
+      toast.success("Ссылка скопирована");
+    } catch {
+      toast.error("Не удалось скопировать. Выделите ссылку и скопируйте вручную");
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="calendar-feed-url" className="text-xs text-muted-foreground">
+          Ссылка для подписки — сохраните её, повторно она не покажется
+        </label>
+        <div className="flex gap-2">
+          <Input
+            id="calendar-feed-url"
+            readOnly
+            value={https}
+            onFocus={(event) => event.currentTarget.select()}
+            className="h-9 min-w-0 flex-1 text-sm"
+          />
+          <Button type="button" variant="secondary" size="icon-lg" onClick={copy} aria-label="Скопировать ссылку">
+            <CopyIcon aria-hidden="true" />
+          </Button>
+        </div>
+      </div>
+      <a href={webcal} className={cn(buttonVariants({ variant: "outline" }), "h-9")}>
+        Открыть в Apple Календаре
+      </a>
+      <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-muted-foreground">
+        <li>
+          <b className="font-medium text-foreground">Google:</b> calendar.google.com → «Другие календари» → «+» →
+          «Добавить по URL». Google обновляет подписку раз в несколько часов и не показывает её напоминания.
+        </li>
+        <li>
+          <b className="font-medium text-foreground">iPhone и Mac:</b> кнопка выше. Чтобы приходили напоминания,
+          выключите «Удалять оповещения» при добавлении.
+        </li>
+        <li>
+          <b className="font-medium text-foreground">Outlook:</b> «Добавить календарь» → «Подписаться из Интернета».
+        </li>
+      </ul>
+    </div>
   );
 }
 
@@ -367,7 +498,7 @@ export function AccountProfile() {
       <ProfileHero user={user} petCount={pets?.length ?? null} onUserChange={handleUserChange} />
       <AccountDetails user={user} />
       <PasswordChangeCard />
-      <GoogleCalendarCard />
+      <CalendarFeedCard />
       <Button variant="secondary" className="theme-shadcn" onClick={() => handleLogout()}><LogOutIcon />Выйти</Button>
     </>
   );
