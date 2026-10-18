@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import DateChooser from "@/components/date-choose";
 import { toDateKey, type CalendarEvent } from "@/lib/health-events";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,7 @@ export const kindColor: Record<EventKind, string> = {
   vaccine: "bg-sky-500",
   medicine: "bg-violet-500",
   parasite: "bg-amber-500",
+  birthday: "bg-rose-500",
 };
 
 export type DayMarker = {
@@ -35,6 +37,8 @@ type CalendarGridProps = {
   onSelectKey: (key: string) => void;
   markers: Map<string, DayMarker>;
   busy?: boolean;
+  // Кнопка действия, которая выводится в одной строке с переключением месяца.
+  action?: ReactNode;
 };
 
 export function CalendarGrid({
@@ -46,10 +50,14 @@ export function CalendarGrid({
   onSelectKey,
   markers,
   busy,
+  action,
 }: CalendarGridProps) {
   return (
     <section aria-label="Календарь" aria-busy={busy} className="flex min-w-0 flex-col gap-4">
-      <DateChooser month={month} onMonthChange={onMonthChange} />
+      <div className="flex items-center justify-center gap-3">
+        <DateChooser month={month} onMonthChange={onMonthChange} />
+        {action}
+      </div>
       <div className="min-w-0 rounded-2xl border bg-card p-2 sm:p-4">
         <div className="mb-2 grid grid-cols-7 gap-1 sm:gap-2" aria-hidden="true">
           {weekdays.map((day) => (

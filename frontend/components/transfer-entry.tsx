@@ -33,7 +33,7 @@ export function TransferEntry({ transfer, children }: { transfer: PetTransfer; c
           </span>
         </div>
       </div>
-      {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
+      {children && <div className="flex flex-wrap items-center gap-2 empty:hidden">{children}</div>}
     </li>
   );
 }

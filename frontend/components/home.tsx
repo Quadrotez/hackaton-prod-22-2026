@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
-import { ArrowRightIcon, PlusIcon } from "lucide-react";
+import { ArrowRightIcon } from "lucide-react";
 import { CalendarGrid, kindColor, monthGrid, type DayMarker } from "@/components/calendar-view";
+import { useActivePet } from "@/components/active-pet-provider";
 import { PetAvatar } from "@/components/pet-avatar";
 import { PageError } from "@/components/page-state";
 import { useProtectedData } from "@/hooks/use-auth";
@@ -13,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { pluralize, type Pet } from "@/lib/pets";
 import { listIncomingTransfers, listOutgoingTransfers } from "@/lib/transfers";
 import { Card } from "@/components/ui/card";
+import { QuickAddMenu } from "@/components/quick-add-menu";
 
 const EMPTY_EVENTS: CalendarEvent[] = [];
 
@@ -25,11 +27,8 @@ const kindLabels: Record<CalendarEvent["kind"], string> = {
   vaccine: "Прививка",
   medicine: "Лекарство",
   parasite: "Обработка",
+  birthday: "День рождения",
 };
-
-function SectionTitle({ id, children }: { id: string; children: React.ReactNode }) {
-  return <h2 id={id}>{children}</h2>;
-}
 
 function EventRow({ event, pet, showDate }: { event: CalendarEvent; pet?: Pet; showDate?: boolean }) {
   return (
@@ -65,6 +64,7 @@ function EventRow({ event, pet, showDate }: { event: CalendarEvent; pet?: Pet; s
 }
 
 export function HomeDashboard({ pets }: { pets: Pet[] }) {
+  const { activePet } = useActivePet();
   const [today] = useState(() => new Date());
   const todayKey = toDateKey(today);
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
@@ -87,8 +87,8 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
     calendar.status === "loading" || (calendar.status === "ready" && calendar.data.range !== `${from}/${to}`);
   const loadedEvents = calendar.status === "ready" ? calendar.data.events : undefined;
   const events = useMemo(
-    () => (loadedEvents && !loading ? loadedEvents : EMPTY_EVENTS),
-    [loadedEvents, loading],
+    () => (loadedEvents && !loading ? loadedEvents.filter((event) => event.petId === activePet?.id) : EMPTY_EVENTS),
+    [loadedEvents, loading, activePet?.id],
   );
 
   const petsByName = useMemo(() => new Map(pets.map((p) => [p.name, p])), [pets]);
@@ -110,43 +110,6 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
 
   return (
     <div className="mx-auto flex w-full max-w-[30rem] flex-col gap-8">
-      <section aria-labelledby="pets-title" className="flex flex-col gap-3">
-        <SectionTitle id="pets-title">Питомцы</SectionTitle>
-        <ul
-          aria-labelledby="pets-title"
-          className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {pets.map((pet) => (
-            <li key={pet.id} className="shrink-0">
-              <Link
-                href={`/pet/${pet.id}`}
-                className="group flex w-20 flex-col items-center gap-1.5 outline-none"
-              >
-                <PetAvatar
-                  pet={pet}
-                  size="md"
-                  className="bg-white group-focus-visible:ring-2 group-focus-visible:ring-foreground group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background"
-                />
-                <span className="w-full truncate text-center text-sm font-medium text-foreground">{pet.name}</span>
-              </Link>
-            </li>
-          ))}
-          <li className="shrink-0">
-            <Link
-              href="/pet/create"
-              className="group flex w-20 flex-col items-center gap-1.5 outline-none"
-            >
-              <span className="flex size-16 items-center justify-center rounded-full border border-dashed border-zinc-600 text-zinc-600 transition group-hover:border-foreground group-hover:text-foreground group-focus-visible:border-solid group-focus-visible:border-foreground group-focus-visible:text-foreground group-focus-visible:ring-2 group-focus-visible:ring-foreground group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background group-active:scale-95 motion-reduce:transition-none motion-reduce:group-active:scale-100">
-                <PlusIcon aria-hidden="true" className="size-6" />
-              </span>
-              <span className="w-full truncate text-center text-sm text-zinc-600 transition-colors group-hover:text-foreground group-focus-visible:text-foreground">
-                Добавить
-              </span>
-            </Link>
-          </li>
-        </ul>
-      </section>
-
       {answersNeeded > 0 && (
         <Link
           href="/transfers"
@@ -177,6 +140,7 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
         onSelectKey={setSelectedKey}
         markers={markers}
         busy={loading}
+        action={<QuickAddMenu pets={activePet ? [activePet] : []} />}
       />
 
       {calendar.status === "error" && <PageError message={calendar.error} onRetry={calendar.retry} />}

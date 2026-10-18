@@ -114,3 +114,34 @@ test("обработка без даты следующей процедуры �
   const treatment = { id: 6, pet_id: 1, kind: "internal", product_name: "Мильбемакс", treated_on: "2026-10-01", interval_days: null, next_due_on: null, clinic: null, notes: null };
   assert.equal(events.calendarEvents(pet, [], [], [], [treatment]).length, 0);
 });
+
+test("день рождения: событие каждый год в периоде с возрастом и ссылкой на карточку питомца", () => {
+  const { events } = clientModules();
+  const barsik = { ...pet, birth_date: "2023-03-12" };
+  const range = { from: "2026-03-01", to: "2027-03-31", today: "2026-10-18" };
+  const result = events.calendarEvents(barsik, [], [], [], [], range);
+  assert.deepEqual(result.map((event) => [event.kind, event.date, event.title, event.time, event.completed]), [
+    ["birthday", "2026-03-12", "День рождения, 3 года", "", true],
+    ["birthday", "2027-03-12", "День рождения, 4 года", "", false],
+  ]);
+  assert.equal(events.healthEventHref(result[1]), "/pet/1");
+  assert.notEqual(result[0].key, result[1].key);
+});
+
+test("день рождения: нет даты или нет периода — нет событий; первое через год после рождения", () => {
+  const { events } = clientModules();
+  const range = { from: "2026-01-01", to: "2026-12-31", today: "2026-10-18" };
+  assert.equal(events.calendarEvents({ ...pet, birth_date: null }, [], [], [], [], range).length, 0);
+  assert.equal(events.calendarEvents({ ...pet, birth_date: "2023-03-12" }, [], [], [], []).length, 0);
+  assert.equal(events.calendarEvents({ ...pet, birth_date: "2026-03-12" }, [], [], [], [], range).length, 0);
+});
+
+test("день рождения 29 февраля в невисокосный год — 28 февраля; склонение возраста", () => {
+  const { events } = clientModules();
+  const leap = { ...pet, birth_date: "2020-02-29" };
+  const dates = (from, to) => events.calendarEvents(leap, [], [], [], [], { from, to, today: from }).map((event) => [event.date, event.title]);
+  assert.deepEqual(dates("2023-01-01", "2023-12-31"), [["2023-02-28", "День рождения, 3 года"]]);
+  assert.deepEqual(dates("2024-01-01", "2024-12-31"), [["2024-02-29", "День рождения, 4 года"]]);
+  assert.deepEqual(dates("2025-01-01", "2025-12-31"), [["2025-02-28", "День рождения, 5 лет"]]);
+  assert.deepEqual(dates("2041-01-01", "2041-12-31"), [["2041-02-28", "День рождения, 21 год"]]);
+});

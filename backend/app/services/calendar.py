@@ -1,5 +1,5 @@
-"""Calendar of all pets of a user, assembled on read from health records:
-vet visits, vaccinations and medication doses (flea treatments are medications too)."""
+"""Calendar of all pets of a user, assembled on read: vet visits, vaccinations, parasite
+treatments, medication doses and yearly birthdays."""
 
 from collections.abc import Collection
 from datetime import UTC, date, datetime, time, timedelta
@@ -17,6 +17,7 @@ from app.models.health import (
 )
 from app.models.pet import Pet
 from app.schemas.calendar import CalendarEvent, CalendarEventType
+from app.services.birthdays import birthday_events
 from app.services.health.common import local_now, local_today
 from app.services.health.schedule import build_schedule
 from app.services.health.visits import is_date_only
@@ -161,6 +162,9 @@ async def collect_events(
                         source_id=dose.medication_id,
                     )
                 )
+
+    if CalendarEventType.BIRTHDAY in types:
+        events += birthday_events(pets, start, end, local_today(tz))
 
     # All-day events first within a day, then by time.
     return sorted(

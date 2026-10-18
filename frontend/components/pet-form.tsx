@@ -363,7 +363,7 @@ export function PetForm({ pet }: { pet?: Pet }) {
                     aria-describedby={errors.breed ? "pet-breed-hint pet-breed-error" : "pet-breed-hint"}
                   />
                   <ComboboxContent>
-                    <ComboboxEmpty>Нет подходящих вариантов. Введённая порода сохранится.</ComboboxEmpty>
+                    <ComboboxEmpty>Сохранится ваш вариант</ComboboxEmpty>
                     <ComboboxList>
                       {(item: string) => (
                         <ComboboxItem key={item} value={item}>{item}</ComboboxItem>
