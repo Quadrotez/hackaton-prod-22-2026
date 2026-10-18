@@ -10,6 +10,7 @@ import json
 import logging
 import logging.config
 import re
+import socket
 from contextvars import ContextVar
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -84,8 +85,13 @@ def _extra_fields(record: logging.LogRecord) -> dict[str, Any]:
     }
 
 
+# Sage rejects `WARNING`: its accepted level set is ERROR, DEBUG, CRITICAL, FATAL,
+# EMERGENCY, INFO, IMPORTANT, WARN, TRACE. Everything else already matches.
+_SAGE_LEVELS = {"WARNING": "WARN"}
+
+
 class JsonFormatter(logging.Formatter):
-    def format(self, record: logging.LogRecord) -> str:
+    def entry(self, record: logging.LogRecord) -> dict[str, Any]:
         entry: dict[str, Any] = {
             "ts": datetime.fromtimestamp(record.created, UTC).isoformat(timespec="milliseconds"),
             "level": record.levelname,
@@ -98,7 +104,34 @@ class JsonFormatter(logging.Formatter):
         entry.update(_extra_fields(record))
         if record.exc_info:
             entry["exc"] = self.formatException(record.exc_info)
-        return json.dumps(entry, ensure_ascii=False, default=str)
+        return entry
+
+    def format(self, record: logging.LogRecord) -> str:
+        return json.dumps(self.entry(record), ensure_ascii=False, default=str)
+
+
+class SageJsonFormatter(JsonFormatter):
+    """Sage-compatible JSON.
+
+    Sage validates every record and requires the fields ``env``, ``system`` and
+    ``inst`` plus an ``@timestamp`` no more than a minute in the future; records
+    that fail validation land in the ``dead-letters`` index. It also spells the
+    warning level ``WARN``.
+    """
+
+    def __init__(self, env: str, system: str, inst: str) -> None:
+        super().__init__()
+        self._required = {"env": env, "system": system, "inst": inst}
+
+    def entry(self, record: logging.LogRecord) -> dict[str, Any]:
+        entry = super().entry(record)
+        entry.pop("ts", None)
+        entry["@timestamp"] = datetime.fromtimestamp(record.created, UTC).isoformat(
+            timespec="milliseconds"
+        )
+        entry["level"] = _SAGE_LEVELS.get(record.levelname, record.levelname)
+        # Sage requires these on every record; keep them first for readability.
+        return {**self._required, **entry}
 
 
 class TextFormatter(logging.Formatter):
@@ -126,6 +159,9 @@ def configure_logging(
     sage_url: str | None = None,
     sage_token: str | None = None,
     sage_timeout: float = 5.0,
+    sage_env: str = "prod",
+    sage_system: str = "petcare",
+    sage_inst: str | None = None,
 ) -> None:
     _install_record_factory()
     formatter = JsonFormatter if fmt == "json" else TextFormatter
@@ -136,7 +172,12 @@ def configure_logging(
             "formatter": "default",
         }
     }
-    sage_handler = build_sage_handler(sage_url, sage_token, sage_timeout, formatter)
+    sage_handler = build_sage_handler(
+        sage_url,
+        sage_token,
+        sage_timeout,
+        SageJsonFormatter(sage_env, sage_system, sage_inst or socket.gethostname()),
+    )
     if sage_handler is not None:
         handlers["sage"] = {
             "()": lambda: sage_handler,
