@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PlusIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useProtectedData, useRequireAuth } from "@/hooks/use-auth";
@@ -31,7 +32,14 @@ function HealthSectionContent({ data, onUpdate }: { data: HealthSectionData; onU
   const [filter, setFilter] = useState(section === "symptoms" || section === "parasites" ? "all" : "plan");
   const [pending, setPending] = useState(false);
   const [refreshError, setRefreshError] = useState(false);
-  const [form, setForm] = useState<{ resource: HealthResource; record?: HealthRecord } | null>(null);
+  // ?add=1 приходит с быстрых ссылок на главной: сразу открываем форму новой записи.
+  const searchParams = useSearchParams();
+  const [form, setForm] = useState<{ resource: HealthResource; record?: HealthRecord } | null>(() =>
+    searchParams.has("add") ? { resource: config.resource } : null,
+  );
+  useEffect(() => {
+    if (searchParams.has("add")) window.history.replaceState(null, "", window.location.pathname);
+  }, [searchParams]);
   const [deleting, setDeleting] = useState<HealthRecord | null>(null);
   const resource = section === "symptoms" && filter === "allergies" ? "allergies" : config.resource;
   const ownRecords = data.records.filter((record) => record.resource === resource);

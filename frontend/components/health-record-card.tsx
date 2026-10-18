@@ -25,9 +25,9 @@ export function HealthRecordCard({ record, today, pending, onEdit, onDelete, onC
     {record.resource === "medications" && <div className="space-y-1 break-words text-sm"><p className="font-semibold">{record.value.dose}</p><p><span className="font-semibold">Время:</span> {record.value.times.map((time) => time.slice(0, 5)).join(", ")}</p><p>{record.value.interval_days === 1 ? "Ежедневно" : `Каждые ${record.value.interval_days} дн.`}{record.value.end_date ? ` · до ${formatHealthDate(record.value.end_date)}` : " · без даты окончания"}</p>{record.value.notes && <p className="text-muted-foreground">{record.value.notes}</p>}</div>}
     {record.resource === "allergies" && <div className="space-y-1 break-words text-sm">{record.value.reactions && <p><span className="font-semibold">Реакция:</span> {record.value.reactions}</p>}{record.value.notes && <p className="text-muted-foreground">{record.value.notes}</p>}</div>}
     <div className="flex flex-wrap items-center gap-2 border-t pt-3">
-      {canComplete && <Button type="button" variant="secondary" className="theme-shadcn" disabled={pending} onClick={onComplete}><CheckIcon aria-hidden="true" />{record.resource === "visits" ? "Приём состоялся" : "Прививка сделана"}</Button>}
-      <Button type="button" variant="secondary" className="theme-shadcn" size="sm" disabled={pending} onClick={onEdit}><PencilIcon aria-hidden="true" />Изменить</Button>
-      <Button type="button" variant="secondary" className="theme-shadcn ml-auto" size="icon" disabled={pending} onClick={onDelete} aria-label={`Удалить: ${recordTitle(record)}`}><Trash2Icon aria-hidden="true" /></Button>
+      {canComplete && <Button type="button" variant="secondary" className="" disabled={pending} onClick={onComplete}><CheckIcon aria-hidden="true" />{record.resource === "visits" ? "Приём состоялся" : "Прививка сделана"}</Button>}
+      <Button type="button" variant="secondary" className="" size="sm" disabled={pending} onClick={onEdit}><PencilIcon aria-hidden="true" />Изменить</Button>
+      <Button type="button" variant="secondary" className=" ml-auto" size="icon" disabled={pending} onClick={onDelete} aria-label={`Удалить: ${recordTitle(record)}`}><Trash2Icon aria-hidden="true" /></Button>
     </div>
   </Card>;
 }
