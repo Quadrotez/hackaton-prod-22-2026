@@ -9,8 +9,10 @@ const date = z.string().refine((value) => {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }, "Укажите корректную дату");
 const datetime = z.string().refine((value) => value.length > 0 && !Number.isNaN(new Date(value).getTime()), "Укажите дату и время").transform((value) => new Date(value).toISOString());
+const optionalIntervalDays = z.union([z.coerce.number().int("Введите целое число дней").min(1, "Минимум один день").max(365, "Не больше 365 дней"), z.literal("")]).optional().transform((value) => (typeof value === "number" ? value : null));
+const optionalDate = z.union([date, z.literal("")]).optional().transform((value) => (value ? value : null));
 export const healthSchemas = {
-  vaccinations: z.object({ name: requiredText(255), scheduled_on: date, status: z.enum(["planned", "done"]), clinic: optionalText(255), notes: optionalText(2000) }),
+  vaccinations: z.object({ name: requiredText(255), scheduled_on: date, status: z.enum(["planned", "done"]), clinic: optionalText(255), notes: optionalText(2000), interval_days: optionalIntervalDays, next_due_on: optionalDate }),
   visits: z.object({
     title: requiredText(255), visit_at: datetime, reason: z.enum(["illness", "examination", "vaccination", "checkup"]),
     status: z.enum(["planned", "completed", "cancelled"]), doctor_name: optionalText(255), doctor_specialty: optionalText(255),
@@ -25,6 +27,15 @@ export const healthSchemas = {
   }).refine((data) => !data.end_date || data.end_date >= data.start_date, { path: ["end_date"], message: "Конец курса не может быть раньше начала" }),
   symptoms: z.object({ description: requiredText(2000), observed_at: datetime }),
   allergies: z.object({ allergen: requiredText(255), reactions: optionalText(2000), notes: optionalText(2000) }),
+  parasites: z.object({
+    kind: z.enum(["internal", "external"]),
+    product_name: requiredText(255),
+    treated_on: date,
+    interval_days: optionalIntervalDays,
+    next_due_on: optionalDate,
+    clinic: optionalText(255),
+    notes: optionalText(2000),
+  }),
 };
 export type HealthField = {
   name: string; label: string; type?: "date" | "datetime-local" | "number" | "textarea";
@@ -35,6 +46,8 @@ export const healthFields: Record<HealthResource, HealthField[]> = {
   vaccinations: [
     { name: "name", label: "Название прививки", required: true, maxLength: 255 },
     { name: "scheduled_on", label: "Дата", type: "date", required: true },
+    { name: "interval_days", label: "Интервал повторения, дней", type: "number", min: 1, max: 365 },
+    { name: "next_due_on", label: "Следующая прививка", type: "date" },
     { name: "status", label: "Статус", options: [{ value: "planned", label: "Запланирована" }, { value: "done", label: "Сделана" }] },
     { name: "clinic", label: "Клиника", maxLength: 255 }, { name: "notes", label: "Примечание", type: "textarea", maxLength: 2000 },
   ],
@@ -56,9 +69,17 @@ export const healthFields: Record<HealthResource, HealthField[]> = {
   ],
   symptoms: [{ name: "description", label: "Что заметили у питомца", type: "textarea", required: true, maxLength: 2000 }, { name: "observed_at", label: "Когда заметили", type: "datetime-local", required: true }],
   allergies: [{ name: "allergen", label: "Аллерген", required: true, maxLength: 255 }, { name: "reactions", label: "Реакция", type: "textarea", maxLength: 2000 }, { name: "notes", label: "Примечание", type: "textarea", maxLength: 2000 }],
+  parasites: [
+    { name: "kind", label: "Вид обработки", options: [{ value: "external", label: "Наружные (блохи, клещи)" }, { value: "internal", label: "Внутренние паразиты" }] },
+    { name: "product_name", label: "Препарат", required: true, maxLength: 255, placeholder: "Например, Стронгхолд" },
+    { name: "treated_on", label: "Дата обработки", type: "date", required: true },
+    { name: "interval_days", label: "Интервал повторения, дней", type: "number", min: 1, max: 365 },
+    { name: "next_due_on", label: "Следующая обработка", type: "date" },
+    { name: "clinic", label: "Клиника", maxLength: 255 }, { name: "notes", label: "Примечание", type: "textarea", maxLength: 2000 },
+  ],
 };
 export function healthFormDefaults(data: HealthSectionData, resource: HealthResource, record?: HealthRecord, history = false): Record<string, string | number> {
-  const values: Record<string, string | number> = { scheduled_on: data.today, visit_at: `${data.today}T09:00`, start_date: data.today, interval_days: 1, times: "09:00", status: history ? resource === "vaccinations" ? "done" : "completed" : "planned", reason: "examination", observed_at: datetimeInput(data.now) };
+  const values: Record<string, string | number> = { scheduled_on: data.today, visit_at: `${data.today}T09:00`, start_date: data.today, treated_on: data.today, interval_days: resource === "medications" ? 1 : "", next_due_on: "", kind: "external", times: "09:00", status: history ? resource === "vaccinations" ? "done" : "completed" : "planned", reason: "examination", observed_at: datetimeInput(data.now) };
   if (record) for (const [key, value] of Object.entries(record.value)) {
     if (key === "visit_at" || key === "observed_at") values[key] = datetimeInput(String(value));
     else if (key === "times" && Array.isArray(value)) values[key] = value.map((time) => time.slice(0, 5)).join(", ");

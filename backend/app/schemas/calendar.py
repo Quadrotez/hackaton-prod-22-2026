@@ -10,6 +10,7 @@ class CalendarEventType(StrEnum):
     VISIT = "visit"
     VACCINATION = "vaccination"
     MEDICATION = "medication"
+    PARASITE = "parasite"
 
 
 class CalendarEvent(BaseModel):

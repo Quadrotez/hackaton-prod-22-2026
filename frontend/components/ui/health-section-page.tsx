@@ -28,7 +28,7 @@ function HealthSectionContent({ data, onUpdate }: { data: HealthSectionData; onU
   const { pet, section } = data;
   const config = healthSections[section];
   const { handleAuthError } = useRequireAuth();
-  const [filter, setFilter] = useState(section === "symptoms" ? "all" : "plan");
+  const [filter, setFilter] = useState(section === "symptoms" || section === "parasites" ? "all" : "plan");
   const [pending, setPending] = useState(false);
   const [refreshError, setRefreshError] = useState(false);
   const [form, setForm] = useState<{ resource: HealthResource; record?: HealthRecord } | null>(null);
@@ -38,10 +38,10 @@ function HealthSectionContent({ data, onUpdate }: { data: HealthSectionData; onU
   const past = ownRecords.filter((record) => recordIsHistory(record, data.today));
   const visible = ownRecords.filter((record) => filter === "history" ? recordIsHistory(record, data.today) : filter === "plan" ? !recordIsHistory(record, data.today) : true)
     .sort((first, second) => {
-      const order = section === "symptoms" || filter === "history" ? -1 : 1;
+      const order = section === "symptoms" || section === "parasites" || filter === "history" ? -1 : 1;
       return order * (new Date(recordDate(first)).getTime() - new Date(recordDate(second)).getTime()) || second.value.id - first.value.id;
     });
-  const filters = section === "symptoms" ? [{ value: "all", label: "Наблюдения" }, { value: "allergies", label: "Аллергии" }] : [{ value: "plan", label: "Актуальные" }, { value: "all", label: "Все" }, { value: "history", label: "История" }];
+  const filters = section === "parasites" ? [] : section === "symptoms" ? [{ value: "all", label: "Наблюдения" }, { value: "allergies", label: "Аллергии" }] : [{ value: "plan", label: "Актуальные" }, { value: "all", label: "Все" }, { value: "history", label: "История" }];
 
   async function refresh() {
     onUpdate(await loadHealthSection(pet.id, section));
