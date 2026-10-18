@@ -11,6 +11,7 @@ const date = z.string().refine((value) => {
 }, "Укажите корректную дату");
 const datetime = z.string().refine((value) => value.length > 0 && !Number.isNaN(new Date(value).getTime()), "Укажите дату и время").transform((value) => new Date(value).toISOString());
 const optionalIntervalDays = z.union([z.coerce.number().int("Введите целое число дней").min(1, "Минимум один день").max(365, "Не больше 365 дней"), z.literal("")]).optional().transform((value) => (typeof value === "number" ? value : null));
+const optionalPrice = z.union([z.literal(""), z.string().trim().transform((value) => Number(value.replace(/\s/g, "").replace(",", "."))).pipe(z.number({ error: "Введите число" }).min(0, "Стоимость не может быть отрицательной"))]).optional().transform((value) => (typeof value === "number" ? value : null));
 const optionalDate = z.union([date, z.literal("")]).optional().transform((value) => (value ? value : null));
 export const healthSchemas = {
   vaccinations: z.object({ name: requiredText(255), scheduled_on: date, status: z.enum(["planned", "done"]), clinic: optionalText(255), notes: optionalText(2000), interval_days: optionalIntervalDays, next_due_on: optionalDate }),
@@ -18,7 +19,7 @@ export const healthSchemas = {
     title: requiredText(255), visit_date: date, visit_time: z.string(), visit_time_unknown: z.string(),
     reason: z.enum(["illness", "examination", "vaccination", "checkup"]),
     status: z.enum(["planned", "completed", "cancelled"]), doctor_name: optionalText(255), doctor_specialty: optionalText(255),
-    topic: optionalText(255), diagnosis: optionalText(5000), notes: optionalText(5000),
+    vet: optionalText(255).optional(), visit_price: optionalPrice, topic: optionalText(255), diagnosis: optionalText(5000), notes: optionalText(5000),
   }).refine((data) => data.visit_time_unknown === "on" || /^([01]\d|2[0-3]):[0-5]\d$/.test(data.visit_time), {
     path: ["visit_time"], message: "Укажите время или отметьте «Время не указано»",
   }).transform(({ visit_date, visit_time, visit_time_unknown, ...rest }) => ({
@@ -47,7 +48,9 @@ export type HealthField = {
   name: string; label: string; type?: "date" | "time" | "datetime-local" | "number" | "textarea" | "checkbox";
   /** Поле неактивно, пока отмечен этот чекбокс. */
   disabledBy?: string;
-  required?: boolean; maxLength?: number; min?: number; max?: number; placeholder?: string;
+  required?: boolean; maxLength?: number; min?: number; max?: number; step?: number; placeholder?: string;
+  /** Клавиатура на мобильных; у цены — цифровая без стрелок, которые есть у type="number". */
+  inputMode?: "decimal" | "numeric";
   options?: { value: string; label: string }[];
 };
 export const healthFields: Record<HealthResource, HealthField[]> = {
@@ -67,6 +70,7 @@ export const healthFields: Record<HealthResource, HealthField[]> = {
     { name: "reason", label: "Причина", options: [{ value: "examination", label: "Осмотр" }, { value: "illness", label: "Болезнь или жалоба" }, { value: "vaccination", label: "Вакцинация" }, { value: "checkup", label: "Контрольный приём" }] },
     { name: "status", label: "Статус", options: [{ value: "planned", label: "Запланирован" }, { value: "completed", label: "Состоялся" }, { value: "cancelled", label: "Отменён" }] },
     { name: "doctor_name", label: "Врач", maxLength: 255 }, { name: "doctor_specialty", label: "Специальность врача", maxLength: 255 },
+    { name: "vet", label: "Клиника", maxLength: 255 }, { name: "visit_price", label: "Стоимость приёма, ₽", inputMode: "decimal", maxLength: 15 },
     { name: "topic", label: "Жалоба или тема визита", maxLength: 255 },
     { name: "diagnosis", label: "Диагноз и заключение", type: "textarea", maxLength: 5000 }, { name: "notes", label: "Примечание", type: "textarea", maxLength: 5000 },
   ],
