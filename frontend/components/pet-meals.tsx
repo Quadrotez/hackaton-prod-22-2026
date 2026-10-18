@@ -2,7 +2,8 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { ChevronDownIcon, ChevronUpIcon, PencilIcon, PlusIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronDownIcon, ChevronUpIcon, PencilIcon, PlusIcon, StethoscopeIcon } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { useRequireAuth } from "@/hooks/use-auth";
@@ -13,7 +14,11 @@ import {
   deleteMeal,
   formatTimeAgo,
   getMealSuggestion,
+  hasReactionType,
   rankFoods,
+  reactionLabels,
+  reactionSymptomText,
+  recordReactionAsSymptom,
   updateMeal,
   type Meal,
   type MealSuggestion,
@@ -62,6 +67,8 @@ const mealSchema = z.object({
     .transform((date) => date.toISOString()),
   liked: z.boolean(),
   tolerated: z.boolean(),
+  digestive_reaction: z.boolean(),
+  allergic_reaction: z.boolean(),
   reaction_notes: z.string().trim().max(1000, "Не больше 1000 символов"),
   notes: z.string().trim().max(1000, "Не больше 1000 символов"),
 });
@@ -96,12 +103,23 @@ function MealForm({
   const [fedAt, setFedAt] = useState(() => toLocalInput(meal ? new Date(meal.fed_at) : new Date()));
   const [liked, setLiked] = useState(meal?.liked ?? true);
   const [tolerated, setTolerated] = useState(meal?.tolerated ?? true);
+  const [digestive, setDigestive] = useState(meal?.digestive_reaction ?? false);
+  const [allergic, setAllergic] = useState(meal?.allergic_reaction ?? false);
   const [suggestion, setSuggestion] = useState<MealSuggestion | null>(null);
   const [errors, setErrors] = useState<MealErrors>({});
   const [pending, setPending] = useState(false);
   const latestFoodId = useRef(foodId);
   const isEdit = meal !== undefined;
   const selected = foods.find((food) => String(food.id) === foodId);
+
+  // «Хорошо» исключает тип реакции: сбрасываем флаги, чтобы не отправить противоречие
+  function changeTolerated(value: boolean) {
+    setTolerated(value);
+    if (value) {
+      setDigestive(false);
+      setAllergic(false);
+    }
+  }
 
   async function handleFoodChange(value: string) {
     setFoodId(value);
@@ -115,7 +133,7 @@ function MealForm({
       setSuggestion(result);
       if (result.suggested_values) {
         setLiked(result.suggested_values.liked);
-        setTolerated(result.suggested_values.tolerated);
+        changeTolerated(result.suggested_values.tolerated);
       }
     } catch (error) {
       // Подсказка необязательна — форму можно заполнить вручную
@@ -133,6 +151,8 @@ function MealForm({
       fed_at: fedAt,
       liked,
       tolerated,
+      digestive_reaction: digestive,
+      allergic_reaction: allergic,
       reaction_notes: formData.get("reaction_notes") ?? "",
       notes: formData.get("notes") ?? "",
     });
@@ -219,9 +239,9 @@ function MealForm({
                 <SelectValue placeholder="Выберите корм" />
               </SelectTrigger>
               <SelectContent>
-                {ranked.map(({ food, likedShare, intolerant }) => {
+                {ranked.map(({ food, likedShare, intolerant, allergic }) => {
                   const hint = [
-                    intolerant ? "плохо переносит" : likedShare !== null ? `нравится в ${Math.round(likedShare * 100)}% случаев` : null,
+                    allergic ? "была аллергия" : intolerant ? "плохо переносит" : likedShare !== null ? `нравится в ${Math.round(likedShare * 100)}% случаев` : null,
                     food.remaining_grams <= 0 ? "закончился" : null,
                   ].filter(Boolean).join(" · ");
                   return (
@@ -329,7 +349,7 @@ function MealForm({
                     type="radio"
                     name="tolerated"
                     checked={tolerated === option.value}
-                    onChange={() => setTolerated(option.value)}
+                    onChange={() => changeTolerated(option.value)}
                     className="peer sr-only"
                   />
                   <span className={choiceClass}>{option.label}</span>
@@ -338,13 +358,38 @@ function MealForm({
             </div>
           </FieldSet>
 
+          {!tolerated && (
+            <FieldSet className="gap-1">
+              <FieldLegend variant="label">Какая реакция</FieldLegend>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: "ЖКТ", hint: "рвота, диарея", checked: digestive, onChange: setDigestive },
+                  { label: "Аллергия", hint: "зуд, сыпь", checked: allergic, onChange: setAllergic },
+                ].map((option) => (
+                  <label key={option.label}>
+                    <input
+                      type="checkbox"
+                      checked={option.checked}
+                      onChange={(event) => option.onChange(event.target.checked)}
+                      className="peer sr-only"
+                    />
+                    <span className={cn(choiceClass, "flex-col gap-0 leading-tight")}>
+                      {option.label}
+                      <span className="text-xs text-muted-foreground">{option.hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </FieldSet>
+          )}
+
           <Field data-invalid={Boolean(errors.reaction_notes)}>
             <FieldLabel htmlFor="meal-reactions">Реакции животного</FieldLabel>
             <Input
               id="meal-reactions"
               name="reaction_notes"
               defaultValue={meal?.reaction_notes ?? ""}
-              placeholder={tolerated ? "Необязательно" : "Рвота, зуд, вялость…"}
+              placeholder={tolerated ? "Необязательно" : "Подробности: когда началось, как проявлялось…"}
               maxLength={1000}
             />
             <FieldError>{errors.reaction_notes}</FieldError>
@@ -374,6 +419,50 @@ function MealForm({
   );
 }
 
+function SymptomOffer({ petId, meal, onDone }: { petId: number; meal: Meal; onDone: () => void }) {
+  const { handleAuthError } = useRequireAuth();
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+
+  async function record() {
+    setPending(true);
+    try {
+      await recordReactionAsSymptom(petId, meal);
+      toast.success("Записали в симптомы", {
+        action: { label: "Открыть", onClick: () => router.push(`/pet/${petId}/health/symptoms`) },
+      });
+      onDone();
+    } catch (error) {
+      if (!handleAuthError(error)) {
+        toast.error(getErrorMessage(error, "Не удалось записать симптом. Попробуйте ещё раз"));
+      }
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div role="status" className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+      <div className="flex items-start gap-2.5">
+        <StethoscopeIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-destructive" />
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <p className="font-medium">Записать реакцию в симптомы?</p>
+          <p className="text-muted-foreground">{reactionSymptomText(meal)}</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" onClick={record} disabled={pending}>
+          {pending && <Spinner />}
+          Записать в симптомы
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onDone} disabled={pending}>
+          Не нужно
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function PetMeals({
   petId,
   meals,
@@ -389,6 +478,8 @@ export function PetMeals({
 }) {
   const [editing, setEditing] = useState<Meal | "new" | null>(null);
   const [showAll, setShowAll] = useState(false);
+  // Кормление с отмеченной реакцией, которое предлагаем перенести в симптомы
+  const [symptomOffer, setSymptomOffer] = useState<Meal | null>(null);
   const visible = meals && (showAll ? meals : meals.slice(0, RECENT_MEALS_LIMIT));
   const knownMeals = meals ?? [];
 
@@ -415,14 +506,23 @@ export function PetMeals({
             meal={editing === "new" ? undefined : editing}
             onCancel={() => setEditing(null)}
             onSaved={(saved) => {
+              const before = editing === "new" ? null : editing;
+              const newReaction = (saved.digestive_reaction && !before?.digestive_reaction)
+                || (saved.allergic_reaction && !before?.allergic_reaction);
+              setSymptomOffer(newReaction ? saved : null);
               setEditing(null);
               onMealsChange([saved, ...knownMeals.filter((item) => item.id !== saved.id)]);
             }}
             onDeleted={(deleted) => {
               setEditing(null);
+              setSymptomOffer((offer) => (offer?.id === deleted.id ? null : offer));
               onMealsChange(knownMeals.filter((item) => item.id !== deleted.id));
             }}
           />
+        )}
+
+        {symptomOffer && editing === null && (
+          <SymptomOffer petId={petId} meal={symptomOffer} onDone={() => setSymptomOffer(null)} />
         )}
 
         {visible === null ? (
@@ -437,7 +537,7 @@ export function PetMeals({
                 <li key={meal.id} className="flex items-center gap-3 border-t border-secondary pt-2.5">
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{foodName}</p>
-                    <p className="truncate text-xs text-muted-foreground">
+                    <p className="line-clamp-2 text-xs text-muted-foreground">
                       <span title={formatFedAt(meal.fed_at)}>{formatTimeAgo(meal.fed_at, now)}</span>
                       {meal.amount_grams != null && ` · ${formatWeight(meal.amount_grams)}`}
                       {" · "}
@@ -445,7 +545,9 @@ export function PetMeals({
                       {!meal.tolerated && (
                         <>
                           {" · "}
-                          <span className="font-semibold text-destructive">реакция</span>
+                          <span className="font-semibold text-destructive">
+                            {hasReactionType(meal) ? reactionLabels(meal).join(", ") : "реакция"}
+                          </span>
                         </>
                       )}
                       {[meal.reaction_notes, meal.notes].filter(Boolean).map((note) => ` · ${note}`).join("")}

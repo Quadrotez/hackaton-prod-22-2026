@@ -11,6 +11,9 @@ export type Meal = {
   fed_at: string;
   liked: boolean;
   tolerated: boolean;
+  // Тип реакции; бывает только при tolerated = false
+  digestive_reaction: boolean;
+  allergic_reaction: boolean;
   reaction_notes: string | null;
   notes: string | null;
   created_at: string;
@@ -23,6 +26,8 @@ export type MealCreate = {
   fed_at: string;
   liked: boolean;
   tolerated: boolean;
+  digestive_reaction?: boolean;
+  allergic_reaction?: boolean;
   reaction_notes?: string | null;
   notes?: string | null;
 };
@@ -64,6 +69,38 @@ export function getMealSuggestion(petId: number, foodId: number) {
   });
 }
 
+// Короткие подписи типов реакций для истории и текста симптома
+export function reactionLabels(meal: Pick<Meal, "digestive_reaction" | "allergic_reaction">): string[] {
+  return [meal.digestive_reaction && "ЖКТ", meal.allergic_reaction && "аллергия"].filter(
+    (label): label is string => Boolean(label),
+  );
+}
+
+export function hasReactionType(meal: Pick<Meal, "digestive_reaction" | "allergic_reaction">): boolean {
+  return meal.digestive_reaction || meal.allergic_reaction;
+}
+
+export function reactionSymptomText(meal: Meal): string {
+  const types = [
+    meal.digestive_reaction && "проблемы с ЖКТ",
+    meal.allergic_reaction && "аллергическая реакция",
+  ].filter(Boolean).join(", ");
+  const details = meal.reaction_notes ? ` — ${meal.reaction_notes}` : "";
+  return `Реакция на корм «${meal.food_name}»: ${types}${details}`;
+}
+
+// Переносит реакцию из кормления в симптомы карты здоровья (по явному действию пользователя)
+export function recordReactionAsSymptom(petId: number, meal: Meal) {
+  return apiFetch<{ id: number; description: string; observed_at: string }>(
+    `/api/v1/pets/${petId}/symptoms`,
+    {
+      method: "POST",
+      body: { description: reactionSymptomText(meal), observed_at: meal.fed_at },
+      auth: true,
+    },
+  );
+}
+
 export function sortMeals(meals: Meal[]): Meal[] {
   return [...meals].sort((a, b) => b.fed_at.localeCompare(a.fed_at) || b.id - a.id);
 }
@@ -73,6 +110,7 @@ export type RankedFood = {
   // Доля приёмов, когда корм понравился; null, если ещё не пробовал
   likedShare: number | null;
   intolerant: boolean;
+  allergic: boolean;
 };
 
 // Порядок в списке выбора: есть в наличии → нравится чаще → ещё не пробовал → плохо переносит
@@ -83,6 +121,7 @@ export function rankFoods(foods: Food[], meals: Meal[]): RankedFood[] {
       food,
       likedShare: history.length ? history.filter((meal) => meal.liked).length / history.length : null,
       intolerant: history.some((meal) => !meal.tolerated),
+      allergic: history.some((meal) => meal.allergic_reaction),
     };
   });
   const score = ({ food, likedShare, intolerant }: RankedFood) =>
