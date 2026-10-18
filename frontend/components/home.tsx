@@ -11,8 +11,9 @@ import { loadCalendar } from "@/lib/health";
 import { healthEventHref, toDateKey, type CalendarEvent } from "@/lib/health-events";
 import { cn } from "@/lib/utils";
 import { pluralize, type Pet } from "@/lib/pets";
-import { listIncomingTransfers, listOutgoingTransfers } from "@/lib/transfers";
+import { listIncomingTransfers, listOutgoingTransfers, listReceivedTransfers } from "@/lib/transfers";
 import { Card } from "@/components/ui/card";
+import { QuickAddMenu } from "@/components/quick-add-menu";
 
 const EMPTY_EVENTS: CalendarEvent[] = [];
 
@@ -29,6 +30,20 @@ const kindLabels: Record<CalendarEvent["kind"], string> = {
 
 function SectionTitle({ id, children }: { id: string; children: React.ReactNode }) {
   return <h2 id={id}>{children}</h2>;
+}
+
+// Плитка с плюсом; сама обёртка (Link или кнопка) задаёт класс group.
+function AddTile({ label }: { label: string }) {
+  return (
+    <>
+      <span className="flex size-16 items-center justify-center rounded-full border border-dashed border-zinc-600 text-zinc-600 transition group-hover:border-foreground group-hover:text-foreground group-focus-visible:border-solid group-focus-visible:border-foreground group-focus-visible:text-foreground group-focus-visible:ring-2 group-focus-visible:ring-foreground group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background group-active:scale-95 motion-reduce:transition-none motion-reduce:group-active:scale-100">
+        <PlusIcon aria-hidden="true" className="size-6" />
+      </span>
+      <span className="w-full truncate text-center text-sm text-zinc-600 transition-colors group-hover:text-foreground group-focus-visible:text-foreground">
+        {label}
+      </span>
+    </>
+  );
 }
 
 function EventRow({ event, pet, showDate }: { event: CalendarEvent; pet?: Pet; showDate?: boolean }) {
@@ -70,13 +85,15 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedKey, setSelectedKey] = useState(todayKey);
 
-  const loadTransfers = useCallback(() => Promise.all([listIncomingTransfers(), listOutgoingTransfers()]), []);
+  const loadTransfers = useCallback(() => Promise.all([listIncomingTransfers(), listOutgoingTransfers(), listReceivedTransfers()]), []);
   const transfers = useProtectedData(loadTransfers, "Не удалось загрузить передачи");
   const answersNeeded =
     transfers.status === "ready"
       ? transfers.data[0].length +
         transfers.data[1].filter((transfer) => transfer.status === "return_requested").length
       : 0;
+
+  const borrowed = transfers.status === "ready" ? transfers.data[2] : [];
 
   const days = useMemo(() => monthGrid(month), [month]);
   const from = toDateKey(days[0]);
@@ -131,17 +148,32 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
               </Link>
             </li>
           ))}
+          {borrowed.map((transfer) => (
+            <li key={`transfer-${transfer.id}`} className="shrink-0">
+              <Link
+                href="/transfers"
+                className="group flex w-20 flex-col items-center gap-1.5 outline-none"
+              >
+                <PetAvatar
+                  pet={{ ...transfer.pet, photo_url: null }}
+                  size="md"
+                  className="bg-white group-focus-visible:ring-2 group-focus-visible:ring-foreground group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background"
+                />
+                <span className="w-full truncate text-center text-sm font-medium text-foreground">
+                  {transfer.pet.name}
+                </span>
+                <span className="-mt-1 w-full truncate text-center text-xs text-muted-foreground">
+                  на время
+                </span>
+              </Link>
+            </li>
+          ))}
           <li className="shrink-0">
             <Link
               href="/pet/create"
               className="group flex w-20 flex-col items-center gap-1.5 outline-none"
             >
-              <span className="flex size-16 items-center justify-center rounded-full border border-dashed border-zinc-600 text-zinc-600 transition group-hover:border-foreground group-hover:text-foreground group-focus-visible:border-solid group-focus-visible:border-foreground group-focus-visible:text-foreground group-focus-visible:ring-2 group-focus-visible:ring-foreground group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background group-active:scale-95 motion-reduce:transition-none motion-reduce:group-active:scale-100">
-                <PlusIcon aria-hidden="true" className="size-6" />
-              </span>
-              <span className="w-full truncate text-center text-sm text-zinc-600 transition-colors group-hover:text-foreground group-focus-visible:text-foreground">
-                Добавить
-              </span>
+              <AddTile label="Добавить" />
             </Link>
           </li>
         </ul>
@@ -177,6 +209,7 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
         onSelectKey={setSelectedKey}
         markers={markers}
         busy={loading}
+        action={<QuickAddMenu pets={pets} />}
       />
 
       {calendar.status === "error" && <PageError message={calendar.error} onRetry={calendar.retry} />}

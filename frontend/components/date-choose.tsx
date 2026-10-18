@@ -27,7 +27,7 @@ export default function DateChooser({ month, onMonthChange }: Props) {
         type="button"
         variant="secondary"
         size="icon"
-        className="size-10 theme-shadcn rounded-xl"
+        className="size-10 rounded-xl"
         aria-label="Предыдущий месяц"
         onClick={() => changeMonth(-1)}
       >
@@ -40,7 +40,7 @@ export default function DateChooser({ month, onMonthChange }: Props) {
         type="button"
         variant="secondary"
         size="icon"
-        className="size-10 rounded-xl theme-shadcn"
+        className="size-10 rounded-xl"
         aria-label="Следующий месяц"
         onClick={() => changeMonth(1)}
       >

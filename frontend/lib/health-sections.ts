@@ -29,7 +29,8 @@ export type ResourceMap = { vaccinations: Vaccine; visits: Visit; medications: M
 export type HealthResource = keyof ResourceMap;
 export type HealthRecord = { [R in HealthResource]: { resource: R; value: ResourceMap[R] } }[HealthResource];
 export type HealthSectionData = Awaited<ReturnType<typeof loadHealthSection>>;
-export type HealthOverview = { planned_visits: Visit[]; planned_vaccinations: Vaccine[]; symptoms_total: number; next_vaccination: Vaccine | null; next_parasite: ParasiteTreatment | null };
+export type Pregnancy = { id: number; pet_id: number; started_on: string; month: number; ended_on: string | null };
+export type HealthOverview = { planned_visits: Visit[]; planned_vaccinations: Vaccine[]; symptoms_total: number; next_vaccination: Vaccine | null; next_parasite: ParasiteTreatment | null; pregnancy: Pregnancy | null };
 export const healthPath = (petId: number, path: string) => `/api/v1/pets/${petId}/${path}`;
 // URL-сегмент для каждого ресурса: у обработок он отличается от ключа ("parasites" → "parasite-treatments").
 export const healthEndpoints: Record<HealthResource, string> = {
@@ -88,6 +89,13 @@ export function saveHealthRecord(petId: number, resource: HealthResource, body: 
 export function deleteHealthRecord(petId: number, record: HealthRecord) {
   return apiFetch<void>(healthPath(petId, `${healthEndpoints[record.resource]}/${record.value.id}`), { method: "DELETE", auth: true });
 }
+// Срок беременности задаётся текущим месяцем (1–9): бэкенд сам отсчитывает дату начала.
+export function savePregnancy(petId: number, month: number) {
+  return apiFetch<Pregnancy>(healthPath(petId, "pregnancy"), { method: "PUT", body: { month }, auth: true });
+}
+export function endPregnancy(petId: number) {
+  return apiFetch<void>(healthPath(petId, "pregnancy"), { method: "DELETE", auth: true });
+}
 export function markHealthDose(petId: number, dose: Dose, status: "taken" | "skipped") {
   return apiFetch(healthPath(petId, `medications/${dose.medication_id}/intakes?tz=${encodeURIComponent(localTimezone())}`), {
     method: "PUT", body: { scheduled_for: dose.scheduled_for, status }, auth: true,
@@ -123,4 +131,17 @@ export function recordIsHistory(record: HealthRecord, today: string) {
     case "parasites": return true;
     default: return false;
   }
+}
+
+export type VetDocumentAnalysis = {
+  status: "success" | "partial" | "error";
+  post_visit_instructions: string | null;
+  warnings: string[];
+  error_code: "UNREADABLE_IMAGE" | "UNSUPPORTED_DOCUMENT" | "INSUFFICIENT_INPUT" | null;
+};
+
+export function analyzeVetDocument(petId: number, image: File): Promise<VetDocumentAnalysis> {
+  const body = new FormData();
+  body.append("image", image);
+  return apiFetch<VetDocumentAnalysis>(healthPath(petId, "vet-documents/analyze"), { method: "POST", body, auth: true });
 }
