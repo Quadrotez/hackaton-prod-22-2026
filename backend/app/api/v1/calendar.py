@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import secrets
 from datetime import date, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -8,6 +9,7 @@ from sqlalchemy import select
 
 from app.api.async_dependencies import AsyncCurrentUser, AsyncDbSession
 from app.api.v1.pet_health.dependencies import LocalTimezone
+from app.core.log import annotate_request, bind_user
 from app.models.calendar import CalendarFeed
 from app.models.pet import Pet
 from app.schemas.calendar import (
@@ -22,6 +24,7 @@ from app.services.calendar_ics import render_calendar
 from app.services.health.common import local_today, unprocessable
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
+logger = logging.getLogger(__name__)
 
 DEFAULT_GRID_DAYS = 42  # six weeks, a full month grid
 EXPORT_PAST_DAYS = 30
@@ -125,6 +128,7 @@ async def export_ics(
     check_range(start, end)
     pets = await pets_for(db, current_user.id, pet_id)
     events = await collect_events(db, pets, start, end, tz)
+    annotate_request(events=len(events))
     return ics_response(render_calendar(events, tz), filename="petcare.ics")
 
 
@@ -164,12 +168,18 @@ async def create_feed(
 
     token = secrets.token_urlsafe(32)
     feed = await db.scalar(select(CalendarFeed).where(CalendarFeed.user_id == current_user.id))
+    rotated = feed is not None
     if feed is None:
         feed = CalendarFeed(user_id=current_user.id)
         db.add(feed)
     feed.token_hash, feed.timezone = hash_token(token), timezone
     await db.commit()
     await db.refresh(feed)
+    logger.info(
+        "Calendar feed link %s",
+        "rotated" if rotated else "created",
+        extra={"event": "calendar.feed_issued", "rotated": rotated, "timezone": timezone},
+    )
     return CalendarFeedLink(
         active=True,
         timezone=feed.timezone,
@@ -185,6 +195,7 @@ async def delete_feed(current_user: AsyncCurrentUser, db: AsyncDbSession) -> Non
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active feed")
     await db.delete(feed)
     await db.commit()
+    logger.info("Calendar feed link revoked", extra={"event": "calendar.feed_revoked"})
 
 
 @router.get(
@@ -197,7 +208,9 @@ async def read_feed(token: str, db: AsyncDbSession) -> Response:
     feed = await db.scalar(select(CalendarFeed).where(CalendarFeed.token_hash == hash_token(token)))
     if feed is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Feed not found")
+    bind_user(feed.user_id)
     tz = ZoneInfo(feed.timezone)
     start, end = export_range(tz)
     events = await collect_events(db, await load_pets(db, feed.user_id), start, end, tz)
+    annotate_request(events=len(events))
     return ics_response(render_calendar(events, tz))

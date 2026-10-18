@@ -1,9 +1,12 @@
+import logging
+
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.api.dependencies import AppSettings, CurrentUser, DbSession
+from app.core.log import bind_user
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
 from app.schemas.auth import (
@@ -17,6 +20,7 @@ from app.schemas.auth import (
 from app.services.storage import FileTooLargeError, InvalidImageError, LocalMediaStorage
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 
 def storage_for(settings: AppSettings) -> LocalMediaStorage:
@@ -40,6 +44,7 @@ def register(payload: UserRegistration, db: DbSession) -> User:
             detail="A user with this email already exists",
         ) from None
     db.refresh(user)
+    logger.info("User registered", extra={"event": "user.registered", "new_user_id": user.id})
     return user
 
 
@@ -47,12 +52,19 @@ def register(payload: UserRegistration, db: DbSession) -> User:
 def login(credentials: Credentials, db: DbSession, settings: AppSettings) -> TokenResponse:
     user = db.scalar(select(User).where(User.email == str(credentials.email)))
     if user is None or not verify_password(credentials.password, user.password_hash):
+        # No email in logs; whether the account exists is enough to spot guessing.
+        logger.warning(
+            "Login failed",
+            extra={"event": "auth.login_failed", "known_user": user is not None},
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    bind_user(user.id)
+    logger.info("Login succeeded", extra={"event": "auth.login"})
     return TokenResponse(access_token=create_access_token(str(user.id), settings))
 
 
@@ -84,6 +96,7 @@ def update_password(payload: PasswordUpdate, current_user: CurrentUser, db: DbSe
 
     current_user.password_hash = hash_password(payload.new_password)
     db.commit()
+    logger.info("Password changed", extra={"event": "auth.password_changed"})
 
 
 @router.post("/me/avatar", response_model=UserPublic)
@@ -116,6 +129,7 @@ async def upload_avatar(
             detail="Unsupported or invalid image; use PNG, JPEG, GIF, or WebP",
         ) from None
     except Exception:
+        logger.exception("Could not save avatar", extra={"event": "auth.avatar_failed"})
         db.rollback()
         if avatar_url:
             storage.delete(avatar_url)

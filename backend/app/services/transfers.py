@@ -2,6 +2,7 @@
 until when, but does not yet change who may read or edit the pet's data."""
 
 import calendar
+import logging
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
@@ -13,6 +14,7 @@ from app.models.transfer import OPEN_STATUSES, PetTransfer, TransferDuration, Tr
 from app.models.user import User
 from app.schemas.transfers import TransferPet, TransferPublic, TransferUser
 
+logger = logging.getLogger(__name__)
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
@@ -79,6 +81,15 @@ async def expire_due(db: AsyncSession, transfers: Iterable[PetTransfer]) -> None
             and transfer.ends_at is not None
             and as_utc(transfer.ends_at) <= now
         ):
+            logger.info(
+                "Transfer expired",
+                extra={
+                    "event": "transfer.expired",
+                    "transfer_id": transfer.id,
+                    "pet_id": transfer.pet_id,
+                    "previous_status": transfer.status.value,
+                },
+            )
             transfer.status = TransferStatus.EXPIRED
             transfer.ended_at = transfer.ends_at
             changed = True

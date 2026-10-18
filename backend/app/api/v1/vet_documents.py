@@ -1,3 +1,4 @@
+import logging
 from io import BytesIO
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
@@ -10,6 +11,7 @@ from app.integrations.llm.vet_document_analyzer import analyze_veterinary_docume
 from app.schemas.vet_documents import VeterinaryDocumentAnalysis
 
 router = APIRouter(prefix="/pets/{pet_id}/vet-documents", tags=["vet documents"])
+logger = logging.getLogger(__name__)
 IMAGE_FORMAT_CONTENT_TYPES = {
     "JPEG": "image/jpeg",
     "PNG": "image/png",
@@ -87,15 +89,38 @@ async def analyze_pet_veterinary_document(
             content_type=content_type,
             user_text=normalized_context,
         )
-        return VeterinaryDocumentAnalysis.model_validate(result)
+        analysis = VeterinaryDocumentAnalysis.model_validate(result)
+        logger.info(
+            "Vet document analyzed",
+            extra={
+                "event": "vet_document.analyzed",
+                "pet_id": pet_id,
+                "status": analysis.status,
+                "document_type": analysis.document_type,
+                "error_code": analysis.error_code,
+                "warnings": len(analysis.warnings),
+            },
+        )
+        return analysis
     except HTTPException:
         raise
-    except ValueError:
+    except ValueError as exc:
+        logger.warning(
+            "AI returned an unusable answer: %s",
+            exc,
+            extra={"event": "vet_document.invalid_answer", "pet_id": pet_id},
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="AI service returned an invalid response",
         ) from None
-    except (OpenAIError, RuntimeError):
+    except (OpenAIError, RuntimeError) as exc:
+        logger.error(
+            "AI service call failed: %s",
+            type(exc).__name__,
+            exc_info=True,
+            extra={"event": "vet_document.ai_unavailable", "pet_id": pet_id},
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="AI service is unavailable",
