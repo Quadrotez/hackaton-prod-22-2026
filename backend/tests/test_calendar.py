@@ -201,6 +201,52 @@ def test_ics_export(client: TestClient, household) -> None:
     assert client.get(f"{CALENDAR}/export.ics").status_code == 401
 
 
+def vevent(body: str, uid: str) -> str:
+    start = body.index(f"UID:{uid}@petcare")
+    return body[start:body.index("END:VEVENT", start)]
+
+
+def test_ics_reminders(client: TestClient, household) -> None:
+    headers = household["headers"]
+    body = client.get(f"{CALENDAR}/export.ics", headers=headers, params=OCTOBER).text
+
+    # Visit: a day before and an hour before.
+    visit = vevent(body, f"visit-{household['visit']['id']}")
+    assert visit.count("BEGIN:VALARM") == 2
+    assert "TRIGGER:-P1D" in visit and "TRIGGER:-PT1H" in visit
+    assert "ACTION:DISPLAY\r\nTRIGGER:-PT1H\r\nDESCRIPTION:Рекс: Плановый осмотр" in visit
+    # All-day vaccination: 09:00 the day before and 09:00 on the day.
+    vaccination = vevent(body, f"vaccination-{household['vaccination']['id']}")
+    assert "TRIGGER:-PT15H" in vaccination and "TRIGGER:PT9H" in vaccination
+    # Medication dose: right at dose time.
+    assert "TRIGGER:PT0M" in body
+
+    # A dose already taken gets no reminder.
+    medication = household["praziquantel"]["id"]
+    intake = {"scheduled_for": "2026-10-16T18:00:00", "status": "taken"}
+    intakes = pet_url(household["barsik"], f"medications/{medication}/intakes")
+    response = client.put(intakes, headers=headers, json=intake)
+    assert response.status_code == 200, response.json()
+    body = client.get(f"{CALENDAR}/export.ics", headers=headers, params=OCTOBER).text
+    assert "TRIGGER:PT0M" in body  # the flea dose is still pending
+    dose = body[body.index("SUMMARY:Барсик: Празиквантел"):]
+    assert "BEGIN:VALARM" not in dose[:dose.index("END:VEVENT")]
+
+
+def test_ics_parasite_treatment(client: TestClient, household) -> None:
+    headers = household["headers"]
+    treatment = post(client, headers, pet_url(household["rex"], "parasite-treatments"), {
+        "kind": "external", "product_name": "Бравекто", "treated_on": "2026-07-20",
+        "interval_days": 90,
+    })
+    response = client.get(f"{CALENDAR}/export.ics", headers=headers, params=OCTOBER)
+    assert response.status_code == 200
+    event = vevent(response.text, f"parasite-{treatment['id']}")
+    assert "DTSTART;VALUE=DATE:20261018" in event
+    assert "CATEGORIES:Обработка от паразитов" in event
+    assert "TRIGGER:-PT15H" in event and "TRIGGER:PT9H" in event
+
+
 def test_long_lines_are_folded_on_character_boundaries() -> None:
     line = "DESCRIPTION:" + "Празиквантел " * 20
     chunks = fold(line)
@@ -240,3 +286,76 @@ def test_subscription_feed(client: TestClient, household) -> None:
     assert client.delete(f"{CALENDAR}/feed", headers=headers).status_code == 404
     assert client.post(f"{CALENDAR}/feed", headers=headers, json={"timezone": "Nowhere/City"}).status_code == 422
     assert client.get(f"{CALENDAR}/feed/not-a-token.ics").status_code == 404
+
+
+def date_only_visits(client: TestClient) -> tuple[dict[str, str], int]:
+    headers = auth_headers(client, "anna@example.com")
+    pet_id = create_pet(client, headers, "Рекс", species="dog", sex="boy")
+    for title, visit_at in (
+        ("Без времени", "2026-10-17T00:00:00Z"),
+        # A real time that lands on 00:00 UTC (03:00 in Moscow) is sent with one second.
+        ("Ровно в 03:00", "2026-10-18T00:00:01Z"),
+        # Local midnight in Moscow is 21:00 UTC, so it keeps its time.
+        ("Местная полночь", "2026-10-18T21:00:00Z"),
+    ):
+        post(client, headers, pet_url(pet_id, "visits"), {
+            "title": title, "visit_at": visit_at, "reason": "checkup", "status": "planned",
+        })
+    return headers, pet_id
+
+
+def test_visit_at_utc_midnight_is_an_all_day_event(client: TestClient) -> None:
+    headers, _ = date_only_visits(client)
+    listed = {item["title"]: item for item in events(client, headers)}
+    assert (listed["Без времени"]["date"], listed["Без времени"]["time"]) == ("2026-10-17", None)
+    assert (listed["Ровно в 03:00"]["date"], listed["Ровно в 03:00"]["time"]) == (
+        "2026-10-18", "03:00:00"
+    )
+    assert (listed["Местная полночь"]["date"], listed["Местная полночь"]["time"]) == (
+        "2026-10-19", "00:00:00"
+    )
+
+
+@pytest.mark.parametrize("tz", ["Europe/Moscow", "UTC", "America/New_York", "Pacific/Auckland"])
+def test_date_only_visit_keeps_its_date_in_any_timezone(client: TestClient, tz: str) -> None:
+    headers, _ = date_only_visits(client)
+    listed = {item["title"]: item for item in events(client, headers, tz=tz)}
+    assert (listed["Без времени"]["date"], listed["Без времени"]["time"]) == ("2026-10-17", None)
+    # The range edges use the same date: a one-day range finds it, the next day does not.
+    day = client.get(
+        f"{CALENDAR}/events", headers=headers, params={"from": "2026-10-17", "to": "2026-10-17", "tz": tz}
+    ).json()
+    assert "Без времени" in [item["title"] for item in day]
+    next_day = client.get(
+        f"{CALENDAR}/events", headers=headers, params={"from": "2026-10-18", "to": "2026-10-18", "tz": tz}
+    ).json()
+    assert "Без времени" not in [item["title"] for item in next_day]
+
+
+def test_date_only_visit_is_upcoming_for_the_whole_day(client: TestClient) -> None:
+    headers = auth_headers(client, "anna@example.com")
+    pet_id = create_pet(client, headers)
+    today = local_today()
+    for title, visit_status in (("Сегодня", "planned"), ("Уже был", "completed")):
+        post(client, headers, pet_url(pet_id, "visits"), {
+            "title": title, "visit_at": f"{today}T00:00:00Z", "reason": "checkup", "status": visit_status,
+        })
+    upcoming = client.get(f"{CALENDAR}/upcoming", headers=headers).json()
+    assert [(item["title"], item["time"]) for item in upcoming] == [("Сегодня", None)]
+
+
+def test_ics_date_only_visit(client: TestClient) -> None:
+    headers, _ = date_only_visits(client)
+    body = client.get(f"{CALENDAR}/export.ics", headers=headers, params=OCTOBER).text
+    events_by_title = {
+        chunk.split("SUMMARY:", 1)[1].split("\r\n", 1)[0]: chunk
+        for chunk in body.split("BEGIN:VEVENT")[1:]
+    }
+    all_day = events_by_title["Рекс: Без времени"]
+    assert "DTSTART;VALUE=DATE:20261017\r\nDTEND;VALUE=DATE:20261018" in all_day
+    # Reminders like other all-day events: 09:00 the day before and on the day.
+    assert "TRIGGER:-PT15H" in all_day and "TRIGGER:PT9H" in all_day
+    assert "TRIGGER:-P1D" not in all_day
+    timed = events_by_title["Рекс: Ровно в 03:00"]
+    assert "DTSTART:20261018T000000Z" in timed
+    assert "TRIGGER:-P1D" in timed and "TRIGGER:-PT1H" in timed

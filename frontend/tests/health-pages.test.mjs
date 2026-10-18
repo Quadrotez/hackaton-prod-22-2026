@@ -86,7 +86,7 @@ test("пять подстраниц: формы проходят полный CR
   const start = await api.loadHealthSection(pet.id, "visits");
   const today = start.today;
   const samples = {
-    visits: { title: "Осмотр", visit_at: `${today}T11:30`, reason: "illness", status: "planned", topic: "Пищеварение", doctor_name: "Иванова", diagnosis: "" },
+    visits: { title: "Осмотр", visit_date: today, visit_time: "11:30", visit_time_unknown: "", reason: "illness", status: "planned", topic: "Пищеварение", doctor_name: "Иванова", diagnosis: "" },
     vaccinations: { name: "Комплексная", scheduled_on: today, status: "planned", clinic: "Клиника" },
     medications: { name: "Курс", dose: "1 таблетка", start_date: today, end_date: today, times: "09:00, 18:00", interval_days: 1 },
     symptoms: { description: "Необычный стул", observed_at: `${today}T09:30` },
@@ -127,4 +127,33 @@ test("пять подстраниц: формы проходят полный CR
     await api.deleteHealthRecord(pet.id, { resource, value: { id } });
     assert.equal((await api.listHealthRecords(pet.id, resource)).length, 0);
   }
+});
+
+test("визит с галочкой «Время не указано» сохраняется как 00:00 UTC и открывается с галочкой", { skip: !process.env.PETCARE_TEST_PYTHON, timeout: 60_000 }, async (t) => {
+  const request = await startBackend(t);
+  const credentials = { email: "visit-date-only@example.com", password: "visit-date-only-password" };
+  await request("/api/v1/auth/register", { method: "POST", body: JSON.stringify({ ...credentials, name: null }) });
+  const login = await request("/api/v1/auth/login", { method: "POST", body: JSON.stringify(credentials) });
+  assert.equal(login.status, 200, await login.clone().text());
+  const token = (await login.json()).access_token;
+  const petResponse = await request("/api/v1/pets/", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: "Без времени", species: "cat", sex: "boy", weight_g: 4000 }) });
+  const pet = await petResponse.json();
+  const { load } = client(request, { session: { getAccessToken: () => token } });
+  const api = load("lib/health-sections");
+  const forms = load("lib/health-form");
+  const today = (await api.loadHealthSection(pet.id, "visits")).today;
+
+  const values = { title: "Приём по документу", visit_date: today, visit_time: "", visit_time_unknown: "on", reason: "examination", status: "planned" };
+  const created = await api.saveHealthRecord(pet.id, "visits", body("visits", values, forms));
+  assert.equal(new Date(created.visit_at).toISOString(), `${today}T00:00:00.000Z`);
+
+  const section = await api.loadHealthSection(pet.id, "visits");
+  const record = section.records.find((item) => item.value.id === created.id);
+  const defaults = forms.healthFormDefaults(section, "visits", record);
+  assert.deepEqual([defaults.visit_date, defaults.visit_time, defaults.visit_time_unknown], [today, "", "on"]);
+
+  // Без галочки время обязательно.
+  const fields = Object.fromEntries(forms.healthFields.visits.map((field) => [field.name, ""]));
+  const missingTime = forms.healthSchemas.visits.safeParse({ ...fields, ...values, visit_time_unknown: "" });
+  assert.equal(missingTime.success, false);
 });

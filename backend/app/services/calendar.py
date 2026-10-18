@@ -19,6 +19,7 @@ from app.models.pet import Pet
 from app.schemas.calendar import CalendarEvent, CalendarEventType
 from app.services.health.common import local_now, local_today
 from app.services.health.schedule import build_schedule
+from app.services.health.visits import is_date_only
 
 MAX_RANGE_DAYS = 400
 
@@ -59,16 +60,26 @@ async def collect_events(
     events: list[CalendarEvent] = []
 
     if CalendarEventType.VISIT in types:
+        # A day of margin on both sides: date-only visits are placed by their UTC date,
+        # which can fall outside the local-time window of the range.
         visits = await db.scalars(
             select(VetVisit).where(
                 VetVisit.pet_id.in_(names),
                 VetVisit.status != VisitStatus.CANCELLED,
-                VetVisit.visit_at >= utc_bound(start, tz),
-                VetVisit.visit_at < utc_bound(end + timedelta(days=1), tz),
+                VetVisit.visit_at >= utc_bound(start - timedelta(days=1), tz),
+                VetVisit.visit_at < utc_bound(end + timedelta(days=2), tz),
             )
         )
         for visit in visits:
-            local = as_utc(visit.visit_at).astimezone(tz)
+            moment = as_utc(visit.visit_at)
+            if is_date_only(moment):
+                # No time known: an all-day event on its UTC date, whatever tz is.
+                day, clock = moment.date(), None
+            else:
+                local = moment.astimezone(tz)
+                day, clock = local.date(), local.time().replace(second=0, microsecond=0)
+            if not start <= day <= end:
+                continue
             events.append(
                 CalendarEvent(
                     id=f"visit-{visit.id}",
@@ -77,8 +88,8 @@ async def collect_events(
                     pet_name=names[visit.pet_id],
                     title=visit.title,
                     detail=visit_detail(visit),
-                    date=local.date(),
-                    time=local.time().replace(second=0, microsecond=0),
+                    date=day,
+                    time=clock,
                     status=visit.status.value,
                     source_id=visit.id,
                 )
@@ -163,13 +174,15 @@ def is_upcoming(event: CalendarEvent, now: datetime) -> bool:
     if event.type is CalendarEventType.VACCINATION:
         return event.status == VaccinationStatus.PLANNED and event.date >= now.date()
     if event.time is None:
-        # All-day events (parasite treatment repeats) are upcoming from today on.
-        return event.date >= now.date()
-    if datetime.combine(event.date, event.time) < now:
-        return False
+        # All-day events (parasite treatments, date-only visits) count from today on.
+        ahead = event.date >= now.date()
+    else:
+        ahead = datetime.combine(event.date, event.time) >= now
     if event.type is CalendarEventType.VISIT:
-        return event.status == VisitStatus.PLANNED
-    return event.status == "pending"
+        return ahead and event.status == VisitStatus.PLANNED
+    if event.type is CalendarEventType.MEDICATION:
+        return ahead and event.status == "pending"
+    return ahead
 
 
 async def upcoming_events(

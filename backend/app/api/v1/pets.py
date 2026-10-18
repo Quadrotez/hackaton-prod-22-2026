@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from app.schemas.pets import PetCreate, PetPublic, PetUpdate, PetWeightPublic
 from app.services.storage import FileTooLargeError, InvalidImageError, LocalMediaStorage
 
 router = APIRouter(prefix="/pets", tags=["pets"])
+logger = logging.getLogger(__name__)
 
 
 def get_owned_pet(pet_id: int, current_user: CurrentUser, db: DbSession) -> Pet:
@@ -39,6 +41,7 @@ def create_pet(payload: PetCreate, current_user: CurrentUser, db: DbSession) -> 
     )
     db.commit()
     db.refresh(pet)
+    logger.info("Pet created", extra={"event": "pet.created", "pet_id": pet.id})
     return pet
 
 
@@ -113,6 +116,9 @@ def delete_pet(
     db.delete(pet)
     db.commit()
     storage_for(settings).delete(photo_url)
+    logger.info(
+        "Pet deleted with all its records", extra={"event": "pet.deleted", "pet_id": pet_id}
+    )
 
 
 @router.post("/{pet_id}/photo", response_model=PetPublic)
@@ -147,6 +153,9 @@ async def upload_pet_photo(
             detail="Unsupported or invalid image; use PNG, JPEG, GIF, or WebP",
         ) from None
     except Exception:
+        logger.exception(
+            "Could not save pet photo", extra={"event": "pet.photo_failed", "pet_id": pet_id}
+        )
         db.rollback()
         if photo_url:
             storage.delete(photo_url)
