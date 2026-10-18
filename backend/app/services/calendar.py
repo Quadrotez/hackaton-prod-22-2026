@@ -8,7 +8,13 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.health import Vaccination, VaccinationStatus, VetVisit, VisitStatus
+from app.models.health import (
+    ParasiteTreatment,
+    Vaccination,
+    VaccinationStatus,
+    VetVisit,
+    VisitStatus,
+)
 from app.models.pet import Pet
 from app.schemas.calendar import CalendarEvent, CalendarEventType
 from app.services.health.common import local_now, local_today
@@ -102,6 +108,31 @@ async def collect_events(
                 )
             )
 
+    if CalendarEventType.PARASITE in types:
+        treatments = await db.scalars(
+            select(ParasiteTreatment).where(
+                ParasiteTreatment.pet_id.in_(names),
+                ParasiteTreatment.next_due_on.is_not(None),
+                ParasiteTreatment.next_due_on >= start,
+                ParasiteTreatment.next_due_on <= end,
+            )
+        )
+        for treatment in treatments:
+            events.append(
+                CalendarEvent(
+                    id=f"parasite-{treatment.id}",
+                    type=CalendarEventType.PARASITE,
+                    pet_id=treatment.pet_id,
+                    pet_name=names[treatment.pet_id],
+                    title=f"{treatment.product_name} (обработка от паразитов)",
+                    detail=treatment.clinic,
+                    date=treatment.next_due_on,
+                    time=None,
+                    status="planned",
+                    source_id=treatment.id,
+                )
+            )
+
     if CalendarEventType.MEDICATION in types:
         for pet in pets:
             for dose in await build_schedule(db, pet.id, start, end):
@@ -131,6 +162,9 @@ def is_upcoming(event: CalendarEvent, now: datetime) -> bool:
     """Still ahead and still to be done; now is naive local time."""
     if event.type is CalendarEventType.VACCINATION:
         return event.status == VaccinationStatus.PLANNED and event.date >= now.date()
+    if event.time is None:
+        # All-day events (parasite treatment repeats) are upcoming from today on.
+        return event.date >= now.date()
     if datetime.combine(event.date, event.time) < now:
         return False
     if event.type is CalendarEventType.VISIT:

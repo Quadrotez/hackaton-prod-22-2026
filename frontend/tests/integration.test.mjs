@@ -253,6 +253,47 @@ test("дашборд: календарь собирает визиты, прив
   assert.equal(healthEvents.healthEventHref(visitEvent), `/pet/${pet.id}/health/visits#health-${visitEvent.recordKey}`);
 });
 
+test("обработки от паразитов: CRUD, авторасчёт срока и календарь на настоящем API", { skip: !process.env.PETCARE_TEST_PYTHON, timeout: 60_000 }, async (t) => {
+  const request = await startBackend(t);
+  const session = memorySession();
+  const { load } = client(request, { session });
+  const pets = load("lib/pets");
+  const health = load("lib/health");
+  const sections = load("lib/health-sections");
+  const events = load("lib/health-events");
+
+  await registerUser(request, "parasite@example.com", "parasite-pass-123", null);
+  await load("lib/auth").login({ email: "parasite@example.com", password: "parasite-pass-123" });
+  const pet = await pets.createPet({ name: "Симба", species: "cat", sex: "boy", weight_g: 4200 });
+
+  const today = new Date().toISOString().slice(0, 10);
+  const due = new Date(Date.parse(`${today}T00:00:00Z`) + 90 * 86_400_000).toISOString().slice(0, 10);
+  const created = await sections.saveHealthRecord(pet.id, "parasites", {
+    kind: "external", product_name: "Стронгхолд", treated_on: today, interval_days: 90,
+  });
+  assert.equal(created.interval_days, 90);
+  assert.equal(created.next_due_on, due, "сервер считает дату следующей обработки из интервала");
+
+  const listed = await sections.listHealthRecords(pet.id, "parasites");
+  assert.equal(listed.length, 1);
+
+  const dashboard = await sections.loadHealthDashboard(pet.id);
+  assert.equal(dashboard.overview.next_parasite.id, created.id);
+
+  const calendar = await health.loadCalendar(`${today.slice(0, 7)}-01`, `${today.slice(0, 7)}-28`);
+  const parasiteEvent = calendar.events.find((event) => event.kind === "parasite");
+  assert.ok(parasiteEvent, "событие обработки попадает в календарь");
+  assert.equal(parasiteEvent.date, due);
+  assert.equal(events.healthEventHref(parasiteEvent), `/pet/${pet.id}/health/parasites#health-parasite-${created.id}`);
+
+  await sections.saveHealthRecord(pet.id, "parasites", { interval_days: 30 }, created.id);
+  const updated = await sections.listHealthRecords(pet.id, "parasites");
+  assert.equal(updated[0].next_due_on !== null, true);
+
+  await sections.deleteHealthRecord(pet.id, { resource: "parasites", value: created });
+  assert.equal((await sections.listHealthRecords(pet.id, "parasites")).length, 0);
+});
+
 test("фото: загрузка фото питомца и аватара пользователя (multipart через настоящий API)", { skip: !process.env.PETCARE_TEST_PYTHON, timeout: 60_000 }, async (t) => {
   const request = await startBackend(t);
   const session = memorySession();

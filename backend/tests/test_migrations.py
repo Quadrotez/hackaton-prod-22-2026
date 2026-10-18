@@ -348,6 +348,44 @@ def test_calendar_feeds_migration_upgrade_and_downgrade(tmp_path: Path, monkeypa
         get_settings.cache_clear()
 
 
+def test_parasite_treatments_migration_upgrade_and_downgrade(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    database_url = f"sqlite+pysqlite:///{tmp_path / 'parasites-migration.sqlite'}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+
+    config = Config("alembic.ini")
+    try:
+        command.upgrade(config, "head")
+        inspector = inspect(create_engine(database_url))
+        assert "parasite_treatments" in inspector.get_table_names()
+        columns = {
+            column["name"]: column for column in inspector.get_columns("parasite_treatments")
+        }
+        assert columns["pet_id"]["nullable"] is False
+        assert columns["kind"]["nullable"] is False
+        assert columns["product_name"]["nullable"] is False
+        assert columns["treated_on"]["nullable"] is False
+        assert columns["interval_days"]["nullable"] is True
+        assert columns["next_due_on"]["nullable"] is True
+        keys = inspector.get_foreign_keys("parasite_treatments")
+        assert keys[0]["referred_table"] == "pets"
+        assert keys[0]["options"].get("ondelete") == "CASCADE"
+
+        vaccination_columns = {column["name"] for column in inspector.get_columns("vaccinations")}
+        assert {"interval_days", "next_due_on"} <= vaccination_columns
+
+        command.downgrade(config, "20261018_0016")
+        downgraded = inspect(create_engine(database_url))
+        assert "parasite_treatments" not in downgraded.get_table_names()
+        downgraded_columns = {column["name"] for column in downgraded.get_columns("vaccinations")}
+        assert "interval_days" not in downgraded_columns
+        assert "next_due_on" not in downgraded_columns
+    finally:
+        get_settings.cache_clear()
+
+
 def test_pet_transfers_migration_upgrade_and_downgrade(tmp_path: Path, monkeypatch) -> None:
     database_url = f"sqlite+pysqlite:///{tmp_path / 'transfers-migration.sqlite'}"
     monkeypatch.setenv("DATABASE_URL", database_url)

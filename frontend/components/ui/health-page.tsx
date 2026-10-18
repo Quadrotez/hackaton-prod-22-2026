@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import Link from "next/link";
 import {
   ActivityIcon,
+  BugIcon,
   PillIcon,
   StethoscopeIcon,
   SyringeIcon,
@@ -11,7 +12,7 @@ import {
 } from "lucide-react";
 import { useProtectedData } from "@/hooks/use-auth";
 import { formatWeight, type Pet } from "@/lib/pets";
-import { loadHealthDashboard, type Visit } from "@/lib/health-sections";
+import { loadHealthDashboard, type HealthOverview } from "@/lib/health-sections";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
@@ -85,11 +86,15 @@ export function HealthPage({ petId }: { petId: number }) {
   if (state.status === "error") {
     return <PageError message={state.error} onRetry={state.retry} backToList />;
   }
-  return <HealthContent pet={state.data.pet} nextVisit={state.data.overview.planned_visits[0]} />;
+  return <HealthContent pet={state.data.pet} overview={state.data.overview} />;
 }
 
-function HealthContent({ pet, nextVisit }: { pet: Pet; nextVisit?: Visit }) {
+const shortDate = (value: string) => new Date(value.length === 10 ? `${value}T00:00:00` : value).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+
+function HealthContent({ pet, overview }: { pet: Pet; overview: HealthOverview }) {
   const base = `/pet/${pet.id}/health`;
+  const nextVisit = overview.planned_visits[0];
+  const nextVaccination = overview.next_vaccination?.next_due_on ?? overview.next_vaccination?.scheduled_on;
 
   return (
     <>
@@ -105,6 +110,8 @@ function HealthContent({ pet, nextVisit }: { pet: Pet; nextVisit?: Visit }) {
           hint={pet.weight_g != null ? "по данным профиля" : "вес не указан"}
         />
         <StatTile label="Ближайший визит" value={nextVisit ? new Date(nextVisit.visit_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" }) : "—"} hint={nextVisit ? nextVisit.title : "приёмов не запланировано"} />
+        <StatTile label="Следующая прививка" value={nextVaccination ? shortDate(nextVaccination) : "—"} hint={overview.next_vaccination?.name ?? "прививок по плану нет"} />
+        <StatTile label="Следующая обработка" value={overview.next_parasite?.next_due_on ? shortDate(overview.next_parasite.next_due_on) : "—"} hint={overview.next_parasite?.product_name ?? "обработок по плану нет"} />
       </div>
 
       
@@ -117,6 +124,12 @@ function HealthContent({ pet, nextVisit }: { pet: Pet; nextVisit?: Visit }) {
           description="Плановые и сделанные"
           icon={SyringeIcon}
           accent
+        />
+        <QuickLinkTile
+          href={`${base}/parasites`}
+          title="Обработки"
+          description="От блох, клещей и глистов"
+          icon={BugIcon}
         />
         <QuickLinkTile
           href={`${base}/visits`}
