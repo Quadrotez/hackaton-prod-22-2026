@@ -2,8 +2,8 @@
 
 import { useCallback } from "react";
 import Link from "next/link";
-import { ArrowRightIcon, type LucideIcon } from "lucide-react";
-import { useProtectedData } from "@/hooks/use-auth";
+import { ArrowRightIcon, Share2Icon, type LucideIcon } from "lucide-react";
+import { useTransferData } from "@/hooks/use-transfer-data";
 import { useNow } from "@/hooks/use-now";
 import { listFoods } from "@/lib/foods";
 import { formatTimeAgo, listMeals, sortMeals, type Meal } from "@/lib/meals";
@@ -11,11 +11,11 @@ import { formatWeight, getPet, isCaretaker, pluralize } from "@/lib/pets";
 import { formatTransferDate } from "@/lib/transfers";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { PageError, PageLoading } from "@/components/page-state";
 import { PetInfoCard } from "@/components/pet-info-card";
 import { PetMeals } from "@/components/pet-meals";
-import { Button } from "./ui/button";
 
 function isToday(date: Date): boolean {
   return date.toDateString() === new Date().toDateString();
@@ -76,7 +76,7 @@ function CareNotice({ ownerName, endsAt }: { ownerName?: string | null; endsAt?:
   return (
     <Card variant="accent" className="flex flex-col items-start gap-3 md:flex-row md:items-center md:justify-between">
       <div className="flex flex-col gap-1">
-        <h3>Питомец у вас на время</h3>
+        <h3>Вы присматриваете за питомцем</h3>
         {(ownerName || endsAt) && (
           <p className="text-sm font-medium leading-5">
             {[ownerName && `Владелец: ${ownerName}`, endsAt && `до ${formatTransferDate(endsAt)}`]
@@ -85,10 +85,10 @@ function CareNotice({ ownerName, endsAt }: { ownerName?: string | null; endsAt?:
           </p>
         )}
         <p className="text-sm leading-5">
-          Можно кормить, отмечать лекарства и добавлять симптомы, замеры и визиты, но не менять и не удалять данные.
+          Смотрите календарь, прививки и назначения, записывайте кормления и наблюдения. Параметры питомца изменяет владелец.
         </p>
       </div>
-      <Link href="/transfers"><Button variant="secondary">Вернуть владельцу</Button></Link>
+      <Link href="/transfers" className={buttonVariants({ variant: "secondary" })}>Вернуть владельцу</Link>
     </Card>
   );
 }
@@ -103,7 +103,7 @@ export function PetDetails({ petId, startFeeding = false }: { petId: number; sta
     ]),
     [petId],
   );
-  const state = useProtectedData(load, "Не удалось загрузить питомца");
+  const state = useTransferData(load, "Не удалось загрузить питомца. Возможно, срок присмотра закончился");
   const now = useNow();
 
   if (state.status === "loading") return <PageLoading />;
@@ -149,6 +149,7 @@ export function PetDetails({ petId, startFeeding = false }: { petId: number; sta
       <PetMeals key={pet.id} defaultOpen={startFeeding} petId={pet.id} meals={meals} foods={foods} now={now} onMealsChange={handleMealsChange} caretaker={caretaker} />
 
       <section aria-label="Быстрые переходы" className="grid md:grid-cols-2 gap-3">
+        <QuickLinkTile href="/me" title="Календарь" description="Расписание прививок, лекарств и приёмов" icon={ArrowRightIcon} />
         <QuickLinkTile
           href={`/pet/${petId}/health`}
           title="Здоровье"
@@ -166,12 +167,12 @@ export function PetDetails({ petId, startFeeding = false }: { petId: number; sta
       {!caretaker && <Card>
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-col gap-2">
-            <h3>Передача другому человеку</h3>
+            <h3>Поделиться питомцем</h3>
             <h5 className="leading-5 text-muted-foreground">
-              Если кто-то будет присматривать за питомцем во время отъезда, отправьте ему заявку на передачу.
+              Договоритесь о временном уходе: отправьте заявку по email и подтвердите возврат, когда питомец будет дома.
             </h5>
           </div>
-          <Link href={`/pet/${petId}/transfer`}><Button>Передать</Button></Link>
+          <Link href={`/pet/${petId}/transfer`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-secondary px-4 text-sm font-medium outline-none hover:bg-secondary/80 focus-visible:ring-2 focus-visible:ring-foreground"><Share2Icon aria-hidden="true" className="size-4" />Поделиться</Link>
         </div>
       </Card>}
     </>

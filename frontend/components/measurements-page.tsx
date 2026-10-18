@@ -36,7 +36,7 @@ export function MeasurementsPage({ petId, embedded = false, onPetChange }: { pet
 
 function MeasurementRow({ name, unit, history, currentValue, pending, onAdd, onEdit, children }: {
   name: string; unit: string | null; history: MeasurementPoint[]; currentValue?: number | null;
-  pending: boolean; onAdd: () => void; onEdit?: () => void; children?: ReactNode;
+  pending: boolean; onAdd?: () => void; onEdit?: () => void; children?: ReactNode;
 }) {
   const latest = history[history.length - 1];
   const value = latest?.value ?? currentValue;
@@ -50,7 +50,7 @@ function MeasurementRow({ name, unit, history, currentValue, pending, onAdd, onE
             <span className="inline-flex items-baseline gap-2 whitespace-nowrap text-lg font-semibold tabular-nums sm:w-[130px]">{value == null ? "—" : measurementValue(value, unit)}
               {change !== null && <span className="text-xs font-medium text-muted-foreground" title="Изменение относительно предыдущего измерения">{change > 0 ? "+" : ""}{measurementNumber(change)}</span>}
             </span>
-            <Button type="button" variant="outline" size="icon" disabled={pending} onClick={onAdd} aria-label={`Новое измерение: ${name}`} title="Обновить значение"><RefreshCwIcon aria-hidden="true" /></Button>
+            {onAdd && <Button type="button" variant="outline" size="icon" disabled={pending} onClick={onAdd} aria-label={`Новое измерение: ${name}`} title="Обновить значение"><RefreshCwIcon aria-hidden="true" /></Button>}
             {onEdit && <Button type="button" variant="outline" size="icon" disabled={pending} onClick={onEdit} aria-label={`Изменить последнее измерение: ${name}`} title="Изменить последнее значение"><PencilIcon aria-hidden="true" /></Button>}
           </div>
           {latest && <span className="sr-only">Измерено {new Date(latest.measured_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}</span>}
@@ -68,7 +68,7 @@ function MeasurementsContent({ data, onUpdate, embedded, onPetChange }: { data: 
   const [editor, setEditor] = useState<Editor | null>(null);
   const [pending, setPending] = useState(false);
   const [refreshError, setRefreshError] = useState(false);
-  // A temporary caretaker adds new values but cannot correct old ones or change parameters.
+  // Measurements are read-only in the caretaker interface.
   const caretaker = isCaretaker(pet);
   const weightHistory = data.weights.map((entry) => ({ value: entry.weight_g / 1000, measured_at: entry.measured_at }));
 
@@ -90,7 +90,7 @@ function MeasurementsContent({ data, onUpdate, embedded, onPetChange }: { data: 
     setEditor({ kind: "parameter", id, mode, date: datetimeInput(mode === "edit" && latest ? latest.measured_at : new Date().toISOString()) });
   }
   async function save(draft: MeasurementDraft) {
-    if (pending || !editor) return;
+    if (pending || !editor || caretaker) return;
     setPending(true);
     try {
       if (editor.kind === "weight") {
@@ -129,13 +129,13 @@ function MeasurementsContent({ data, onUpdate, embedded, onPetChange }: { data: 
           {!caretaker && <span className="text-xs text-muted-foreground"><Link href={`/pet/${pet.id}/measurements/parameters`} className="font-semibold text-foreground underline underline-offset-4">параметры</Link></span>}
         </div>
         <div>
-          <MeasurementRow name="Вес" unit="кг" history={weightHistory} currentValue={pet.weight_g == null ? null : pet.weight_g / 1000} pending={pending} onAdd={() => setEditor({ kind: "weight" })}>
+          <MeasurementRow name="Вес" unit="кг" history={weightHistory} currentValue={pet.weight_g == null ? null : pet.weight_g / 1000} pending={pending} onAdd={caretaker ? undefined : () => setEditor({ kind: "weight" })}>
             {editor?.kind === "weight" && <MeasurementEditor key="weight" name="Вес" unit="кг" weight initialValue={pet.weight_g == null ? "" : String(pet.weight_g / 1000).replace(".", ",")} pending={pending} onSave={save} onCancel={() => setEditor(null)} />}
           </MeasurementRow>
           {(showAll ? parameters : []).map((parameter) => {
             const latest = parameter.history[parameter.history.length - 1];
             const editing = editor?.kind === "parameter" && editor.id === parameter.id;
-            return <MeasurementRow key={parameter.id} name={parameter.name} unit={parameter.unit} history={parameter.history} pending={pending} onAdd={() => openParameter(parameter.id, "add")} onEdit={latest && !caretaker ? () => openParameter(parameter.id, "edit") : undefined}>
+            return <MeasurementRow key={parameter.id} name={parameter.name} unit={parameter.unit} history={parameter.history} pending={pending} onAdd={caretaker ? undefined : () => openParameter(parameter.id, "add")} onEdit={latest && !caretaker ? () => openParameter(parameter.id, "edit") : undefined}>
               {editing && <MeasurementEditor key={`${parameter.id}-${editor.mode}`} name={parameter.name} unit={parameter.unit} rename={editor.mode === "edit"} initialValue={editor.mode === "edit" ? String(latest.value).replace(".", ",") : ""} initialDate={editor.date} pending={pending} onSave={save} onCancel={() => setEditor(null)} />}
             </MeasurementRow>;
           })}

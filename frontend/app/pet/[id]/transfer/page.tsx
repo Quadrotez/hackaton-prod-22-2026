@@ -5,7 +5,7 @@ import { PageError, PageLoading } from "@/components/page-state";
 import { PetTransfer } from "@/components/pet-transfer";
 
 export const metadata: Metadata = {
-  title: "Передача питомца — PetCare",
+  title: "Поделиться питомцем — PetCare",
 };
 
 export default function TransferPage({ params }: PageProps<"/pet/[id]/transfer">) {
@@ -15,7 +15,7 @@ export default function TransferPage({ params }: PageProps<"/pet/[id]/transfer">
         {params.then(({ id }) => {
           const petId = Number(id);
           return Number.isInteger(petId) && petId > 0 ? (
-            <PetTransfer petId={petId} />
+            <PetTransfer key={petId} petId={petId} />
           ) : (
             <PageError message="Питомец не найден" backToList />
           );

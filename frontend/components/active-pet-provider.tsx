@@ -39,8 +39,8 @@ function PetSessionProvider({ authorized, children }: { authorized: boolean; chi
   const selectedId = useRef<number | null>(null);
   const requests = useRef({ version: 0 });
   const userId = useRef<number | null>(null);
+  const availablePets = useRef<Pet[]>(NO_PETS);
   const pets = snapshot?.pets ?? NO_PETS;
-  const ownerId = snapshot?.userId;
 
   const refreshPets = useCallback(async () => {
     if (!authorized) return;
@@ -52,6 +52,7 @@ function PetSessionProvider({ authorized, children }: { authorized: boolean; chi
       ]);
       if (request !== requests.current.version) return;
       userId.current = user.id;
+      availablePets.current = nextPets;
       const candidates = [petIdFromPath(window.location.pathname), selectedId.current, readActivePetId(user.id)];
       const nextId = candidates.find((id) => nextPets.some((pet) => pet.id === id)) ?? nextPets[0]?.id ?? null;
       selectedId.current = nextId;
@@ -69,21 +70,26 @@ function PetSessionProvider({ authorized, children }: { authorized: boolean; chi
   }, [authorized]);
 
   const selectPet = useCallback((petId: number) => {
-    if (ownerId === undefined || !pets.some((pet) => pet.id === petId)) return;
+    if (userId.current === null || !availablePets.current.some((pet) => pet.id === petId)) return;
     selectedId.current = petId;
-    rememberActivePet(ownerId, petId);
+    rememberActivePet(userId.current, petId);
     setSnapshot((current) => current && current.selectedId !== petId ? { ...current, selectedId: petId } : current);
-  }, [pets, ownerId]);
+  }, []);
 
   useEffect(() => {
     const pending = requests.current;
     const refresh = () => { void refreshPets(); };
+    const refreshVisible = () => { if (document.visibilityState === "visible") refresh(); };
+    const timer = window.setInterval(refreshVisible, 30_000);
     window.addEventListener(PETS_CHANGED_EVENT, refresh);
     window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshVisible);
     return () => {
       ++pending.version;
+      window.clearInterval(timer);
       window.removeEventListener(PETS_CHANGED_EVENT, refresh);
       window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshVisible);
     };
   }, [refreshPets]);
 
