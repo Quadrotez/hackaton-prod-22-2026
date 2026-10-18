@@ -13,6 +13,7 @@ from app.schemas.vet_documents import VeterinaryDocumentAnalysis
 
 MODEL_NAME = os.getenv("YANDEX_MODEL", "deepseek-v4.1-flash")
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+INVALID_RESPONSE_RETRIES = 2
 
 SYSTEM_PROMPT = """
 Ты — AI-анализатор фотографий ветеринарных документов приложения PetCare.
@@ -126,36 +127,41 @@ def analyze_veterinary_document(
     context = normalized_text or "Текстовый комментарий отсутствует. Используй только фотографию."
 
     model_client = client or build_client()
-    response = model_client.chat.completions.create(
-        model=f"gpt://{FOLDER_ID}/{MODEL_NAME}",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            "Сначала проанализируй фотографию. Используй следующий текст "
-                            "только как вспомогательный источник для незаполненных полей; "
-                            f"значения с фотографии имеют приоритет:\n\n{context}"
-                        ),
-                    },
-                    {"type": "image_url", "image_url": {"url": image_data_url}},
-                ],
-            },
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.1,
-        max_tokens=900,
-    )
+    for attempt in range(INVALID_RESPONSE_RETRIES + 1):
+        response = model_client.chat.completions.create(
+            model=f"gpt://{FOLDER_ID}/{MODEL_NAME}",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Сначала проанализируй фотографию. Используй следующий текст "
+                                "только как вспомогательный источник для незаполненных полей; "
+                                f"значения с фотографии имеют приоритет:\n\n{context}"
+                            ),
+                        },
+                        {"type": "image_url", "image_url": {"url": image_data_url}},
+                    ],
+                },
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.1,
+            max_tokens=900,
+        )
 
-    raw_content = checked_message(response).content
-    try:
-        parsed = VeterinaryDocumentAnalysis.model_validate_json(raw_content)
-    except ValidationError as exc:
-        raise ValueError(
-            "The model returned an invalid veterinary-document analysis"
-        ) from exc
+        try:
+            raw_content = checked_message(response).content
+            parsed = VeterinaryDocumentAnalysis.model_validate_json(raw_content)
+        except (ValueError, ValidationError) as exc:
+            if attempt == INVALID_RESPONSE_RETRIES:
+                raise ValueError(
+                    "The model returned an invalid veterinary-document analysis"
+                ) from exc
+            continue
 
-    return parsed.model_dump(mode="json")
+        return parsed.model_dump(mode="json")
+
+    raise AssertionError("Unreachable")
