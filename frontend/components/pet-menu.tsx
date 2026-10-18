@@ -100,6 +100,7 @@ function PetMenuWithPath() {
               </ul>
             )}
             {pageCount > 1 && status === "ready" && <p aria-live="polite" className="pet-menu-pageLabel">{currentPage + 1} / {pageCount}</p>}
+            {pets.length > 0 && status === "ready" && <Link href="/pet/create" onNavigate={() => setOpen(false)} className={buttonVariants({ variant: "secondary", className: "mt-2 w-full" })}><PlusIcon aria-hidden="true" />Добавить питомца</Link>}
             {activePet && status === "ready" && <Link href={`/pet/${activePet.id}`} onNavigate={() => setOpen(false)} className="pet-menu-profileLink">
               <span className="min-w-0"><span className="block truncate font-medium">Профиль питомца: {activePet.name}</span><span className="mt-1 block text-xs text-muted-foreground">Здоровье, прививки и измерения</span></span><ArrowRightIcon aria-hidden="true" className="size-4 shrink-0" />
             </Link>}
