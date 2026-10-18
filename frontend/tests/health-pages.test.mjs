@@ -39,7 +39,38 @@ test("редактирование сохраняет все значения, �
   assert.equal(forms.healthFormDefaults(data, "visits", undefined, true).status, "completed");
 });
 
-test("четыре подстраницы: формы проходят полный CRUD на настоящем health API", { skip: !process.env.PETCARE_TEST_PYTHON, timeout: 60_000 }, async (t) => {
+test("бейдж срока обработки: сегодня, через N дней и просрочка", () => {
+  const { load } = client(() => Promise.resolve(new Response()));
+  const api = load("lib/health-sections");
+  assert.equal(api.dueBadge(null, "2026-10-17"), null);
+  assert.equal(api.dueBadge("2026-10-17", "2026-10-17"), "сегодня");
+  assert.equal(api.dueBadge("2026-10-18", "2026-10-17"), "через 1 дн.");
+  assert.equal(api.dueBadge("2026-10-24", "2026-10-17"), "через 7 дн.");
+  assert.equal(api.dueBadge("2026-10-16", "2026-10-17"), "просрочено 1 дн.");
+  assert.equal(api.dueBadge("2026-10-10", "2026-10-17"), "просрочено 7 дн.");
+});
+
+test("обработка: заголовок, дата и принадлежность к истории", () => {
+  const { load } = client(() => Promise.resolve(new Response()));
+  const api = load("lib/health-sections");
+  const record = { resource: "parasites", value: { id: 3, kind: "external", product_name: "Стронгхолд", treated_on: "2026-10-01", next_due_on: "2026-12-30" } };
+  assert.equal(api.recordTitle(record), "Стронгхолд");
+  assert.equal(api.recordDate(record), "2026-10-01");
+  assert.equal(api.recordIsHistory(record, "2026-10-17"), true);
+});
+
+test("валидация формы обработки: обязательные поля и необязательный интервал", () => {
+  const { load } = client(() => Promise.resolve(new Response()));
+  const forms = load("lib/health-form");
+  const ok = forms.healthSchemas.parasites.safeParse({ kind: "external", product_name: "Стронгхолд", treated_on: "2026-10-17", interval_days: "90", next_due_on: "", clinic: "", notes: "" });
+  assert.equal(ok.success, true, JSON.stringify(ok.error?.issues));
+  assert.equal(ok.data.interval_days, 90);
+  assert.equal(ok.data.next_due_on, null);
+  assert.equal(forms.healthSchemas.parasites.safeParse({ kind: "external", product_name: "  ", treated_on: "2026-10-17", interval_days: "", next_due_on: "" }).success, false);
+  assert.equal(forms.healthSchemas.parasites.safeParse({ kind: "external", product_name: "X", treated_on: "2026-10-17", interval_days: "0", next_due_on: "" }).success, false);
+});
+
+test("пять подстраниц: формы проходят полный CRUD на настоящем health API", { skip: !process.env.PETCARE_TEST_PYTHON, timeout: 60_000 }, async (t) => {
   const request = await startBackend(t);
   const register = await request("/api/v1/auth/register", { method: "POST", body: JSON.stringify({ email: "health-pages-test@example.com", name: null, password: "health-pages-test-password" }) });
   assert.ok([200, 201, 409].includes(register.status), await register.clone().text());
@@ -60,15 +91,20 @@ test("четыре подстраницы: формы проходят полн�
     medications: { name: "Курс", dose: "1 таблетка", start_date: today, end_date: today, times: "09:00, 18:00", interval_days: 1 },
     symptoms: { description: "Необычный стул", observed_at: `${today}T09:30` },
     allergies: { allergen: "Курица", reactions: "Зуд" },
+    parasites: { kind: "external", product_name: "Стронгхолд", treated_on: today, interval_days: 90, next_due_on: "", clinic: "", notes: "" },
   };
   const recordIds = {};
   for (const [resource, values] of Object.entries(samples)) {
     const created = await api.saveHealthRecord(pet.id, resource, body(resource, values, forms));
     recordIds[resource] = created.id;
+    if (resource === "parasites") {
+      const expectedDue = new Date(Date.parse(`${today}T00:00:00Z`) + 90 * 86_400_000).toISOString().slice(0, 10);
+      assert.equal(created.next_due_on, expectedDue, "сервер считает дату следующей обработки из интервала");
+    }
     const updated = await api.saveHealthRecord(pet.id, resource, body(resource, { ...values, ...(resource === "symptoms" ? { description: "Наблюдение уточнено" } : resource === "allergies" ? { reactions: "Чихание" } : { notes: "Сохранено после изменения" }) }, forms), created.id);
     assert.equal(updated.id, created.id);
   }
-  for (const section of ["vaccines", "visits", "medicines", "symptoms"]) {
+  for (const section of ["vaccines", "parasites", "visits", "medicines", "symptoms"]) {
     const data = await api.loadHealthSection(pet.id, section);
     assert.equal(data.pet.id, pet.id);
     assert.ok(data.records.length > 0, section);

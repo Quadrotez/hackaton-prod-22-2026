@@ -57,6 +57,11 @@ class IntakeStatus(StrEnum):
     SKIPPED = "skipped"
 
 
+class ParasiteKind(StrEnum):
+    INTERNAL = "internal"  # internal parasites (helminths etc.)
+    EXTERNAL = "external"  # external parasites (fleas, ticks)
+
+
 class Symptom(Base):
     __tablename__ = "symptoms"
     __table_args__ = (Index("ix_symptoms_pet_id", "pet_id"),)
@@ -118,6 +123,29 @@ class Vaccination(Base):
     status: Mapped[VaccinationStatus] = mapped_column(
         string_enum(VaccinationStatus, "vaccination_status"), nullable=False
     )
+    clinic: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Optional booster interval; when set, next_due_on is derived server-side.
+    interval_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    next_due_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ParasiteTreatment(Base):
+    __tablename__ = "parasite_treatments"
+    __table_args__ = (Index("ix_parasite_treatments_pet_id", "pet_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    pet_id: Mapped[int] = mapped_column(ForeignKey("pets.id", ondelete="CASCADE"), nullable=False)
+    kind: Mapped[ParasiteKind] = mapped_column(
+        string_enum(ParasiteKind, "parasite_kind"), nullable=False
+    )
+    product_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    treated_on: Mapped[date] = mapped_column(Date, nullable=False)
+    interval_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    next_due_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     clinic: Mapped[str | None] = mapped_column(String(255), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
