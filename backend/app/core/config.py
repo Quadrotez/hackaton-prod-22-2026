@@ -22,10 +22,16 @@ class Settings(BaseSettings):
         env_file=PROJECT_ROOT / ".env", env_file_encoding="utf-8", extra="ignore"
     )
 
+    # Environment variables are often set in another case (LOG_FORMAT=JSON in CI).
     @field_validator("log_level", mode="before")
     @classmethod
     def upper_log_level(cls, value: object) -> object:
-        return value.upper() if isinstance(value, str) else value
+        return value.strip().upper() if isinstance(value, str) else value
+
+    @field_validator("log_format", mode="before")
+    @classmethod
+    def lower_log_format(cls, value: object) -> object:
+        return value.strip().lower() if isinstance(value, str) else value
 
     @field_validator("media_dir", mode="after")
     @classmethod

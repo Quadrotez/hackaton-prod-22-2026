@@ -11,7 +11,7 @@ import { Spinner } from "@/components/ui/spinner";
 
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-export function PregnancyCard({ petId, pregnancy, onChanged }: { petId: number; pregnancy: Pregnancy | null; onChanged: () => Promise<void> }) {
+export function PregnancyCard({ petId, pregnancy, onChanged, readOnly = false }: { petId: number; pregnancy: Pregnancy | null; onChanged: () => Promise<void>; readOnly?: boolean }) {
   const { handleAuthError } = useRequireAuth();
   const [pending, setPending] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -52,7 +52,7 @@ export function PregnancyCard({ petId, pregnancy, onChanged }: { petId: number; 
       </label>
       <Button type="submit" className="theme-shadcn" disabled={pending}>{pending && <Spinner />}Сохранить</Button>
       <Button type="button" variant="secondary" className="theme-shadcn" disabled={pending} onClick={() => setEditing(false)}>Отмена</Button>
-    </form> : <div className="flex flex-wrap gap-2">
+    </form> : readOnly ? null : <div className="flex flex-wrap gap-2">
       <Button type="button" variant="secondary" className="theme-shadcn" disabled={pending} onClick={() => setEditing(true)}>{pregnancy ? "Изменить месяц" : "Отметить беременность"}</Button>
       {pregnancy && <Button type="button" variant="secondary" className="theme-shadcn" disabled={pending} onClick={() => run(() => endPregnancy(petId), "Беременность завершена")}>Завершить</Button>}
     </div>}

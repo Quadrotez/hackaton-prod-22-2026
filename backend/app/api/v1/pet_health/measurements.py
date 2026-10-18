@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
-from app.api.async_dependencies import AsyncDbSession, OwnedPet
+from app.api.async_dependencies import AsyncDbSession, CaredPet, OwnedPet
 from app.models.health import Measurement, MeasurementParameter
 from app.schemas.health import (
     MeasurementCreate,
@@ -61,7 +61,7 @@ async def list_templates() -> list[MeasurementTemplate]:
     summary="List measurement parameters",
     description=TEMPLATE_NOTE,
 )
-async def list_parameters(pet: OwnedPet, db: AsyncDbSession) -> list[MeasurementParameter]:
+async def list_parameters(pet: CaredPet, db: AsyncDbSession) -> list[MeasurementParameter]:
     await ensure_initialized(db, pet)
     return list(await load_parameters(db, pet.id))
 
@@ -72,7 +72,7 @@ async def list_parameters(pet: OwnedPet, db: AsyncDbSession) -> list[Measurement
     summary="Parameters with latest value, change and recent points",
     description=TEMPLATE_NOTE,
 )
-async def get_summary(pet: OwnedPet, db: AsyncDbSession) -> list[MeasurementParameterSummary]:
+async def get_summary(pet: CaredPet, db: AsyncDbSession) -> list[MeasurementParameterSummary]:
     await ensure_initialized(db, pet)
     return await summarize(db, pet.id)
 
@@ -115,7 +115,7 @@ async def apply_species_template(
 
 @router.get("/{parameter_id}", response_model=MeasurementParameterPublic)
 async def get_parameter(
-    pet: OwnedPet, parameter_id: int, db: AsyncDbSession
+    pet: CaredPet, parameter_id: int, db: AsyncDbSession
 ) -> MeasurementParameter:
     return await get_pet_child(db, MeasurementParameter, pet.id, parameter_id, PARAMETER_NOT_FOUND)
 
@@ -167,7 +167,7 @@ async def get_measurement(
     status_code=status.HTTP_201_CREATED,
 )
 async def create_measurement(
-    pet: OwnedPet, parameter_id: int, payload: MeasurementCreate, db: AsyncDbSession
+    pet: CaredPet, parameter_id: int, payload: MeasurementCreate, db: AsyncDbSession
 ) -> Measurement:
     await get_pet_child(db, MeasurementParameter, pet.id, parameter_id, PARAMETER_NOT_FOUND)
     return await save(db, Measurement(parameter_id=parameter_id, **payload.model_dump()))
@@ -180,7 +180,7 @@ async def create_measurement(
     description="Optionally limited to [from, to] for charts.",
 )
 async def list_measurements(
-    pet: OwnedPet,
+    pet: CaredPet,
     parameter_id: int,
     db: AsyncDbSession,
     start: datetime | None = Query(default=None, alias="from"),
@@ -197,7 +197,7 @@ async def list_measurements(
 
 @router.get("/{parameter_id}/measurements/{measurement_id}", response_model=MeasurementPublic)
 async def read_measurement(
-    pet: OwnedPet, parameter_id: int, measurement_id: int, db: AsyncDbSession
+    pet: CaredPet, parameter_id: int, measurement_id: int, db: AsyncDbSession
 ) -> Measurement:
     return await get_measurement(db, pet.id, parameter_id, measurement_id)
 

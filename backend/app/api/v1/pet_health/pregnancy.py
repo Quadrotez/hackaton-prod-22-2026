@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 
-from app.api.async_dependencies import AsyncDbSession, OwnedPet
+from app.api.async_dependencies import AsyncDbSession, CaredPet, OwnedPet
 from app.api.v1.pet_health.dependencies import LocalTimezone
 from app.models.health import Pregnancy
 from app.models.pet import PetSex
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/pets/{pet_id}/pregnancy", tags=["pet health: pregnan
     description="Returns null when the pet is not currently pregnant.",
 )
 async def get_pregnancy(
-    pet: OwnedPet, db: AsyncDbSession, tz: LocalTimezone
+    pet: CaredPet, db: AsyncDbSession, tz: LocalTimezone
 ) -> PregnancyPublic | None:
     pregnancy = await active_pregnancy(db, pet.id)
     return to_public(pregnancy, local_today(tz)) if pregnancy else None
