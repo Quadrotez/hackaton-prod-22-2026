@@ -9,7 +9,13 @@ from app.core.log import configure_logging
 from app.core.request_logging import register_request_logging
 
 settings = get_settings()
-configure_logging(settings.log_level, settings.log_format)
+configure_logging(
+    settings.log_level,
+    settings.log_format,
+    settings.sage_log_url,
+    settings.sage_api_token,
+    settings.sage_log_timeout_seconds,
+)
 
 SWAGGER_REQUEST_INTERCEPTOR_PLACEHOLDER = "__petcare_request_interceptor__"
 SWAGGER_REQUEST_INTERCEPTOR = """request => {
