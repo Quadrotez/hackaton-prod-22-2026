@@ -21,7 +21,12 @@ class CalendarEvent(BaseModel):
     title: str = Field(description="Visit title, vaccine name or medication name.")
     detail: str | None = Field(description="Doctor, clinic or dose.")
     date: Date = Field(description="Local date in the requested timezone.")
-    time: Time | None = Field(description="Local time; null for all-day events (vaccinations).")
+    time: Time | None = Field(
+        description=(
+            "Local time; null for all-day events (vaccinations, parasite treatments, "
+            "visits without a known time)."
+        )
+    )
     status: str = Field(
         description=(
             "visit: planned/completed; vaccination: planned/done; "

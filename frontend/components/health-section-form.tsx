@@ -16,6 +16,10 @@ export function HealthSectionForm({ data, resource, record, history, pending, on
   const id = useId();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const defaults = healthFormDefaults(data, resource, record, history);
+  // Чекбоксы, от которых зависят другие поля (например, «Время не указано» отключает время).
+  const [checked, setChecked] = useState<Record<string, boolean>>(() => Object.fromEntries(
+    healthFields[resource].filter((field) => field.type === "checkbox").map((field) => [field.name, defaults[field.name] === "on"]),
+  ));
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) return;
@@ -37,11 +41,18 @@ export function HealthSectionForm({ data, resource, record, history, pending, on
       <FieldSet disabled={pending}><FieldGroup className="gap-4">
         {healthFields[resource].map((field, index) => {
           const fieldId = `${id}-${field.name}`;
-          return <Field key={field.name} data-invalid={Boolean(errors[field.name])}>
+          if (field.type === "checkbox") return <Field key={field.name} orientation="horizontal">
+            <input id={fieldId} name={field.name} type="checkbox" checked={checked[field.name] ?? false}
+              onChange={(event) => { const value = event.target.checked; setChecked((current) => ({ ...current, [field.name]: value })); }}
+              className="size-4 shrink-0 accent-primary" />
+            <FieldLabel htmlFor={fieldId} className="font-normal">{field.label}</FieldLabel>
+          </Field>;
+          const disabled = field.disabledBy ? Boolean(checked[field.disabledBy]) : false;
+          return <Field key={field.name} data-invalid={Boolean(errors[field.name])} data-disabled={disabled || undefined}>
             <FieldLabel htmlFor={fieldId}>{field.label}</FieldLabel>
             {field.options ? <select id={fieldId} name={field.name} defaultValue={defaults[field.name]} aria-invalid={Boolean(errors[field.name])} aria-describedby={errors[field.name] ? `${fieldId}-error` : undefined} className="h-9 w-full rounded-lg border border-input bg-card px-2.5 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50">
               {field.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select> : field.type === "textarea" ? <textarea id={fieldId} name={field.name} defaultValue={defaults[field.name] ?? ""} rows={3} required={field.required} maxLength={field.maxLength} autoFocus={index === 0} aria-invalid={Boolean(errors[field.name])} aria-describedby={errors[field.name] ? `${fieldId}-error` : undefined} className="min-h-24 w-full resize-y rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50" /> : <Input id={fieldId} name={field.name} type={field.type ?? "text"} required={field.required} maxLength={field.maxLength} min={field.min} max={field.max} step={field.type === "number" ? 1 : undefined} placeholder={field.placeholder} defaultValue={defaults[field.name] ?? ""} autoFocus={index === 0} aria-invalid={Boolean(errors[field.name])} aria-describedby={errors[field.name] ? `${fieldId}-error` : undefined} />}
+            </select> : field.type === "textarea" ? <textarea id={fieldId} name={field.name} defaultValue={defaults[field.name] ?? ""} rows={3} required={field.required} maxLength={field.maxLength} autoFocus={index === 0} aria-invalid={Boolean(errors[field.name])} aria-describedby={errors[field.name] ? `${fieldId}-error` : undefined} className="min-h-24 w-full resize-y rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50" /> : <Input id={fieldId} name={field.name} type={field.type ?? "text"} required={field.required} maxLength={field.maxLength} min={field.min} max={field.max} step={field.type === "number" ? 1 : undefined} placeholder={field.placeholder} defaultValue={defaults[field.name] ?? ""} disabled={disabled} autoFocus={index === 0} aria-invalid={Boolean(errors[field.name])} aria-describedby={errors[field.name] ? `${fieldId}-error` : undefined} />}
             <FieldError id={`${fieldId}-error`}>{errors[field.name]}</FieldError>
           </Field>;
         })}
