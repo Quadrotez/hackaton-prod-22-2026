@@ -43,6 +43,8 @@ const quickTimes = [
   { label: "3 ч назад", minutes: 180 },
 ];
 
+const quickPortions = [50, 100, 150, 200, 300];
+
 function toLocalInput(date: Date): string {
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -101,6 +103,7 @@ function MealForm({
   const ranked = rankFoods(foods, meals);
   const [foodId, setFoodId] = useState(meal?.food_id ? String(meal.food_id) : "");
   const [fedAt, setFedAt] = useState(() => toLocalInput(meal ? new Date(meal.fed_at) : new Date()));
+  const [amount, setAmount] = useState(String(DEFAULT_PORTION_GRAMS));
   const [liked, setLiked] = useState(meal?.liked ?? true);
   const [tolerated, setTolerated] = useState(meal?.tolerated ?? true);
   const [digestive, setDigestive] = useState(meal?.digestive_reaction ?? false);
@@ -277,12 +280,33 @@ function MealForm({
                 inputMode="numeric"
                 min={1}
                 step={1}
-                defaultValue={DEFAULT_PORTION_GRAMS}
+                value={amount}
                 required
-                onChange={() => setErrors((current) => ({ ...current, amount_grams: undefined }))}
+                onChange={(event) => {
+                  setAmount(event.target.value);
+                  setErrors((current) => ({ ...current, amount_grams: undefined }));
+                }}
                 aria-invalid={Boolean(errors.amount_grams)}
                 aria-describedby="meal-amount-help meal-amount-error"
+                // На мобильных стрелки-счётчики не нужны: порцию выбирают шаблонами или вводят с клавиатуры
+                className="max-md:[appearance:textfield] max-md:[&::-webkit-inner-spin-button]:appearance-none max-md:[&::-webkit-outer-spin-button]:appearance-none"
               />
+              <div className="flex flex-wrap gap-2.5 md:gap-1.5">
+                {quickPortions.map((grams) => (
+                  <Button
+                    key={grams}
+                    type="button"
+                    size="xs"
+                    variant="secondary"
+                    onClick={() => {
+                      setAmount(String(grams));
+                      setErrors((current) => ({ ...current, amount_grams: undefined }));
+                    }}
+                  >
+                    {grams} г
+                  </Button>
+                ))}
+              </div>
               <p id="meal-amount-help" className="text-xs text-muted-foreground">Можно изменить перед сохранением.</p>
               <FieldError id="meal-amount-error">{errors.amount_grams}</FieldError>
             </Field>
@@ -401,14 +425,14 @@ function MealForm({
             <FieldError>{errors.notes}</FieldError>
           </Field>
 
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" size="lg">
+          <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap">
+            <Button type="submit" size="lg" className="max-md:h-11">
               {pending && <Spinner />}
               {isEdit ? "Сохранить" : "Записать"}
             </Button>
-            <Button type="button" size="lg" variant="outline" onClick={onCancel}>Отмена</Button>
+            <Button type="button" size="lg" variant="outline" className="max-md:h-11" onClick={onCancel}>Отмена</Button>
             {isEdit && (
-              <Button type="button" size="lg" variant="destructive" className="ml-auto" onClick={handleDelete}>
+              <Button type="button" size="lg" variant="destructive" className="max-md:col-span-2 max-md:h-11 md:ml-auto" onClick={handleDelete}>
                 Удалить
               </Button>
             )}
@@ -489,7 +513,7 @@ export function PetMeals({
         <div className="flex items-center justify-between gap-3">
           <h2>Приёмы пищи</h2>
           {editing === null && (
-            <Button type="button" onClick={() => setEditing("new")}>
+            <Button type="button" className="max-md:h-10 max-md:px-4" onClick={() => setEditing("new")}>
               <PlusIcon aria-hidden="true" />
               Покормить
             </Button>
