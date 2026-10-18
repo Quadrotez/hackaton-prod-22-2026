@@ -4,6 +4,12 @@
 #   SPIRIT_DOCKER_SA_KEY (File) - service-account key for the private registry
 #   SSH_PRIVATE_KEY (File)      - private key of the VM deploy user
 #   DEPLOY_USER, DEPLOY_HOST    - deploy user name and VM address
+#   DB_PASSWORD                 - Postgres password (compose)
+#   JWT_SECRET_KEY              - JWT signing secret (backend)
+#   ACCESS_TOKEN_EXPIRE_MINUTES - access token TTL in minutes (optional, defaults to 30)
+#   YANDEX_API_KEY              - Yandex AI key (backend)
+#   YANDEX_FOLDER_ID            - Yandex Cloud folder id (backend)
+# The deploy job renders /opt/petcare/.env from these on every deploy.
 
 stages:
   - prepare
@@ -218,6 +224,19 @@ deploy:
       KEY_B64=$(base64 -w0 "$SPIRIT_DOCKER_SA_KEY")
       ssh $SSH_ADDRESS "bash /opt/petcare/registry-login.sh '$KEY_B64' ${DP_CLI_VERSION}"
     - scp docker-compose.yml "${SSH_ADDRESS}:/opt/petcare/docker-compose.yml"
+    # Render the runtime env file from CI/CD variables, so no .env has to be
+    # created or kept by hand on the VM. Values are streamed over stdin (never
+    # on the command line), so secrets do not leak into `ps` or logs.
+    - |
+      cat <<ENV_EOF | ssh $SSH_ADDRESS "cat > /opt/petcare/.env && chmod 600 /opt/petcare/.env"
+      DB_PASSWORD=${DB_PASSWORD}
+      JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      YANDEX_API_KEY=${YANDEX_API_KEY}
+      YANDEX_FOLDER_ID=${YANDEX_FOLDER_ID}
+      LOG_LEVEL=${LOG_LEVEL:-INFO}
+      LOG_FORMAT=json
+      ENV_EOF
     # Pre-flight: миграция в одноразовом контейнере ДО того, как трогать api/site.
     # Если она падает — прод продолжает крутить предыдущий образ (без окна 502).
     - ssh $SSH_ADDRESS "cd /opt/petcare && TAG=${TAG} docker compose pull && TAG=${TAG} docker compose run --rm migrate"
