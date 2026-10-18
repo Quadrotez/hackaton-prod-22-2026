@@ -11,6 +11,7 @@ class CalendarEventType(StrEnum):
     VACCINATION = "vaccination"
     MEDICATION = "medication"
     PARASITE = "parasite"
+    BIRTHDAY = "birthday"
 
 
 class CalendarEvent(BaseModel):
@@ -30,10 +31,12 @@ class CalendarEvent(BaseModel):
     status: str = Field(
         description=(
             "visit: planned/completed; vaccination: planned/done; "
-            "medication: pending/taken/skipped."
+            "medication: pending/taken/skipped; birthday: planned/past."
         )
     )
-    source_id: int = Field(description="Id of the visit, vaccination or medication.")
+    source_id: int = Field(
+        description="Id of the visit, vaccination, medication or treatment; the pet for a birthday."
+    )
 
 
 class CalendarFeedStatus(BaseModel):

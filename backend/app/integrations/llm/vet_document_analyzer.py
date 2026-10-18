@@ -16,6 +16,7 @@ from app.schemas.vet_documents import VeterinaryDocumentAnalysis
 MODEL_NAME = os.getenv("YANDEX_MODEL", "deepseek-v4.1-flash")
 logger = logging.getLogger(__name__)
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+INVALID_RESPONSE_RETRIES = 2
 
 SYSTEM_PROMPT = """
 Ты — AI-анализатор фотографий ветеринарных документов приложения PetCare.
@@ -129,54 +130,62 @@ def analyze_veterinary_document(
     context = normalized_text or "Текстовый комментарий отсутствует. Используй только фотографию."
 
     model_client = client or build_client()
-    started = time.perf_counter()
-    response = model_client.chat.completions.create(
-        model=f"gpt://{FOLDER_ID}/{MODEL_NAME}",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            "Сначала проанализируй фотографию. Используй следующий текст "
-                            "только как вспомогательный источник для незаполненных полей; "
-                            f"значения с фотографии имеют приоритет:\n\n{context}"
-                        ),
-                    },
-                    {"type": "image_url", "image_url": {"url": image_data_url}},
-                ],
-            },
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.1,
-        max_tokens=900,
-    )
-
-    usage = getattr(response, "usage", None)
-    # Never log the document text or the model output: they hold personal data.
-    llm_fields = {
-        "event": "llm.response",
-        "model": MODEL_NAME,
-        "duration_ms": round((time.perf_counter() - started) * 1000, 1),
-        "image_bytes": len(image_bytes),
-        "prompt_tokens": getattr(usage, "prompt_tokens", None),
-        "completion_tokens": getattr(usage, "completion_tokens", None),
-        "finish_reason": response.choices[0].finish_reason if response.choices else None,
-    }
-    logger.info("LLM answered", extra=llm_fields)
-
-    raw_content = checked_message(response).content
-    try:
-        parsed = VeterinaryDocumentAnalysis.model_validate_json(raw_content)
-    except ValidationError as exc:
-        logger.warning(
-            "LLM answer does not match the contract",
-            extra={"event": "llm.invalid_answer", "errors": exc.error_count()},
+    for attempt in range(INVALID_RESPONSE_RETRIES + 1):
+        started = time.perf_counter()
+        response = model_client.chat.completions.create(
+            model=f"gpt://{FOLDER_ID}/{MODEL_NAME}",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Сначала проанализируй фотографию. Используй следующий текст "
+                                "только как вспомогательный источник для незаполненных полей; "
+                                f"значения с фотографии имеют приоритет:\n\n{context}"
+                            ),
+                        },
+                        {"type": "image_url", "image_url": {"url": image_data_url}},
+                    ],
+                },
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.1,
+            max_tokens=900,
         )
-        raise ValueError(
-            "The model returned an invalid veterinary-document analysis"
-        ) from exc
 
-    return parsed.model_dump(mode="json")
+        usage = getattr(response, "usage", None)
+        # Never log the document text or the model output: they hold personal data.
+        llm_fields = {
+            "event": "llm.response",
+            "model": MODEL_NAME,
+            "duration_ms": round((time.perf_counter() - started) * 1000, 1),
+            "image_bytes": len(image_bytes),
+            "prompt_tokens": getattr(usage, "prompt_tokens", None),
+            "completion_tokens": getattr(usage, "completion_tokens", None),
+            "finish_reason": response.choices[0].finish_reason if response.choices else None,
+        }
+        logger.info("LLM answered", extra=llm_fields)
+
+        try:
+            raw_content = checked_message(response).content
+            parsed = VeterinaryDocumentAnalysis.model_validate_json(raw_content)
+        except (ValueError, ValidationError) as exc:
+            logger.warning(
+                "LLM answer does not match the contract",
+                extra={
+                    "event": "llm.invalid_answer",
+                    "errors": exc.error_count() if isinstance(exc, ValidationError) else None,
+                },
+            )
+            if attempt == INVALID_RESPONSE_RETRIES:
+                raise ValueError(
+                    "The model returned an invalid veterinary-document analysis"
+                ) from exc
+            continue
+
+        return parsed.model_dump(mode="json")
+
+    raise AssertionError("Unreachable")
