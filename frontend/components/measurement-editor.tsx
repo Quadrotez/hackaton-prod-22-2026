@@ -34,7 +34,7 @@ export function MeasurementEditor({ name, unit, initialValue = "", initialDate =
   }
 
   return (
-    <form onSubmit={submit} noValidate aria-label={`Измерение: ${name}`} aria-busy={pending} className="rounded-xl bg-black/2 p-3">
+    <form onSubmit={submit} noValidate aria-label={`Измерение: ${name}`} aria-busy={pending} className="rounded-xl bg-black/2 p-3 dark:bg-white/3">
       <fieldset disabled={pending} className="flex min-w-0 flex-col gap-3">
         {!rename && <p className="text-sm font-semibold">{name}</p>}
         {rename && <Field data-invalid={!!errors.name}>
