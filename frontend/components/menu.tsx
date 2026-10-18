@@ -96,8 +96,8 @@ function MenuBar({ pathname = "", feeding = false }: { pathname?: string; feedin
         </span>
         <span className="text-[11px] font-semibold leading-3">Профиль</span>
       </Link>
-      <MenuLink href="/pet" label="Запасы" icon={PackageIcon} active={stockActive} />
+      <MenuLink href="/food" label="Запасы" icon={PackageIcon} active={stockActive} />
       <MenuLink href="/account" label="Аккаунт" icon={UserIcon} active={pathname === "/account"} />
     </nav>
   );
-}
+} 
