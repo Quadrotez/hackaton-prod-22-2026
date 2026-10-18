@@ -169,9 +169,6 @@ export function LoginForm() {
                     disabled={pending}
                   >
                     <span className="font-medium">{account.title}</span>
-                    <span className="text-xs font-normal text-muted-foreground">
-                      {account.description}
-                    </span>
                   </Button>
                 ))}
               </div>
