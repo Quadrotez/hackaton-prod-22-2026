@@ -1,4 +1,4 @@
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -307,9 +307,29 @@ class IntakeMark(BaseModel):
 # --- Vet visits -------------------------------------------------------------------
 
 
+def visit_at_utc(value: datetime | None) -> datetime | None:
+    """Stored in UTC; a value without an offset is taken as UTC (as Postgres does)."""
+    if value is None:
+        return None
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+VISIT_AT_DESCRIPTION = (
+    "Date and time of the visit. Exactly 00:00:00 UTC (e.g. 2026-10-17T00:00:00Z) means the "
+    "time is unknown: the visit is shown as an all-day event on that date. A real time that "
+    "falls on 00:00:00 UTC should be sent as 00:00:01."
+)
+
+
 class VetVisitCreate(BaseModel):
     # Analyzer field names are accepted alongside the existing visit contract.
-    visit_at: datetime
+    visit_at: datetime = Field(description=VISIT_AT_DESCRIPTION)
+
+    @field_validator("visit_at")
+    @classmethod
+    def normalize_visit_at(cls, value: datetime | None) -> datetime | None:
+        return visit_at_utc(value)
+
     visit_reason: str | None = Field(default=None, min_length=1, max_length=5000)
     visit_price: float | None = Field(default=None, ge=0)
     veterinarian_name: str | None = Field(default=None, max_length=255)
@@ -355,7 +375,13 @@ class VetVisitCreate(BaseModel):
 
 
 class VetVisitUpdate(BaseModel):
-    visit_at: datetime | None = None
+    visit_at: datetime | None = Field(default=None, description=VISIT_AT_DESCRIPTION)
+
+    @field_validator("visit_at")
+    @classmethod
+    def normalize_visit_at(cls, value: datetime | None) -> datetime | None:
+        return visit_at_utc(value)
+
     visit_reason: str | None = Field(default=None, min_length=1, max_length=5000)
     visit_price: float | None = Field(default=None, ge=0)
     veterinarian_name: str | None = Field(default=None, max_length=255)
@@ -403,6 +429,13 @@ class VetVisitPublic(ORMModel):
     notes: str | None
     referred_by_visit_id: int | None
     created_at: datetime
+
+    @field_validator("visit_at")
+    @classmethod
+    def aware_utc(cls, value: datetime) -> datetime:
+        # SQLite hands timezone-aware columns back naive; values are written in UTC.
+        # Always answer with an offset so clients do not read it as local time.
+        return visit_at_utc(value)
 
 
 class VisitTopic(BaseModel):
@@ -547,6 +580,8 @@ class FeedingBrief(ORMModel):
     fed_at: datetime
     liked: bool
     tolerated: bool
+    digestive_reaction: bool
+    allergic_reaction: bool
     reaction_notes: str | None
 
 

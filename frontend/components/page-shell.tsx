@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BackgroundArt } from "@/components/background-art";
 import { Logo } from "@/components/logo";
 import { Menu } from "@/components/menu";
 
@@ -7,7 +8,8 @@ export function PageShell({ children, contentClassName = "max-w-sm md:max-w-xl" 
   contentClassName?: string;
 }) {
   return (
-    <main className="relative flex min-h-dvh flex-col items-center bg-secondary px-6 pb-28 pt-20">
+    <main className="relative isolate flex min-h-dvh flex-col items-center bg-background px-6 pb-28 pt-20">
+      <BackgroundArt />
       <Link
         href="/me"
         className="absolute left-6 top-6 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-foreground"

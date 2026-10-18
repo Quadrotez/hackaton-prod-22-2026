@@ -386,6 +386,61 @@ def test_parasite_treatments_migration_upgrade_and_downgrade(
         get_settings.cache_clear()
 
 
+def test_feeding_reaction_types_migration_backfills_false(tmp_path: Path, monkeypatch) -> None:
+    database_url = f"sqlite+pysqlite:///{tmp_path / 'reaction-types-migration.sqlite'}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    get_settings.cache_clear()
+
+    config = Config("alembic.ini")
+    engine = create_engine(database_url)
+    try:
+        command.upgrade(config, "20261018_0017")
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO users (email, password_hash, created_at) "
+                    "VALUES ('reactions@example.com', 'hash', CURRENT_TIMESTAMP)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO pets (user_id, name, species, sex, weight_g) "
+                    "VALUES (1, 'Milo', 'cat', 'boy', 4500)"
+                )
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO feeding_records (pet_id, food_name, fed_at, liked, tolerated, "
+                    "reaction_notes, created_at) VALUES (1, 'Old food', CURRENT_TIMESTAMP, "
+                    "1, 0, 'Vomiting', CURRENT_TIMESTAMP)"
+                )
+            )
+
+        command.upgrade(config, "head")
+        columns = {c["name"]: c for c in inspect(engine).get_columns("feeding_records")}
+        assert columns["digestive_reaction"]["nullable"] is False
+        assert columns["allergic_reaction"]["nullable"] is False
+        with engine.connect() as connection:
+            row = connection.execute(
+                text(
+                    "SELECT digestive_reaction, allergic_reaction, reaction_notes "
+                    "FROM feeding_records"
+                )
+            ).one()
+        assert (bool(row[0]), bool(row[1]), row[2]) == (False, False, "Vomiting")
+
+        command.downgrade(config, "20261018_0017")
+        downgraded = {c["name"] for c in inspect(engine).get_columns("feeding_records")}
+        assert not {"digestive_reaction", "allergic_reaction"} & downgraded
+        with engine.connect() as connection:
+            assert connection.execute(
+                text("SELECT reaction_notes FROM feeding_records")
+            ).scalar_one() == "Vomiting"
+    finally:
+        engine.dispose()
+        get_settings.cache_clear()
+
+
 def test_pet_transfers_migration_upgrade_and_downgrade(tmp_path: Path, monkeypatch) -> None:
     database_url = f"sqlite+pysqlite:///{tmp_path / 'transfers-migration.sqlite'}"
     monkeypatch.setenv("DATABASE_URL", database_url)

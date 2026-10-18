@@ -653,3 +653,75 @@ def test_openapi_documents_feeding_endpoints_and_conditional_ratings(
     public_schema = schema["components"]["schemas"]["FeedingRecordPublic"]
     assert public_schema["properties"]["liked"]["type"] == "boolean"
     assert public_schema["properties"]["tolerated"]["type"] == "boolean"
+
+
+def test_reaction_types_are_stored_and_returned(client: TestClient) -> None:
+    headers = auth_headers(client, "reactions@example.com")
+    pet_id = create_pet(client, headers)
+
+    plain = create_record(client, headers, pet_id, food_name="Safe Food").json()
+    assert plain["digestive_reaction"] is False
+    assert plain["allergic_reaction"] is False
+
+    response = client.post(feeding_url(pet_id), headers=headers, json={
+        "food_name": "Fish Mix", "fed_at": "2026-10-15T12:00:00Z", "liked": True,
+        "tolerated": False, "digestive_reaction": True, "allergic_reaction": True,
+        "reaction_notes": "Vomiting and itching",
+    })
+    assert response.status_code == 201, response.json()
+    body = response.json()
+    assert (body["digestive_reaction"], body["allergic_reaction"]) == (True, True)
+    listed = client.get(feeding_url(pet_id), headers=headers).json()
+    assert {(r["food_name"], r["allergic_reaction"]) for r in listed} == {
+        ("Safe Food", False), ("Fish Mix", True),
+    }
+
+
+def test_reaction_type_implies_not_tolerated_when_omitted(client: TestClient) -> None:
+    headers = auth_headers(client, "implied@example.com")
+    pet_id = create_pet(client, headers)
+    # The pet tolerated this food before; a new allergic reaction overrides the copied rating.
+    create_record(client, headers, pet_id, food_name="Chicken", tolerated=True)
+
+    response = client.post(feeding_url(pet_id), headers=headers, json={
+        "food_name": "Chicken", "fed_at": "2026-10-16T12:00:00Z", "allergic_reaction": True,
+    })
+    assert response.status_code == 201, response.json()
+    assert response.json()["tolerated"] is False
+    assert response.json()["liked"] is True  # still copied from history
+
+
+def test_reaction_type_conflicts_with_tolerated(client: TestClient, db: Session) -> None:
+    headers = auth_headers(client, "conflict@example.com")
+    pet_id = create_pet(client, headers)
+    food_id = create_food(client, headers)
+
+    conflict = client.post(feeding_url(pet_id), headers=headers, json={
+        "food_id": food_id, "amount_grams": 50, "fed_at": "2026-10-15T12:00:00Z",
+        "liked": True, "tolerated": True, "digestive_reaction": True,
+    })
+    assert conflict.status_code == 422
+    assert conflict.json()["detail"] == "Reaction types require tolerated to be false"
+    # Rejected before the stock is touched.
+    assert db.scalar(select(func.count()).select_from(FeedingRecord)) == 0
+    stock = client.get(f"/api/v1/foods/{food_id}", headers=headers).json()
+    assert stock["remaining_grams"] == 5000
+
+    record = create_record(
+        client, headers, pet_id, tolerated=False, include_liked=True
+    ).json()
+    url = f"{feeding_url(pet_id)}/{record['id']}"
+    flagged = client.patch(url, headers=headers, json={"digestive_reaction": True})
+    assert flagged.status_code == 200
+    assert flagged.json()["digestive_reaction"] is True
+
+    # Marking as tolerated while a reaction type is set is a contradiction.
+    assert client.patch(url, headers=headers, json={"tolerated": True}).status_code == 422
+    assert client.get(url, headers=headers).json()["tolerated"] is False
+    # Clearing the reaction in the same request is fine.
+    cleared = client.patch(
+        url, headers=headers, json={"tolerated": True, "digestive_reaction": False}
+    )
+    assert cleared.status_code == 200
+    assert (cleared.json()["tolerated"], cleared.json()["digestive_reaction"]) == (True, False)
+    assert client.patch(url, headers=headers, json={"allergic_reaction": None}).status_code == 422

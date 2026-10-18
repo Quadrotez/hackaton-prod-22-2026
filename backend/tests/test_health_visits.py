@@ -165,14 +165,14 @@ def test_analyzer_fields_are_saved_and_returned_without_llm_call(client: TestCli
     body = created.json()
     assert {key: body[key] for key in payload} == {
         **payload,
-        "visit_at": "2026-10-17T15:44:49.875000",
+        "visit_at": "2026-10-17T15:44:49.875000Z",
         "visit_price": 0.0,
         "vet": "Happy Paws Clinic",
     }
 
     fetched = client.get(pet_url(pet_id, f"visits/{body['id']}"), headers=headers)
     assert fetched.status_code == 200
-    assert fetched.json()["visit_at"] == "2026-10-17T15:44:49.875000"
+    assert fetched.json()["visit_at"] == "2026-10-17T15:44:49.875000Z"
     assert fetched.json()["vet"] == "Happy Paws Clinic"
 
     patched = client.patch(
@@ -181,5 +181,38 @@ def test_analyzer_fields_are_saved_and_returned_without_llm_call(client: TestCli
         json={"visit_at": "2026-10-18T12:00:00Z", "visit_price": 1250},
     )
     assert patched.status_code == 200
-    assert patched.json()["visit_at"] == "2026-10-18T12:00:00"
+    assert patched.json()["visit_at"] == "2026-10-18T12:00:00Z"
     assert patched.json()["visit_price"] == 1250
+
+
+def test_is_date_only_detects_exact_utc_midnight() -> None:
+    from datetime import UTC, datetime, timedelta, timezone
+
+    from app.services.health.visits import is_date_only
+
+    assert is_date_only(datetime(2026, 10, 17, tzinfo=UTC))
+    # SQLite returns naive values; they are UTC.
+    assert is_date_only(datetime(2026, 10, 17))
+    assert is_date_only(datetime(2026, 10, 17, 3, tzinfo=timezone(timedelta(hours=3))))
+    assert not is_date_only(datetime(2026, 10, 17, 0, 0, 1, tzinfo=UTC))
+    assert not is_date_only(datetime(2026, 10, 17, 0, 0, 0, 1, tzinfo=UTC))
+    assert not is_date_only(datetime(2026, 10, 17, 0, tzinfo=timezone(timedelta(hours=3))))
+
+
+def test_visit_at_is_returned_with_utc_offset(client: TestClient) -> None:
+    headers = auth_headers(client, "owner@example.com")
+    pet_id = create_pet(client, headers)
+    response = client.post(
+        pet_url(pet_id, "visits"),
+        headers=headers,
+        json={"title": "Без времени", "visit_at": "2026-10-17T00:00:00Z", "reason": "checkup"},
+    )
+    assert response.json()["visit_at"] == "2026-10-17T00:00:00Z"
+    moscow = client.post(
+        pet_url(pet_id, "visits"),
+        headers=headers,
+        json={"title": "Утро", "visit_at": "2026-10-17T11:30:00+03:00", "reason": "checkup"},
+    )
+    assert moscow.json()["visit_at"] == "2026-10-17T08:30:00Z"
+    listed = client.get(pet_url(pet_id, "visits"), headers=headers).json()
+    assert {item["visit_at"] for item in listed} == {"2026-10-17T00:00:00Z", "2026-10-17T08:30:00Z"}

@@ -174,6 +174,48 @@ test("кормление: приёмы пищи, подстановка прош
   assert.equal((await meals.listMeals(pet.id)).length, 0);
 });
 
+test("кормление: типы реакций (ЖКТ, аллергия) и перенос реакции в симптомы", { skip: !process.env.PETCARE_TEST_PYTHON, timeout: 60_000 }, async (t) => {
+  const request = await startBackend(t);
+  const session = memorySession();
+  const { load } = client(request, { session });
+  const pets = load("lib/pets");
+  const foods = load("lib/foods");
+  const meals = load("lib/meals");
+  const api = load("lib/api");
+
+  await registerUser(request, "reactions@example.com", "reactions-pass-1234", null);
+  await load("lib/auth").login({ email: "reactions@example.com", password: "reactions-pass-1234" });
+  const pet = await pets.createPet({ name: "Барсик", species: "cat", sex: "boy", weight_g: 4000 });
+  const food = await foods.createFood({
+    name: "Fish Mix", description: "Влажный корм", type: "wet", protein: 10, fats: 5,
+    carbohydrates: 3, calories: 90, total_grams: 1000,
+  });
+
+  const fed = await meals.createMeal(pet.id, {
+    food_id: food.id, amount_grams: 85, fed_at: "2026-10-17T10:00:00", liked: true, tolerated: false,
+    digestive_reaction: true, allergic_reaction: true, reaction_notes: "рвота и зуд",
+  });
+  assert.equal(fed.digestive_reaction, true);
+  assert.equal(fed.allergic_reaction, true);
+  assert.deepEqual(meals.reactionLabels(fed), ["ЖКТ", "аллергия"]);
+  assert.equal(meals.rankFoods([food], [fed])[0].allergic, true, "корм с аллергией помечается при выборе");
+
+  await assert.rejects(
+    meals.updateMeal(pet.id, fed.id, { tolerated: true }),
+    (error) => error instanceof api.ApiError && error.status === 422,
+    "«перенёс хорошо» при отмеченной реакции — противоречие",
+  );
+  const cleared = await meals.updateMeal(pet.id, fed.id, { tolerated: true, digestive_reaction: false, allergic_reaction: false });
+  assert.equal(meals.hasReactionType(cleared), false);
+  const flagged = await meals.updateMeal(pet.id, fed.id, { tolerated: false, allergic_reaction: true });
+
+  const symptom = await meals.recordReactionAsSymptom(pet.id, flagged);
+  assert.equal(symptom.description, "Реакция на корм «Fish Mix»: аллергическая реакция — рвота и зуд");
+  const health = await load("lib/health").loadHealth(pet.id);
+  assert.deepEqual(health.symptoms.map((item) => item.description), [symptom.description], "симптом виден в карте здоровья");
+  assert.equal(new Date(health.symptoms[0].observed_at).getTime(), new Date(flagged.fed_at).getTime(), "время симптома — время кормления");
+});
+
 test("измерения: шаблонные параметры, CRUD серий и история веса (новый код без покрытия)", { skip: !process.env.PETCARE_TEST_PYTHON, timeout: 60_000 }, async (t) => {
   const request = await startBackend(t);
   const session = memorySession();
