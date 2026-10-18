@@ -18,6 +18,7 @@ import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { PageError, PageLoading } from "@/components/page-state";
 import { PetWeightChart } from "@/components/pet-weight-chart";
+import { PregnancyCard } from "@/components/pregnancy-card";
 import { PetCard } from "../pet-card";
 import { visitDateKey } from "@/lib/visit-time";
 
@@ -87,15 +88,19 @@ export function HealthPage({ petId }: { petId: number }) {
   if (state.status === "error") {
     return <PageError message={state.error} onRetry={state.retry} backToList />;
   }
-  return <HealthContent pet={state.data.pet} overview={state.data.overview} />;
+  return <HealthContent pet={state.data.pet} overview={state.data.overview} onUpdate={state.update} />;
 }
 
 const shortDate = (value: string) => new Date(value.length === 10 ? `${value}T00:00:00` : value).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
 
-function HealthContent({ pet, overview }: { pet: Pet; overview: HealthOverview }) {
+function HealthContent({ pet, overview, onUpdate }: { pet: Pet; overview: HealthOverview; onUpdate: (data: { pet: Pet; overview: HealthOverview }) => void }) {
   const base = `/pet/${pet.id}/health`;
   const nextVisit = overview.planned_visits[0];
   const nextVaccination = overview.next_vaccination?.next_due_on ?? overview.next_vaccination?.scheduled_on;
+
+  async function refresh() {
+    onUpdate(await loadHealthDashboard(pet.id));
+  }
 
   return (
     <>
@@ -115,7 +120,8 @@ function HealthContent({ pet, overview }: { pet: Pet; overview: HealthOverview }
         <StatTile label="Следующая обработка" value={overview.next_parasite?.next_due_on ? shortDate(overview.next_parasite.next_due_on) : "—"} hint={overview.next_parasite?.product_name ?? "обработок по плану нет"} />
       </div>
 
-      
+      {pet.sex === "girl" && <PregnancyCard petId={pet.id} pregnancy={overview.pregnancy} onChanged={refresh} />}
+
       <PetWeightChart key={`${pet.id}-${pet.weight_g}`} petId={pet.id} />
 
       <section aria-label="Разделы здоровья" className="grid grid-cols-2 gap-3">

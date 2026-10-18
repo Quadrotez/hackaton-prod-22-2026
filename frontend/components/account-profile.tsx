@@ -22,6 +22,7 @@ import { useProtectedData, useRequireAuth } from "@/hooks/use-auth";
 import { getErrorMessage } from "@/lib/api";
 import { getMe, updateMe, updatePassword, uploadAvatar, type UserPublic } from "@/lib/auth";
 import { listPets, pluralize } from "@/lib/pets";
+import { listReceivedTransfers } from "@/lib/transfers";
 import {
   createCalendarFeed,
   deleteCalendarFeed,
@@ -478,14 +479,14 @@ function FeedLink({ path }: { path: string }) {
 
 export function AccountProfile() {
   const router = useRouter();
-  const load = useCallback(() => Promise.all([getMe(), listPets().catch(() => null)]), []);
+  const load = useCallback(() => Promise.all([getMe(), listPets().catch(() => null), listReceivedTransfers().catch(() => [])]), []);
   const state = useProtectedData(load, "Не удалось загрузить профиль");
 
   if (state.status === "loading") return <PageLoading />;
   if (state.status === "error") return <PageError message={state.error} onRetry={state.retry} />;
 
-  const [user, pets] = state.data;
-  const handleUserChange = (updated: UserPublic) => state.update([updated, pets]);
+  const [user, pets, received] = state.data;
+  const handleUserChange = (updated: UserPublic) => state.update([updated, pets, received]);
 
   function handleLogout() {
     clearAccessToken();
@@ -495,11 +496,11 @@ export function AccountProfile() {
   return (
     <>
       <PageHeader title="Аккаунт" />
-      <ProfileHero user={user} petCount={pets?.length ?? null} onUserChange={handleUserChange} />
+      <ProfileHero user={user} petCount={pets ? pets.length + received.length : null} onUserChange={handleUserChange} />
       <AccountDetails user={user} />
       <PasswordChangeCard />
       <CalendarFeedCard />
-      <Button variant="secondary" className="theme-shadcn" onClick={() => handleLogout()}><LogOutIcon />Выйти</Button>
+      <Button onClick={() => handleLogout()}><LogOutIcon />Выйти</Button>
     </>
   );
 }
