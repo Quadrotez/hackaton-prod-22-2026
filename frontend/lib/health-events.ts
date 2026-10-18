@@ -1,19 +1,23 @@
 import type { Dose, HealthView, ParasiteTreatment, Visit, Vaccination } from "./health";
+import { birthdaysBetween, birthdayTitle } from "@/lib/birthdays";
 import { visitDateKey, visitTimeText } from "@/lib/visit-time";
 
 export type CalendarEvent = {
   key: string; recordKey: string; petId: number; petName: string;
-  kind: "visit" | "vaccine" | "medicine" | "parasite"; title: string;
+  kind: "visit" | "vaccine" | "medicine" | "parasite" | "birthday"; title: string;
   date: string; time: string; completed: boolean; view: HealthView;
 };
 export function toDateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 export function calendarEvents(
-  pet: { id: number; name: string }, visits: Visit[], vaccinations: Vaccination[], doses: Dose[],
+  pet: { id: number; name: string; birth_date?: string | null }, visits: Visit[], vaccinations: Vaccination[], doses: Dose[],
   parasites: ParasiteTreatment[] = [],
+  // Дни рождения повторяются каждый год, поэтому нужен период; без него их нет.
+  range?: { from: string; to: string; today: string },
 ): CalendarEvent[] {
   const common = { petId: pet.id, petName: pet.name };
+  const birthdays = pet.birth_date && range ? birthdaysBetween(pet.birth_date, range.from, range.to) : [];
   return [
     // Визит без времени (00:00:00 UTC) — событие на весь день: дата по UTC, время пустое.
     ...visits.filter((visit) => visit.status !== "cancelled").map((visit): CalendarEvent => ({
@@ -29,9 +33,14 @@ export function calendarEvents(
     ...parasites.filter((treatment) => treatment.next_due_on).map((treatment): CalendarEvent => ({ ...common,
       key: `${pet.id}-parasite-${treatment.id}`, recordKey: `parasite-${treatment.id}`, kind: "parasite",
       title: treatment.product_name, date: treatment.next_due_on as string, time: "", completed: false, view: "plan" })),
+    ...birthdays.map(({ date, age }): CalendarEvent => ({ ...common,
+      key: `${pet.id}-birthday-${date}`, recordKey: `birthday-${date.slice(0, 4)}`, kind: "birthday",
+      title: birthdayTitle(age), date, time: "", completed: Boolean(range && date < range.today), view: "plan" })),
   ];
 }
 export function healthEventHref(event: CalendarEvent) {
+  // День рождения относится к питомцу, а не к разделу «Здоровье».
+  if (event.kind === "birthday") return `/pet/${event.petId}`;
   const section = { visit: "visits", vaccine: "vaccines", medicine: "medicines", parasite: "parasites" }[event.kind];
   return `/pet/${event.petId}/health/${section}#health-${event.recordKey}`;
 }

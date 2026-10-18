@@ -16,6 +16,7 @@ TYPE_LABEL = {
     CalendarEventType.VACCINATION: "Прививка",
     CalendarEventType.MEDICATION: "Лекарство",
     CalendarEventType.PARASITE: "Обработка от паразитов",
+    CalendarEventType.BIRTHDAY: "День рождения",
 }
 # Reminders as RFC 5545 durations relative to DTSTART. All-day events start at local
 # midnight, so -PT15H is 09:00 the day before and PT9H is 09:00 on the day.
@@ -24,6 +25,8 @@ ALARM_TRIGGERS = {
     CalendarEventType.VACCINATION: ("-PT15H", "PT9H"),
     CalendarEventType.PARASITE: ("-PT15H", "PT9H"),
     CalendarEventType.MEDICATION: ("PT0M",),
+    # A birthday needs no warning the day before: 09:00 on the day.
+    CalendarEventType.BIRTHDAY: ("PT9H",),
 }
 # A visit without a known time is an all-day event: remind like other all-day events,
 # not a day and an hour before midnight.
@@ -66,7 +69,10 @@ def alarm_lines(event: CalendarEvent, summary: str) -> list[str]:
     if event.status not in ALARM_STATUSES:
         return []
     lines = []
-    triggers = ALL_DAY_ALARM_TRIGGERS if event.time is None else ALARM_TRIGGERS[event.type]
+    if event.type is CalendarEventType.VISIT and event.time is None:
+        triggers = ALL_DAY_ALARM_TRIGGERS
+    else:
+        triggers = ALARM_TRIGGERS[event.type]
     for trigger in triggers:
         lines += [
             "BEGIN:VALARM",

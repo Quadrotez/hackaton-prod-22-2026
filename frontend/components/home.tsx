@@ -27,6 +27,7 @@ const kindLabels: Record<CalendarEvent["kind"], string> = {
   vaccine: "Прививка",
   medicine: "Лекарство",
   parasite: "Обработка",
+  birthday: "День рождения",
 };
 
 function EventRow({ event, pet, showDate }: { event: CalendarEvent; pet?: Pet; showDate?: boolean }) {
