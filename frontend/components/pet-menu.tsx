@@ -26,13 +26,20 @@ function PetMenuWithPath() {
   const { pets, activePet, status, error, selectPet, refreshPets } = useActivePet();
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(0);
-  const pageCount = Math.ceil(pets.length / PAGE_SIZE);
+  const [group, setGroup] = useState<"owner" | "caretaker" | null>(null);
+  const selectedGroup = group ?? (activePet && isCaretaker(activePet) ? "caretaker" : "owner");
+  const ownPets = pets.filter((pet) => !isCaretaker(pet));
+  const carePets = pets.filter(isCaretaker);
+  const groupPets = selectedGroup === "caretaker" ? carePets : ownPets;
+  const pageCount = Math.ceil(groupPets.length / PAGE_SIZE);
   const currentPage = Math.min(page, Math.max(0, pageCount - 1));
-  const visiblePets = pets.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+  const visiblePets = groupPets.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
   function changeOpen(nextOpen: boolean) {
     if (nextOpen) {
-      const index = pets.findIndex((pet) => pet.id === activePet?.id);
+      const nextGroup = activePet && isCaretaker(activePet) ? "caretaker" : "owner";
+      setGroup(nextGroup);
+      const index = (nextGroup === "caretaker" ? carePets : ownPets).findIndex((pet) => pet.id === activePet?.id);
       setPage(index < 0 ? 0 : Math.floor(index / PAGE_SIZE));
       void refreshPets();
     }
@@ -61,7 +68,7 @@ function PetMenuWithPath() {
           {activePet ? <PetAvatar key={activePet.id} pet={activePet} size="sm" className="pet-menu-currentAvatar" /> : <PawPrintIcon aria-hidden="true" className="size-6" strokeWidth={1.6} />}
           {pets.length > 0 && <span className="pet-menu-count">{pets.length}</span>}
         </span>
-        <span aria-live="polite" className="pet-menu-triggerLabel"><span className="block text-[10px] font-normal text-muted-foreground">Активный питомец</span>{activePet?.name ?? "Выбрать"}</span>
+        <span aria-live="polite" className="pet-menu-triggerLabel"><span className="block text-[10px] font-normal text-muted-foreground">{activePet && isCaretaker(activePet) ? "Присматриваю" : "Мой питомец"}</span>{activePet?.name ?? "Выбрать"}</span>
         <ChevronDownIcon aria-hidden="true" className="size-4 shrink-0" />
       </Popover.Trigger>
       <Popover.Portal>
@@ -79,6 +86,11 @@ function PetMenuWithPath() {
                 </div>
               )}
             </div>
+            {pets.length > 0 && status === "ready" && <div aria-label="Группа питомцев" className="my-2 grid grid-cols-2 gap-1 rounded-xl bg-secondary/40 p-1">
+              {([{ value: "owner", label: "Мои", count: ownPets.length }, { value: "caretaker", label: "Присматриваю", count: carePets.length }] as const).map((item) => <button key={item.value} type="button" aria-pressed={selectedGroup === item.value} onClick={() => { setGroup(item.value); setPage(0); }} className={cn("min-h-10 rounded-lg px-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-foreground", selectedGroup === item.value ? "bg-card text-foreground" : "text-muted-foreground hover:bg-card/60")}>
+                {item.label} · {item.count}
+              </button>)}
+            </div>}
             {status === "loading" ? (
               <div role="status" className="pet-menu-message"><LoaderCircleIcon aria-hidden="true" className="size-5 animate-spin motion-reduce:animate-none" /><span>Загружаем питомцев…</span></div>
             ) : status === "error" ? (
@@ -88,14 +100,14 @@ function PetMenuWithPath() {
                 <p>Добавьте своего первого питомца</p>
                 <Link href="/pet/create" className={buttonVariants()} onNavigate={() => setOpen(false)}><PlusIcon aria-hidden="true" /> Добавить питомца</Link>
               </div>
-            ) : (
-              <ul key={currentPage} aria-label={`Питомцы, страница ${currentPage + 1} из ${pageCount}`} className="pet-menu-fan">
+            ) : groupPets.length === 0 ? <div className="pet-menu-message"><p>{selectedGroup === "owner" ? "Своих питомцев пока нет" : "Питомцев под присмотром пока нет"}</p>{selectedGroup === "caretaker" && <Link href="/transfers" onNavigate={() => setOpen(false)} className="underline underline-offset-4">Открыть приглашения</Link>}</div> : (
+              <ul key={`${selectedGroup}-${currentPage}`} aria-label={`${selectedGroup === "caretaker" ? "Под присмотром" : "Мои питомцы"}, страница ${currentPage + 1} из ${pageCount}`} className="pet-menu-fan">
                 {visiblePets.map((pet) => (
                   <li key={pet.id} className="pet-menu-pet">
                     <button type="button" aria-label={`Выбрать питомца: ${pet.name}${isCaretaker(pet) ? " (у вас на время)" : ""}`} aria-pressed={pet.id === activePet?.id} onClick={() => choosePet(pet.id)} className="pet-menu-petLink">
                       <PetAvatar pet={pet} size="md" className="pet-menu-avatar" />
                       <span className="pet-menu-petName" title={pet.name}>{pet.name}</span>
-                      {isCaretaker(pet) && <span className="pet-menu-careBadge">на время</span>}
+                      {isCaretaker(pet) && <span className="pet-menu-careBadge">под присмотром</span>}
                     </button>
                   </li>
                 ))}
