@@ -68,7 +68,7 @@
 .pet-menu-avatar { width: 3.5rem; height: 3.5rem; box-shadow: 0 0 0 3px var(--card), 0 0 0 4px var(--border); }
 .pet-menu-petLink[aria-pressed="true"] .pet-menu-avatar { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--primary); }
 .pet-menu-profileLink { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-top: .5rem; padding: .875rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--secondary); font-size: .875rem; outline-offset: 3px; }
-.pet-menu-profileLink:hover { background: var(--muted); }
+.pet-menu-profileLink:hover { background: var(--secondary); }
 .pet-menu-petName { width: 100%; overflow: hidden; font-size: .75rem; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .pet-menu-message { display: flex; min-height: 8rem; flex-direction: column; align-items: center; justify-content: center; gap: .75rem; padding: 1rem .25rem; text-align: center; font-size: .875rem; color: var(--muted-foreground); }
 .pet-menu-pageLabel { margin: .25rem 0 0; text-align: center; font-size: .6875rem; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
