@@ -9,6 +9,8 @@
 #   ACCESS_TOKEN_EXPIRE_MINUTES - access token TTL in minutes (optional, defaults to 30)
 #   YANDEX_API_KEY              - Yandex AI key (backend)
 #   YANDEX_FOLDER_ID            - Yandex Cloud folder id (backend)
+#   SAGE_LOG_URL, SAGE_API_TOKEN - Sage Logs push endpoint + token (optional; off when empty)
+#   SAGE_ENV, SAGE_SYSTEM, SAGE_INST - Sage required fields (defaults: prod, petcare, hostname)
 # The deploy job renders /opt/petcare/.env from these on every deploy.
 
 stages:
@@ -242,6 +244,9 @@ deploy:
       SAGE_LOG_URL=${SAGE_LOG_URL}
       SAGE_API_TOKEN=${SAGE_API_TOKEN}
       SAGE_LOG_TIMEOUT_SECONDS=${SAGE_LOG_TIMEOUT_SECONDS:-5}
+      SAGE_ENV=${SAGE_ENV:-prod}
+      SAGE_SYSTEM=${SAGE_SYSTEM:-petcare}
+      SAGE_INST=${SAGE_INST:-}
       ENV_EOF
     # Pre-flight: миграция в одноразовом контейнере ДО того, как трогать api/site.
     # Если она падает — прод продолжает крутить предыдущий образ (без окна 502).

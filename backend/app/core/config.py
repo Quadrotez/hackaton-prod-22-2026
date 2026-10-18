@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     sage_log_url: str | None = None
     sage_api_token: str | None = None
     sage_log_timeout_seconds: float = 5.0
+    # Required fields Sage validates on every record (see the "Загрузка логов" docs).
+    sage_env: str = "prod"
+    sage_system: str = "petcare"
+    sage_inst: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env", env_file_encoding="utf-8", extra="ignore"
