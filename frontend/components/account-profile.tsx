@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useState, useSyncExternalStore, type FormEvent, type KeyboardEvent } from "react";
 import {
   CalendarCheckIcon,
@@ -24,7 +25,6 @@ import { useProtectedData, useRequireAuth } from "@/hooks/use-auth";
 import { getErrorMessage } from "@/lib/api";
 import { getMe, updateMe, updatePassword, uploadAvatar, type UserPublic } from "@/lib/auth";
 import { listPets, pluralize } from "@/lib/pets";
-import { listReceivedTransfers } from "@/lib/transfers";
 import {
   createCalendarFeed,
   deleteCalendarFeed,
@@ -509,14 +509,14 @@ function FeedLink({ path }: { path: string }) {
 
 export function AccountProfile() {
   const router = useRouter();
-  const load = useCallback(() => Promise.all([getMe(), listPets().catch(() => null), listReceivedTransfers().catch(() => [])]), []);
+  const load = useCallback(() => Promise.all([getMe(), listPets().catch(() => null)]), []);
   const state = useProtectedData(load, "Не удалось загрузить профиль");
 
   if (state.status === "loading") return <PageLoading />;
   if (state.status === "error") return <PageError message={state.error} onRetry={state.retry} />;
 
-  const [user, pets, received] = state.data;
-  const handleUserChange = (updated: UserPublic) => state.update([updated, pets, received]);
+  const [user, pets] = state.data;
+  const handleUserChange = (updated: UserPublic) => state.update([updated, pets]);
 
   function handleLogout() {
     clearAccessToken();
@@ -526,9 +526,12 @@ export function AccountProfile() {
   return (
     <>
       <PageHeader title="Аккаунт" />
-      <ProfileHero user={user} petCount={pets ? pets.length + received.length : null} onUserChange={handleUserChange} />
+      <ProfileHero user={user} petCount={pets ? pets.filter((pet) => pet.access !== "caretaker").length : null} onUserChange={handleUserChange} />
       <AccountDetails user={user} />
       <ThemeCard />
+      <Link href="/transfers" className="rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-foreground">
+        <Card className="flex flex-col gap-1 transition-colors hover:bg-secondary/30"><h2>Передачи питомцев</h2><p className="text-sm text-muted-foreground">Входящие заявки, питомцы под присмотром и возвраты</p></Card>
+      </Link>
       <PasswordChangeCard />
       <CalendarFeedCard />
       <Button onClick={() => handleLogout()}><LogOutIcon />Выйти</Button>

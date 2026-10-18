@@ -134,7 +134,6 @@ export async function createPet(data: PetCreate): Promise<Pet> {
   notifyPetsChanged();
   return pet;
 }
-
 export async function updatePet(petId: number, data: PetUpdate): Promise<Pet> {
   const pet = await apiFetch<Pet>(`/api/v1/pets/${petId}`, {
     method: "PATCH",
@@ -169,44 +168,3 @@ export async function uploadPetPhoto(petId: number, file: File | Blob): Promise<
   notifyPetsChanged();
   return pet;
 }
-
-export type PetShare = {
-  id: number;
-  email: string;
-  created_at: string;
-  expires_at: string;
-};
-
-export type PetShareCreate = {
-  email: string;
-  expires_in_hours: number;
-};
-
-export const durationOptions = [
-  { hours: 24, label: "24 часа" },
-  { hours: 72, label: "3 дня" },
-  { hours: 168, label: "7 дней" },
-  { hours: 720, label: "30 дней" },
-] as const;
-
-export function isActive(share: PetShare): boolean {
-  return new Date(share.expires_at).getTime() > Date.now();
-}
-
-export function formatExpiry(iso: string): string {
-  return `до ${new Date(iso).toLocaleString("ru-RU", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`;
-}
-
-export const listShares = (petId: number) =>
-  apiFetch<PetShare[]>(`/api/v1/pets/${petId}/shares`, { method: "GET", auth: true });
-
-export const createShare = (petId: number, data: PetShareCreate) =>
-  apiFetch<PetShare>(`/api/v1/pets/${petId}/shares`, { method: "POST", body: data, auth: true });
-
-export const deleteShare = (petId: number, shareId: number) =>
-  apiFetch<void>(`/api/v1/pets/${petId}/shares/${shareId}`, { method: "DELETE", auth: true });

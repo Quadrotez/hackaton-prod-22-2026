@@ -29,8 +29,8 @@ export type Dose = { medication_id: number; name: string; dose: string; schedule
 export type ResourceMap = { vaccinations: Vaccine; visits: Visit; medications: Medication; symptoms: Symptom; allergies: Allergy; parasites: ParasiteTreatment };
 export type HealthResource = keyof ResourceMap;
 
-// A temporary caretaker may add these records (and mark doses) but edit or delete nothing.
-export const CARETAKER_ADDABLE: readonly HealthResource[] = ["symptoms", "visits"];
+// The caretaker UI only adds observations; treatment and appointments stay read-only.
+export const CARETAKER_ADDABLE: readonly HealthResource[] = ["symptoms"];
 
 export function canAddHealthRecord(pet: { access?: "owner" | "caretaker" }, resource: HealthResource): boolean {
   return pet.access !== "caretaker" || CARETAKER_ADDABLE.includes(resource);

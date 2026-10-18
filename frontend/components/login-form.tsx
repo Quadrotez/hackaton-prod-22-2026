@@ -35,6 +35,11 @@ type Mode = "login" | "register";
 
 const switchModeClass = "h-auto p-0 text-sm text-foreground underline underline-offset-4 cursor-pointer";
 
+function loginDestination(): string {
+  const next = new URLSearchParams(window.location.search).get("next");
+  return next && /^\/transfers(?:\/[1-9]\d*)?$/.test(next) ? next : "/me";
+}
+
 export function LoginForm() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
@@ -50,6 +55,7 @@ export function LoginForm() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (pending) return;
 
     const formData = new FormData(e.currentTarget);
     const result = credentialsSchema.safeParse({
@@ -80,7 +86,7 @@ export function LoginForm() {
       } else {
         await login(result.data);
       }
-      router.push("/me");
+      router.push(loginDestination());
     } catch (error) {
       const fallback = isRegister
         ? "Не удалось зарегистрироваться"
@@ -97,7 +103,7 @@ export function LoginForm() {
     setPending(true);
     try {
       await login({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
-      router.push("/me");
+      router.push(loginDestination());
     } catch (error) {
       toast.error(getErrorMessage(error, "Не удалось войти в демо-аккаунт"));
     } finally {

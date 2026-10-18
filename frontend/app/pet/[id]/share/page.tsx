@@ -15,7 +15,7 @@ export default function SharePage({ params }: PageProps<"/pet/[id]/share">) {
         {params.then(({ id }) => {
           const petId = Number(id);
           return Number.isInteger(petId) && petId > 0 ? (
-            <PetShare petId={petId} />
+            <PetShare key={petId} petId={petId} />
           ) : (
             <PageError message="Питомец не найден" backToList />
           );
