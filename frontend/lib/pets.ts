@@ -15,6 +15,11 @@ export type Pet = {
   photo_url: string | null;
 };
 
+export const PETS_CHANGED_EVENT = "petcare:pets-changed";
+function notifyPetsChanged() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(PETS_CHANGED_EVENT));
+}
+
 export type PetCreate = {
   name: string;
   species: string;
@@ -112,19 +117,23 @@ export async function getPet(petId: number): Promise<Pet> {
 }
 
 export async function createPet(data: PetCreate): Promise<Pet> {
-  return apiFetch<Pet>("/api/v1/pets/", {
+  const pet = await apiFetch<Pet>("/api/v1/pets/", {
     method: "POST",
     body: data,
     auth: true,
   });
+  notifyPetsChanged();
+  return pet;
 }
 
 export async function updatePet(petId: number, data: PetUpdate): Promise<Pet> {
-  return apiFetch<Pet>(`/api/v1/pets/${petId}`, {
+  const pet = await apiFetch<Pet>(`/api/v1/pets/${petId}`, {
     method: "PATCH",
     body: data,
     auth: true,
   });
+  notifyPetsChanged();
+  return pet;
 }
 
 export async function deletePet(petId: number): Promise<void> {
@@ -132,6 +141,7 @@ export async function deletePet(petId: number): Promise<void> {
     method: "DELETE",
     auth: true,
   });
+  notifyPetsChanged();
 }
 
 export function petPhotoPath(petId: number): string {
@@ -142,11 +152,13 @@ export async function uploadPetPhoto(petId: number, file: File | Blob): Promise<
   const formData = new FormData();
   formData.append("file", file);
 
-  return apiFetch<Pet>(petPhotoPath(petId), {
+  const pet = await apiFetch<Pet>(petPhotoPath(petId), {
     method: "POST",
     body: formData,
     auth: true,
   });
+  notifyPetsChanged();
+  return pet;
 }
 
 export type PetShare = {
