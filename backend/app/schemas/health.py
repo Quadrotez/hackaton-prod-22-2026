@@ -547,6 +547,8 @@ class FeedingBrief(ORMModel):
     fed_at: datetime
     liked: bool
     tolerated: bool
+    digestive_reaction: bool
+    allergic_reaction: bool
     reaction_notes: str | None
 
 
