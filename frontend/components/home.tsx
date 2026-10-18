@@ -7,12 +7,13 @@ import { CalendarGrid, kindColor, monthGrid, type DayMarker } from "@/components
 import { useActivePet } from "@/components/active-pet-provider";
 import { PetAvatar } from "@/components/pet-avatar";
 import { PageError } from "@/components/page-state";
-import { useProtectedData } from "@/hooks/use-auth";
+import { useTransferData } from "@/hooks/use-transfer-data";
+import { useNow } from "@/hooks/use-now";
 import { loadCalendar } from "@/lib/health";
 import { healthEventHref, toDateKey, type CalendarEvent } from "@/lib/health-events";
 import { cn } from "@/lib/utils";
-import { pluralize, type Pet } from "@/lib/pets";
-import { listIncomingTransfers, listOutgoingTransfers } from "@/lib/transfers";
+import { isCaretaker, pluralize, type Pet } from "@/lib/pets";
+import { currentTransfer, isOpenTransfer, listIncomingTransfers, listOutgoingTransfers, listReceivedTransfers } from "@/lib/transfers";
 import { Card } from "@/components/ui/card";
 import { QuickAddMenu } from "@/components/quick-add-menu";
 
@@ -70,28 +71,32 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedKey, setSelectedKey] = useState(todayKey);
 
-  const loadTransfers = useCallback(() => Promise.all([listIncomingTransfers(), listOutgoingTransfers()]), []);
-  const transfers = useProtectedData(loadTransfers, "Не удалось загрузить передачи");
+  const loadTransfers = useCallback(() => Promise.all([listIncomingTransfers(), listOutgoingTransfers(), listReceivedTransfers()]), []);
+  const transfers = useTransferData(loadTransfers, "Не удалось загрузить передачи");
+  const now = useNow(1_000);
+  const transferLists = transfers.status === "ready" ? transfers.data.map((items) => items.map((item) => currentTransfer(item, now)).filter(isOpenTransfer)) : null;
   const answersNeeded =
-    transfers.status === "ready"
-      ? transfers.data[0].length +
-        transfers.data[1].filter((transfer) => transfer.status === "return_requested").length
+    transferLists
+      ? transferLists[0].length +
+        transferLists[1].filter((transfer) => transfer.status === "return_requested").length
       : 0;
+  const hasTransfers = transferLists?.some((items) => items.length > 0) ?? false;
 
   const days = useMemo(() => monthGrid(month), [month]);
   const from = toDateKey(days[0]);
   const to = toDateKey(days[41]);
-  const load = useCallback(() => loadCalendar(from, to), [from, to]);
-  const calendar = useProtectedData(load, "Не удалось загрузить события календаря");
+  const activePetId = activePet?.id;
+  const load = useCallback(() => loadCalendar(from, to, activePetId), [from, to, activePetId]);
+  const calendar = useTransferData(load, "Не удалось загрузить события календаря");
   const loading =
-    calendar.status === "loading" || (calendar.status === "ready" && calendar.data.range !== `${from}/${to}`);
+    calendar.status === "loading" || (calendar.status === "ready" && (calendar.data.range !== `${from}/${to}` || calendar.data.petId !== (activePetId ?? null)));
   const loadedEvents = calendar.status === "ready" ? calendar.data.events : undefined;
   const events = useMemo(
     () => (loadedEvents && !loading ? loadedEvents.filter((event) => event.petId === activePet?.id) : EMPTY_EVENTS),
     [loadedEvents, loading, activePet?.id],
   );
 
-  const petsByName = useMemo(() => new Map(pets.map((p) => [p.name, p])), [pets]);
+  const petsById = useMemo(() => new Map(pets.map((pet) => [pet.id, pet])), [pets]);
 
   const markers = useMemo(() => {
     const marks = new Map<string, DayMarker>();
@@ -110,7 +115,7 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
 
   return (
     <div className="mx-auto flex w-full max-w-[30rem] flex-col gap-8">
-      {answersNeeded > 0 && (
+      {hasTransfers && (
         <Link
           href="/transfers"
           className="rounded-2xl outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-foreground"
@@ -119,8 +124,7 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
             <div className="flex flex-col gap-0.5">
               <h2>Передачи</h2>
               <p className="text-sm">
-                {answersNeeded} {pluralize(answersNeeded, "заявка ждёт", "заявки ждут", "заявок ждут")} вашего
-                ответа
+                {answersNeeded > 0 ? `${answersNeeded} ${pluralize(answersNeeded, "заявка ждёт", "заявки ждут", "заявок ждут")} вашего ответа` : "Посмотреть питомцев на передержке и мои заявки"}
               </p>
             </div>
             <ArrowRightIcon aria-hidden="true" className="size-5 shrink-0" strokeWidth={1.5} />
@@ -128,6 +132,10 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
         </Link>
       )}
 
+      {activePet && <div className="flex items-center gap-3">
+        <PetAvatar pet={activePet} size="xs" />
+        <div className="min-w-0"><h2 className="truncate">Календарь: {activePet.name}</h2><p className="text-xs text-muted-foreground">{isCaretaker(activePet) ? "Под присмотром · события этого питомца" : "Мой питомец"}</p></div>
+      </div>}
       <CalendarGrid
         days={days}
         month={month}
@@ -144,6 +152,7 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
       />
 
       {calendar.status === "error" && <PageError message={calendar.error} onRetry={calendar.retry} />}
+      {calendar.status === "ready" && calendar.refreshError && <PageError message={calendar.refreshError} onRetry={calendar.refresh} />}
 
       <section
         aria-labelledby="day-title"
@@ -157,7 +166,7 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
         ) : (
           <ul className="flex flex-col mt-2">
             {dayEvents.map((event) => (
-              <EventRow key={event.key} event={event} pet={petsByName.get(event.petName)} />
+              <EventRow key={event.key} event={event} pet={petsById.get(event.petId)} />
             ))}
           </ul>
         )}
