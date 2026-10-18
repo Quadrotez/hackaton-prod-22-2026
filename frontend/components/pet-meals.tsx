@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDownIcon, ChevronUpIcon, PencilIcon, PlusIcon, StethoscopeIcon } from "lucide-react";
@@ -489,18 +489,34 @@ function SymptomOffer({ petId, meal, onDone }: { petId: number; meal: Meal; onDo
 
 export function PetMeals({
   petId,
+  defaultOpen = false,
   meals,
   foods,
   now,
   onMealsChange,
 }: {
   petId: number;
+  defaultOpen?: boolean;
   meals: Meal[] | null;
   foods: Food[] | null;
   now: number;
   onMealsChange: (meals: Meal[]) => void;
 }) {
-  const [editing, setEditing] = useState<Meal | "new" | null>(null);
+  const [editing, setEditing] = useState<Meal | "new" | null>(defaultOpen ? "new" : null);
+  const [feedingRequested, setFeedingRequested] = useState(defaultOpen);
+  if (feedingRequested !== defaultOpen) {
+    setFeedingRequested(defaultOpen);
+    if (defaultOpen) setEditing("new");
+  }
+  const router = useRouter();
+  const cardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (defaultOpen) cardRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
+  }, [defaultOpen]);
+  function closeForm() {
+    setEditing(null);
+    if (defaultOpen) router.replace(`/pet/${petId}`, { scroll: false });
+  }
   const [showAll, setShowAll] = useState(false);
   // Кормление с отмеченной реакцией, которое предлагаем перенести в симптомы
   const [symptomOffer, setSymptomOffer] = useState<Meal | null>(null);
@@ -509,7 +525,7 @@ export function PetMeals({
 
   return (
     <>
-      <Card className="flex flex-col gap-2.5">
+      <Card ref={cardRef} id="feeding" className="flex scroll-mt-6 flex-col gap-2.5">
         <div className="flex items-center justify-between gap-3">
           <h2>Приёмы пищи</h2>
           {editing === null && (
@@ -528,17 +544,17 @@ export function PetMeals({
             foodsFailed={foods === null}
             meals={knownMeals}
             meal={editing === "new" ? undefined : editing}
-            onCancel={() => setEditing(null)}
+            onCancel={closeForm}
             onSaved={(saved) => {
               const before = editing === "new" ? null : editing;
               const newReaction = (saved.digestive_reaction && !before?.digestive_reaction)
                 || (saved.allergic_reaction && !before?.allergic_reaction);
               setSymptomOffer(newReaction ? saved : null);
-              setEditing(null);
+              closeForm();
               onMealsChange([saved, ...knownMeals.filter((item) => item.id !== saved.id)]);
             }}
             onDeleted={(deleted) => {
-              setEditing(null);
+              closeForm();
               setSymptomOffer((offer) => (offer?.id === deleted.id ? null : offer));
               onMealsChange(knownMeals.filter((item) => item.id !== deleted.id));
             }}

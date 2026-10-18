@@ -26,14 +26,16 @@ export function PetAvatar({
 
   if (photoUrl) {
     return (
-      <Image
-        unoptimized
-        width={px}
-        height={px}
-        src={photoUrl}
-        alt={pet.name}
-        className={cn(box, "shrink-0 rounded-full bg-secondary object-cover", className)}
-      />
+      <span className={cn(box, "relative block min-h-0 min-w-0 shrink-0 overflow-hidden rounded-full bg-secondary", className)}>
+        <Image
+          unoptimized
+          fill
+          sizes={`${px}px`}
+          src={photoUrl}
+          alt={pet.name}
+          className="object-cover"
+        />
+      </span>
     );
   }
 
