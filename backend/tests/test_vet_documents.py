@@ -168,7 +168,7 @@ def fake_client_with_json(payload: dict[str, object]):
     return SimpleNamespace(chat=SimpleNamespace(completions=completions))
 
 
-def test_llm_validation_rejects_missing_and_additional_fields() -> None:
+def test_llm_normalization_fills_missing_and_removes_additional_fields() -> None:
     valid_input = {
         "image_bytes": image_bytes(),
         "content_type": "image/png",
@@ -176,30 +176,39 @@ def test_llm_validation_rejects_missing_and_additional_fields() -> None:
     }
 
     missing = {key: value for key, value in EXPECTED_ANALYSIS.items() if key != "status"}
-    with pytest.raises(ValueError, match="invalid"):
-        analyze_veterinary_document(**valid_input, client=fake_client_with_json(missing))
+    result = analyze_veterinary_document(**valid_input, client=fake_client_with_json(missing))
+    assert set(result) == set(EXPECTED_ANALYSIS)
+    assert result["status"] == "partial"
+    assert result["document_type"] == "veterinary_report"
+    assert result["visit_at"] == EXPECTED_ANALYSIS["visit_at"]
+    assert result["visit_reason"] == EXPECTED_ANALYSIS["visit_reason"]
 
     additional = {**EXPECTED_ANALYSIS, "diagnosis": "forbidden"}
-    with pytest.raises(ValueError, match="invalid"):
-        analyze_veterinary_document(**valid_input, client=fake_client_with_json(additional))
+    result = analyze_veterinary_document(**valid_input, client=fake_client_with_json(additional))
+    assert result == EXPECTED_ANALYSIS
+    assert "diagnosis" not in result
 
 
-def test_llm_validation_rejects_invalid_strict_field_types() -> None:
-    invalid_types = [
-        {**EXPECTED_ANALYSIS, "visit_price": "1500"},
-        {**EXPECTED_ANALYSIS, "veterinarian_name": 123},
-        {**EXPECTED_ANALYSIS, "veterinarian_profession": 123},
-        {**EXPECTED_ANALYSIS, "vet": 123},
-        {**EXPECTED_ANALYSIS, "post_visit_instructions": 123},
-    ]
+def test_llm_normalization_coerces_recoverable_field_types() -> None:
+    payload = {
+        **EXPECTED_ANALYSIS,
+        "visit_price": "1 500 руб.",
+        "veterinarian_name": 123,
+        "veterinarian_profession": 456,
+        "vet": 789,
+        "post_visit_instructions": 101112,
+    }
+    result = analyze_veterinary_document(
+        image_bytes(),
+        content_type="image/png",
+        client=fake_client_with_json(payload),
+    )
 
-    for payload in invalid_types:
-        with pytest.raises(ValueError, match="invalid"):
-            analyze_veterinary_document(
-                image_bytes(),
-                content_type="image/png",
-                client=fake_client_with_json(payload),
-            )
+    assert result["visit_price"] == 1500
+    assert result["veterinarian_name"] == "123"
+    assert result["veterinarian_profession"] == "456"
+    assert result["vet"] == "789"
+    assert result["post_visit_instructions"] == "101112"
 
 
 def test_llm_validation_accepts_null_optional_values() -> None:

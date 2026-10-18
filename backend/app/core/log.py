@@ -14,6 +14,8 @@ from contextvars import ContextVar
 from datetime import UTC, datetime
 from typing import Any, Literal
 
+from app.core.sage_logging import build_sage_handler
+
 # One mutable dict per request. Sync dependencies and endpoints run in worker threads
 # with a copy of the context; the copy points to the same dict, so a user id set during
 # authentication is visible to every later log line of the request.
@@ -118,22 +120,36 @@ class TextFormatter(logging.Formatter):
         return line
 
 
-def configure_logging(level: str = "INFO", fmt: Literal["json", "text"] = "json") -> None:
+def configure_logging(
+    level: str = "INFO",
+    fmt: Literal["json", "text"] = "json",
+    sage_url: str | None = None,
+    sage_token: str | None = None,
+    sage_timeout: float = 5.0,
+) -> None:
     _install_record_factory()
     formatter = JsonFormatter if fmt == "json" else TextFormatter
+    handlers: dict[str, object] = {
+        "stdout": {
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stdout",
+            "formatter": "default",
+        }
+    }
+    sage_handler = build_sage_handler(sage_url, sage_token, sage_timeout, formatter)
+    if sage_handler is not None:
+        handlers["sage"] = sage_handler
+
     logging.config.dictConfig(
         {
             "version": 1,
             "disable_existing_loggers": False,
             "formatters": {"default": {"()": formatter}},
-            "handlers": {
-                "stdout": {
-                    "class": "logging.StreamHandler",
-                    "stream": "ext://sys.stdout",
-                    "formatter": "default",
-                }
+            "handlers": handlers,
+            "root": {
+                "level": level.upper(),
+                "handlers": ["stdout"] + (["sage"] if sage_handler is not None else []),
             },
-            "root": {"level": level.upper(), "handlers": ["stdout"]},
             "loggers": {
                 # Server messages go through the same handler and format.
                 "uvicorn": {"handlers": [], "propagate": True},
