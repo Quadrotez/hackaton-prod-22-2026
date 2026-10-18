@@ -448,9 +448,9 @@ def seed_senior(session, user: User, today: date) -> None:
     food = new_food(user, name="Hill's Senior, рыба", type=FoodType.DRY,
                 protein=30, fats=14, carbohydrates=34, calories=3800)
     food.stock = FoodStock(user=user, total_grams=3000, remaining_grams=120)
-    food_wet.stock = FoodStock(user=user, total_grams=1200, remaining_grams=800)
     food_wet = new_food(user, name="Консервы Felix, паштет с тунцом", type=FoodType.WET,
                     protein=12, fats=6, carbohydrates=1, calories=950)
+    food_wet.stock = FoodStock(user=user, total_grams=1200, remaining_grams=800)
     add_feedings(stepan, today, [(food, "Hill's Senior, рыба", 55), (food_wet, "Консервы Felix, паштет с тунцом", 70)],
                  days=21, hour=8, notes={5: "Почти не ел, отказался от сухого"})
 
