@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     # json for servers (one object per line), text for reading locally.
     log_format: Literal["json", "text"] = "json"
+    # Optional Sage Logs push appender. Disabled when the URL is empty.
+    sage_log_url: str | None = None
+    sage_api_token: str | None = None
+    sage_log_timeout_seconds: float = 5.0
 
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env", env_file_encoding="utf-8", extra="ignore"
