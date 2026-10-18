@@ -47,7 +47,7 @@ test("сохранённый визит читается календарём и
       return Response.json(records);
     }
     if (parsed.pathname.endsWith("/visits/7")) { Object.assign(records[0], JSON.parse(init.body)); return Response.json(records[0]); }
-    if (parsed.pathname.endsWith("/vaccinations") || parsed.pathname.endsWith("/medications/schedule")) return Response.json([]);
+    if (parsed.pathname.endsWith("/vaccinations") || parsed.pathname.endsWith("/medications/schedule") || parsed.pathname.endsWith("/parasite-treatments")) return Response.json([]);
     throw new Error(`Unexpected request ${url}`);
   });
   await health.saveHealth(1, "visits", visit);
@@ -94,4 +94,23 @@ test("визит учитывает часовой пояс, а ключи од�
 test("сбой API не маскируется пустым календарём", async () => {
   const { health } = clientModules(async (url) => url === "/api/v1/pets/" ? Response.json([pet]) : Response.json({ detail: "Unavailable" }, { status: 503 }));
   await assert.rejects(() => health.loadCalendar("2026-10-01", "2026-11-11"), (error) => error.status === 503);
+});
+
+test("обработка с датой следующей процедуры становится событием parasite и ведёт в раздел обработок", () => {
+  const { events } = clientModules();
+  const treatment = { id: 5, pet_id: 1, kind: "external", product_name: "Стронгхолд", treated_on: "2026-10-01", interval_days: 90, next_due_on: "2026-12-30", clinic: null, notes: null };
+  const result = events.calendarEvents(pet, [], [], [], [treatment]);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].kind, "parasite");
+  assert.equal(result[0].title, "Стронгхолд");
+  assert.equal(result[0].date, "2026-12-30");
+  assert.equal(result[0].recordKey, "parasite-5");
+  assert.equal(result[0].completed, false);
+  assert.equal(events.healthEventHref(result[0]), "/pet/1/health/parasites#health-parasite-5");
+});
+
+test("обработка без даты следующей процедуры в календарь не попадает", () => {
+  const { events } = clientModules();
+  const treatment = { id: 6, pet_id: 1, kind: "internal", product_name: "Мильбемакс", treated_on: "2026-10-01", interval_days: null, next_due_on: null, clinic: null, notes: null };
+  assert.equal(events.calendarEvents(pet, [], [], [], [treatment]).length, 0);
 });
