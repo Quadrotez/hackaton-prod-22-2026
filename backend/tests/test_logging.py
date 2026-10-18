@@ -237,3 +237,12 @@ def test_json_formatter_writes_one_object_per_line() -> None:
 
     text = TextFormatter().format(record)
     assert "WARNING" in text and "[req-1]" in text and "event=x.y" in text and "pet_id=5" in text
+
+
+def test_log_settings_accept_any_case(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.core.config import Settings
+
+    monkeypatch.setenv("LOG_FORMAT", "JSON")
+    monkeypatch.setenv("LOG_LEVEL", " debug ")
+    settings = Settings(jwt_secret_key="test")
+    assert (settings.log_format, settings.log_level) == ("json", "DEBUG")
