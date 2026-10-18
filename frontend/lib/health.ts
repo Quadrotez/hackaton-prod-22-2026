@@ -65,7 +65,7 @@ export async function loadCalendar(from: string, to: string) {
       apiFetch<Dose[]>(healthPath(pet.id, `medications/schedule?${new URLSearchParams({ from, to, tz: timezone() })}`), { auth: true }),
       apiFetch<ParasiteTreatment[]>(healthPath(pet.id, "parasite-treatments"), { auth: true }),
     ]);
-    return calendarEvents(pet, visits, vaccinations, doses, parasites);
+    return calendarEvents(pet, visits, vaccinations, doses, parasites, { from, to, today: toDateKey(new Date()) });
   }));
   return { events: groups.flat().sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)), range: `${from}/${to}`, pets };
 }
