@@ -239,6 +239,9 @@ deploy:
       YANDEX_FOLDER_ID=${YANDEX_FOLDER_ID}
       LOG_LEVEL=${LOG_LEVEL:-INFO}
       LOG_FORMAT=json
+      SAGE_LOG_URL=${SAGE_LOG_URL}
+      SAGE_API_TOKEN=${SAGE_API_TOKEN}
+      SAGE_LOG_TIMEOUT_SECONDS=${SAGE_LOG_TIMEOUT_SECONDS:-5}
       ENV_EOF
     # Pre-flight: миграция в одноразовом контейнере ДО того, как трогать api/site.
     # Если она падает — прод продолжает крутить предыдущий образ (без окна 502).
