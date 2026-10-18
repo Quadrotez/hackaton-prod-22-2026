@@ -6,6 +6,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { getErrorMessage } from "@/lib/api";
 import { login, registerAndLogin } from "@/lib/auth";
+import { DEMO_PASSWORD, demoAccounts } from "@/lib/demo-accounts";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import {
@@ -25,9 +26,6 @@ const credentialsSchema = z.object({
     .email("Введите корректный email"),
   password: z.string().min(1, "Это обязательное поле"),
 });
-
-const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL ?? "demo@quadrotez.com";
-const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? "demo";
 
 type CredentialsValues = z.infer<typeof credentialsSchema>;
 type FormErrors = Partial<Record<keyof CredentialsValues, string>>;
@@ -91,12 +89,12 @@ export function LoginForm() {
     }
   }
 
-  async function handleDemoLogin() {
+  async function handleDemoLogin(email: string) {
     if (pending) return;
     setErrors({});
     setPending(true);
     try {
-      await login({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+      await login({ email, password: DEMO_PASSWORD });
       router.push("/me");
     } catch (error) {
       toast.error(getErrorMessage(error, "Не удалось войти в демо-аккаунт"));
@@ -159,14 +157,24 @@ export function LoginForm() {
 
           {!isRegister && (
             <Field>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleDemoLogin}
-                disabled={pending}
-              >
-                Войти в демо
-              </Button>
+              <p className="text-sm text-muted-foreground">Демо-аккаунты</p>
+              <div className="grid gap-2">
+                {demoAccounts.map((account) => (
+                  <Button
+                    key={account.email}
+                    type="button"
+                    variant="outline"
+                    className="h-auto flex-col items-start gap-0 whitespace-normal py-2 text-left"
+                    onClick={() => handleDemoLogin(account.email)}
+                    disabled={pending}
+                  >
+                    <span className="font-medium">{account.title}</span>
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {account.description}
+                    </span>
+                  </Button>
+                ))}
+              </div>
             </Field>
           )}
 

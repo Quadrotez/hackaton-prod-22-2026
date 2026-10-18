@@ -248,8 +248,8 @@ deploy:
     - ssh $SSH_ADDRESS "cd /opt/petcare && TAG=${TAG} docker compose pull && TAG=${TAG} docker compose run --rm migrate"
     - ssh $SSH_ADDRESS "cd /opt/petcare && TAG=${TAG} docker compose up -d --remove-orphans"
 
-# Creates/refreshes the demo account (demo@quadrotez.com) inside the running API
-# container so the "Войти в демо" button keeps working. Idempotent.
+# Rebuilds the demo accounts (see backend/scripts/create_demo_user.py) inside the running
+# API container so the demo login buttons keep working. Idempotent.
 demo:account:
   stage: deploy
   image: kroniak/ssh-client:3.19
