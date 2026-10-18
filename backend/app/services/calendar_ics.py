@@ -25,6 +25,9 @@ ALARM_TRIGGERS = {
     CalendarEventType.PARASITE: ("-PT15H", "PT9H"),
     CalendarEventType.MEDICATION: ("PT0M",),
 }
+# A visit without a known time is an all-day event: remind like other all-day events,
+# not a day and an hour before midnight.
+ALL_DAY_ALARM_TRIGGERS = ("-PT15H", "PT9H")
 # Done, taken or skipped events need no reminder.
 ALARM_STATUSES = {"planned", "pending"}
 MAX_LINE_OCTETS = 75
@@ -63,7 +66,8 @@ def alarm_lines(event: CalendarEvent, summary: str) -> list[str]:
     if event.status not in ALARM_STATUSES:
         return []
     lines = []
-    for trigger in ALARM_TRIGGERS[event.type]:
+    triggers = ALL_DAY_ALARM_TRIGGERS if event.time is None else ALARM_TRIGGERS[event.type]
+    for trigger in triggers:
         lines += [
             "BEGIN:VALARM",
             "ACTION:DISPLAY",

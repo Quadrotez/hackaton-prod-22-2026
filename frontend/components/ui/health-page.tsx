@@ -20,6 +20,7 @@ import { PageError, PageLoading } from "@/components/page-state";
 import { PetWeightChart } from "@/components/pet-weight-chart";
 import { PregnancyCard } from "@/components/pregnancy-card";
 import { PetCard } from "../pet-card";
+import { visitDateKey } from "@/lib/visit-time";
 
 function StatTile({
   label,
@@ -114,7 +115,7 @@ function HealthContent({ pet, overview, onUpdate }: { pet: Pet; overview: Health
           value={pet.weight_g != null ? formatWeight(pet.weight_g) : "—"}
           hint={pet.weight_g != null ? "по данным профиля" : "вес не указан"}
         />
-        <StatTile label="Ближайший визит" value={nextVisit ? new Date(nextVisit.visit_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" }) : "—"} hint={nextVisit ? nextVisit.title : "приёмов не запланировано"} />
+        <StatTile label="Ближайший визит" value={nextVisit ? new Date(`${visitDateKey(nextVisit.visit_at)}T00:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "short" }) : "—"} hint={nextVisit ? nextVisit.title : "приёмов не запланировано"} />
         <StatTile label="Следующая прививка" value={nextVaccination ? shortDate(nextVaccination) : "—"} hint={overview.next_vaccination?.name ?? "прививок по плану нет"} />
         <StatTile label="Следующая обработка" value={overview.next_parasite?.next_due_on ? shortDate(overview.next_parasite.next_due_on) : "—"} hint={overview.next_parasite?.product_name ?? "обработок по плану нет"} />
       </div>
