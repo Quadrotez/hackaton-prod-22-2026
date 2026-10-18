@@ -22,12 +22,11 @@ const options: { section: "visits" | "vaccines" | "medicines" | "parasites"; lab
 ];
 
 const href = (pet: Pet, section: string) => `/pet/${pet.id}/health/${section}?add=1`;
-// A temporary caretaker can add visits but not change the pet's treatment plan.
-const canAdd = (pet: Pet, section: string) => section === "visits" || !isCaretaker(pet);
+const canAdd = (pet: Pet) => !isCaretaker(pet);
 
 export function QuickAddMenu({ pets }: { pets: Pet[] }) {
   const available = options
-    .map((option) => ({ ...option, pets: pets.filter((pet) => canAdd(pet, option.section)) }))
+    .map((option) => ({ ...option, pets: pets.filter(canAdd) }))
     .filter((option) => option.pets.length > 0);
   if (available.length === 0) return null;
 

@@ -15,7 +15,13 @@ export function useRequireAuth() {
   const token = useAccessToken();
 
   useEffect(() => {
-    if (token === null) router.replace("/");
+    if (token === null) {
+      const path = window.location.pathname;
+      const destination = /^\/transfers(?:\/[1-9]\d*)?$/.test(path)
+        ? `/?next=${encodeURIComponent(path)}`
+        : "/";
+      router.replace(destination);
+    }
   }, [token, router]);
 
   const handleAuthError = useCallback((error: unknown): boolean => {

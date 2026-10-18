@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
-import { getSpeciesOption, petPhotoPath, type Pet } from "@/lib/pets";
+import { getSpeciesOption, isCaretaker, petPhotoPath, type Pet } from "@/lib/pets";
 import { birthdayOnDate, birthdayTitle } from "@/lib/birthdays";
 import { useProtectedImage } from "@/hooks/use-protected-image";
 
@@ -37,7 +37,7 @@ export function PetAvatar({
   size = "sm",
   className,
 }: {
-  pet: Pick<Pet, "id" | "name" | "species" | "photo_url"> & Partial<Pick<Pet, "birth_date">>;
+  pet: Pick<Pet, "id" | "name" | "species" | "photo_url"> & Partial<Pick<Pet, "birth_date" | "access">>;
   size?: keyof typeof sizes;
   className?: string;
 }) {
@@ -48,6 +48,7 @@ export function PetAvatar({
   const Icon = getSpeciesOption(pet.species).icon;
   return (
     <span
+      data-care={isCaretaker(pet) || undefined}
       title={birthday ? `${pet.name} — ${birthdayTitle(birthday.age)}` : undefined}
       className={cn(box, "relative isolate block min-h-0 min-w-0 shrink-0 rounded-full bg-secondary", className)}
     >
@@ -58,6 +59,10 @@ export function PetAvatar({
           <Icon data-pet-avatar-icon aria-hidden="true" className={icon} strokeWidth={1.5} />
         )}
       </span>
+      {isCaretaker(pet) && <>
+        <span aria-hidden="true" className="pointer-events-none absolute -inset-0.5 rounded-full border-2 border-dashed border-foreground/60" />
+        <span className="sr-only">Под присмотром</span>
+      </>}
       {birthday && <>
         <svg aria-hidden="true" viewBox="0 0 56 60" className="pointer-events-none absolute -top-[34%] left-[18%] z-10 h-auto w-[64%] origin-[50%_90%] -rotate-8 overflow-visible drop-shadow-[0_1px_1px_rgba(43,45,31,0.12)]">
           <path d="M4 52 25 9q3-5 6 0l21 43q-24 9-48 0Z" fill="#e98b83" />
