@@ -9,6 +9,7 @@ from PIL import Image
 
 from app.api.v1 import vet_documents
 from app.core.log import JsonFormatter, TextFormatter, mask_path, start_request_context
+from app.core.sage_logging import SageMultilineHandler
 from app.integrations.llm.vet_document_analyzer import analyze_veterinary_document
 from app.main import app
 from tests.health_helpers import PASSWORD, auth_headers, create_pet, pet_url
@@ -237,3 +238,44 @@ def test_json_formatter_writes_one_object_per_line() -> None:
 
     text = TextFormatter().format(record)
     assert "WARNING" in text and "[req-1]" in text and "event=x.y" in text and "pet_id=5" in text
+
+
+def test_log_settings_accept_any_case(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.core.config import Settings
+
+    monkeypatch.setenv("LOG_FORMAT", "JSON")
+    monkeypatch.setenv("LOG_LEVEL", " debug ")
+    settings = Settings(jwt_secret_key="test")
+    assert (settings.log_format, settings.log_level) == ("json", "DEBUG")
+
+
+def test_sage_handler_posts_one_formatted_record(monkeypatch: pytest.MonkeyPatch) -> None:
+    sent: list[tuple[str, dict[str, str], bytes]] = []
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    def fake_urlopen(request, timeout):
+        sent.append((request.full_url, dict(request.header_items()), request.data))
+        return FakeResponse()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    handler = SageMultilineHandler("https://sage.example/api/hack-led-22/multiline/", "secret")
+    handler.setFormatter(JsonFormatter())
+    try:
+        record = logging.getLogger("app.test").makeRecord(
+            "app.test", logging.WARNING, __file__, 1, "hello", (), None, extra={"event": "test"}
+        )
+        handler.emit(record)
+        handler._records.join()
+        assert len(sent) == 1
+        assert sent[0][0].endswith("/multiline/")
+        assert sent[0][1]["Authorization"] == "Bearer secret"
+        assert sent[0][1]["Content-type"] == "application/x-ndjson"
+        assert json.loads(sent[0][2])['message'] == "hello"
+    finally:
+        handler.close()

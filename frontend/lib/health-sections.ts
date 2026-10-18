@@ -29,6 +29,13 @@ export type Allergy = { id: number; allergen: string; reactions: string | null; 
 export type Dose = { medication_id: number; name: string; dose: string; scheduled_for: string; status: "pending" | "taken" | "skipped" };
 export type ResourceMap = { vaccinations: Vaccine; visits: Visit; medications: Medication; symptoms: Symptom; allergies: Allergy; parasites: ParasiteTreatment };
 export type HealthResource = keyof ResourceMap;
+
+// A temporary caretaker may add these records (and mark doses) but edit or delete nothing.
+export const CARETAKER_ADDABLE: readonly HealthResource[] = ["symptoms", "visits"];
+
+export function canAddHealthRecord(pet: { access?: "owner" | "caretaker" }, resource: HealthResource): boolean {
+  return pet.access !== "caretaker" || CARETAKER_ADDABLE.includes(resource);
+}
 export type HealthRecord = { [R in HealthResource]: { resource: R; value: ResourceMap[R] } }[HealthResource];
 export type HealthSectionData = Awaited<ReturnType<typeof loadHealthSection>>;
 export type Pregnancy = { id: number; pet_id: number; started_on: string; month: number; ended_on: string | null };

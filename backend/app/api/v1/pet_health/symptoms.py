@@ -1,7 +1,7 @@
 from fastapi import APIRouter, status
 from sqlalchemy import select
 
-from app.api.async_dependencies import AsyncDbSession, OwnedPet
+from app.api.async_dependencies import AsyncDbSession, CaredPet, OwnedPet
 from app.models.health import Symptom
 from app.schemas.health import SymptomCreate, SymptomPublic, SymptomUpdate
 from app.services.health.common import get_pet_child, patch_changes, save
@@ -11,12 +11,12 @@ NOT_FOUND = "Symptom not found"
 
 
 @router.post("", response_model=SymptomPublic, status_code=status.HTTP_201_CREATED)
-async def create_symptom(pet: OwnedPet, payload: SymptomCreate, db: AsyncDbSession) -> Symptom:
+async def create_symptom(pet: CaredPet, payload: SymptomCreate, db: AsyncDbSession) -> Symptom:
     return await save(db, Symptom(pet_id=pet.id, **payload.model_dump()))
 
 
 @router.get("", response_model=list[SymptomPublic], summary="List symptoms, latest first")
-async def list_symptoms(pet: OwnedPet, db: AsyncDbSession) -> list[Symptom]:
+async def list_symptoms(pet: CaredPet, db: AsyncDbSession) -> list[Symptom]:
     return list(
         await db.scalars(
             select(Symptom)
@@ -27,7 +27,7 @@ async def list_symptoms(pet: OwnedPet, db: AsyncDbSession) -> list[Symptom]:
 
 
 @router.get("/{symptom_id}", response_model=SymptomPublic)
-async def get_symptom(pet: OwnedPet, symptom_id: int, db: AsyncDbSession) -> Symptom:
+async def get_symptom(pet: CaredPet, symptom_id: int, db: AsyncDbSession) -> Symptom:
     return await get_pet_child(db, Symptom, pet.id, symptom_id, NOT_FOUND)
 
 

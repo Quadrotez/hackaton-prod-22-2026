@@ -8,6 +8,7 @@ import {
   cancelTransfer,
   cancelTransferReturn,
   confirmTransferReturn,
+  endTransfer,
   declineTransfer,
   isOpenTransfer,
   listIncomingTransfers,
@@ -16,7 +17,8 @@ import {
   requestTransferReturn,
   type PetTransfer,
 } from "@/lib/transfers";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { PageError, PageLoading } from "@/components/page-state";
@@ -157,15 +159,20 @@ export function TransfersManager() {
       >
         {(transfer) =>
           transfer.status === "accepted" ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={busy(transfer.id)}
-              onClick={() => handleAction(transfer.id, requestTransferReturn, "Не удалось запросить возврат")}
-            >
-              Передать обратно
-            </Button>
+            <>
+              <Link href={`/pet/${transfer.pet.id}`} className={buttonVariants({ size: "sm" })}>
+                Открыть питомца
+              </Link>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={busy(transfer.id)}
+                onClick={() => handleAction(transfer.id, requestTransferReturn, "Не удалось запросить возврат")}
+              >
+                Передать обратно
+              </Button>
+            </>
           ) : (
             <>
               <p className="text-xs text-muted-foreground">Возврат запрошен — ждём подтверждения владельца</p>
@@ -210,6 +217,17 @@ export function TransfersManager() {
                 onClick={() => handleAction(transfer.id, confirmTransferReturn, "Не удалось подтвердить возврат")}
               >
                 Подтвердить возврат
+              </Button>
+            )}
+            {transfer.status === "accepted" && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={busy(transfer.id)}
+                onClick={() => handleAction(transfer.id, endTransfer, "Не удалось завершить передачу")}
+              >
+                Забрать досрочно
               </Button>
             )}
           </>

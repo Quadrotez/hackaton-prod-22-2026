@@ -37,7 +37,7 @@ test("длительности, статусы и форматы дат пере
       ["week", "Неделя"],
       ["month", "Месяц"],
       ["three_months", "3 месяца"],
-      ["indefinite", "Бессрочно"],
+      ["custom", "До даты"],
     ],
   );
   assert.equal(transfers.transferDurationLabel("three_months"), "3 месяца");
@@ -71,6 +71,7 @@ test("клиент передачи ходит в эндпоинты бэкен�
   await transfers.requestTransferReturn(5);
   await transfers.cancelTransferReturn(5);
   await transfers.confirmTransferReturn(5);
+  await transfers.endTransfer(5);
   await transfers.listIncomingTransfers();
   await transfers.listReceivedTransfers();
   await transfers.listOutgoingTransfers();
@@ -85,6 +86,7 @@ test("клиент передачи ходит в эндпоинты бэкен�
     "POST /api/v1/transfers/5/return",
     "POST /api/v1/transfers/5/cancel-return",
     "POST /api/v1/transfers/5/confirm-return",
+    "POST /api/v1/transfers/5/end",
     "GET /api/v1/transfers/incoming",
     "GET /api/v1/transfers/received",
     "GET /api/v1/transfers/outgoing",
@@ -126,4 +128,35 @@ test("ошибки бэкенда о передаче локализуются, 
     () => transfers.listIncomingTransfers(),
     (error) => error instanceof api.ApiError && error.status === 404 && error.message === "Передача не найдена",
   );
+});
+
+test("срок передачи: пресеты считаются от сейчас, своя дата — до конца выбранного дня", () => {
+  const { transfers } = clientModules();
+  const now = new Date(2026, 0, 31, 12, 0);
+  assert.deepEqual(transfers.transferEndDate("week", "", now), new Date(2026, 1, 7, 12, 0));
+  // 31 января + месяц упирается в конец февраля.
+  assert.deepEqual(transfers.transferEndDate("month", "", now), new Date(2026, 1, 28, 12, 0));
+  assert.deepEqual(transfers.transferEndDate("three_months", "", now), new Date(2026, 3, 30, 12, 0));
+  assert.deepEqual(transfers.transferEndDate("custom", "2026-02-10", now), new Date(2026, 1, 10, 23, 59));
+  assert.equal(transfers.transferEndDate("custom", "", now), null);
+
+  assert.equal(transfers.customEndDateError(null, now), "Выберите дату окончания");
+  assert.equal(transfers.customEndDateError(new Date(2026, 0, 30), now), "Дата окончания должна быть в будущем");
+  assert.equal(transfers.customEndDateError(new Date(2027, 1, 2), now), "Не дальше чем на 366 дней");
+  assert.equal(transfers.customEndDateError(new Date(2026, 1, 10, 23, 59), now), null);
+  assert.equal(transfers.toDateInput(now), "2026-01-31");
+});
+
+test("заявка уходит либо с пресетом, либо с датой окончания", () => {
+  const { transfers } = clientModules();
+  assert.deepEqual(transfers.transferCreatePayload("a@b.co", "week", null), {
+    recipient_email: "a@b.co",
+    duration: "week",
+  });
+  const end = new Date(Date.UTC(2026, 1, 10, 20, 59));
+  assert.deepEqual(transfers.transferCreatePayload("a@b.co", "custom", end), {
+    recipient_email: "a@b.co",
+    ends_at: "2026-02-10T20:59:00.000Z",
+  });
+  assert.equal(transfers.transferDurationLabel("custom"), "до выбранной даты");
 });

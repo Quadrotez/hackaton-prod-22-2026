@@ -8,6 +8,7 @@ import { Popover } from "@base-ui/react/popover";
 import { ArrowRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, LoaderCircleIcon, PawPrintIcon, PlusIcon } from "lucide-react";
 import { useActivePet } from "@/components/active-pet-provider";
 import { petIdFromPath, petSwitchHref } from "@/lib/active-pet";
+import { isCaretaker } from "@/lib/pets";
 import { cn } from "@/lib/utils";
 import { PetAvatar } from "@/components/pet-avatar";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -91,9 +92,10 @@ function PetMenuWithPath() {
               <ul key={currentPage} aria-label={`Питомцы, страница ${currentPage + 1} из ${pageCount}`} className="pet-menu-fan">
                 {visiblePets.map((pet) => (
                   <li key={pet.id} className="pet-menu-pet">
-                    <button type="button" aria-label={`Выбрать питомца: ${pet.name}`} aria-pressed={pet.id === activePet?.id} onClick={() => choosePet(pet.id)} className="pet-menu-petLink">
+                    <button type="button" aria-label={`Выбрать питомца: ${pet.name}${isCaretaker(pet) ? " (у вас на время)" : ""}`} aria-pressed={pet.id === activePet?.id} onClick={() => choosePet(pet.id)} className="pet-menu-petLink">
                       <PetAvatar pet={pet} size="md" className="pet-menu-avatar" />
                       <span className="pet-menu-petName" title={pet.name}>{pet.name}</span>
+                      {isCaretaker(pet) && <span className="pet-menu-careBadge">на время</span>}
                     </button>
                   </li>
                 ))}
