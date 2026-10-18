@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { datetimeInput, type HealthRecord, type HealthResource, type HealthSectionData } from "@/lib/health-sections";
+import { visitAtPayload, visitFormValues } from "@/lib/visit-time";
 
 const requiredText = (max: number) => z.string().trim().min(1, "Это обязательное поле").max(max, `Не больше ${max} символов`);
 const optionalText = (max: number) => z.string().trim().max(max, `Не больше ${max} символов`).transform((value) => value || null);
@@ -8,23 +9,21 @@ const date = z.string().refine((value) => {
   const parsed = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }, "Укажите корректную дату");
-const validDatetime = (value: string) => value.length > 0 && !Number.isNaN(new Date(value).getTime());
-const datetime = z.string().refine(validDatetime, "Укажите дату и время").transform((value) => new Date(value).toISOString());
-// Бэкенд считает событие в 00:00 событием на весь день, поэтому явно выбранное 00:00 отправляем как 00:00:10.
-const eventDatetime = z.string().refine(validDatetime, "Укажите дату и время").transform((value) => {
-  const date = new Date(value);
-  if (date.getHours() === 0 && date.getMinutes() === 0) date.setSeconds(10);
-  return date.toISOString();
-});
+const datetime = z.string().refine((value) => value.length > 0 && !Number.isNaN(new Date(value).getTime()), "Укажите дату и время").transform((value) => new Date(value).toISOString());
 const optionalIntervalDays = z.union([z.coerce.number().int("Введите целое число дней").min(1, "Минимум один день").max(365, "Не больше 365 дней"), z.literal("")]).optional().transform((value) => (typeof value === "number" ? value : null));
 const optionalDate = z.union([date, z.literal("")]).optional().transform((value) => (value ? value : null));
 export const healthSchemas = {
   vaccinations: z.object({ name: requiredText(255), scheduled_on: date, status: z.enum(["planned", "done"]), clinic: optionalText(255), notes: optionalText(2000), interval_days: optionalIntervalDays, next_due_on: optionalDate }),
   visits: z.object({
-    title: requiredText(255), visit_at: eventDatetime, reason: z.enum(["illness", "examination", "vaccination", "checkup"]),
+    title: requiredText(255), visit_date: date, visit_time: z.string(), visit_time_unknown: z.string(),
+    reason: z.enum(["illness", "examination", "vaccination", "checkup"]),
     status: z.enum(["planned", "completed", "cancelled"]), doctor_name: optionalText(255), doctor_specialty: optionalText(255),
     topic: optionalText(255), diagnosis: optionalText(5000), notes: optionalText(5000),
-  }),
+  }).refine((data) => data.visit_time_unknown === "on" || /^([01]\d|2[0-3]):[0-5]\d$/.test(data.visit_time), {
+    path: ["visit_time"], message: "Укажите время или отметьте «Время не указано»",
+  }).transform(({ visit_date, visit_time, visit_time_unknown, ...rest }) => ({
+    ...rest, visit_at: visitAtPayload(visit_date, visit_time_unknown === "on" ? null : visit_time),
+  })),
   medications: z.object({
     name: requiredText(255), dose: requiredText(100), start_date: date,
     end_date: z.union([date, z.literal("")]).transform((value) => value || null),
@@ -45,7 +44,9 @@ export const healthSchemas = {
   }),
 };
 export type HealthField = {
-  name: string; label: string; type?: "date" | "datetime-local" | "number" | "textarea";
+  name: string; label: string; type?: "date" | "time" | "datetime-local" | "number" | "textarea" | "checkbox";
+  /** Поле неактивно, пока отмечен этот чекбокс. */
+  disabledBy?: string;
   required?: boolean; maxLength?: number; min?: number; max?: number; placeholder?: string;
   options?: { value: string; label: string }[];
 };
@@ -60,7 +61,9 @@ export const healthFields: Record<HealthResource, HealthField[]> = {
   ],
   visits: [
     { name: "title", label: "Название приёма", required: true, maxLength: 255, placeholder: "Например, плановый осмотр" },
-    { name: "visit_at", label: "Дата и время", type: "datetime-local", required: true },
+    { name: "visit_date", label: "Дата", type: "date", required: true },
+    { name: "visit_time", label: "Время", type: "time", disabledBy: "visit_time_unknown" },
+    { name: "visit_time_unknown", label: "Время не указано", type: "checkbox" },
     { name: "reason", label: "Причина", options: [{ value: "examination", label: "Осмотр" }, { value: "illness", label: "Болезнь или жалоба" }, { value: "vaccination", label: "Вакцинация" }, { value: "checkup", label: "Контрольный приём" }] },
     { name: "status", label: "Статус", options: [{ value: "planned", label: "Запланирован" }, { value: "completed", label: "Состоялся" }, { value: "cancelled", label: "Отменён" }] },
     { name: "doctor_name", label: "Врач", maxLength: 255 }, { name: "doctor_specialty", label: "Специальность врача", maxLength: 255 },
@@ -86,9 +89,10 @@ export const healthFields: Record<HealthResource, HealthField[]> = {
   ],
 };
 export function healthFormDefaults(data: HealthSectionData, resource: HealthResource, record?: HealthRecord, history = false): Record<string, string | number> {
-  const values: Record<string, string | number> = { scheduled_on: data.today, visit_at: `${data.today}T09:00`, start_date: data.today, treated_on: data.today, interval_days: resource === "medications" ? 1 : "", next_due_on: "", kind: "external", times: "09:00", status: history ? resource === "vaccinations" ? "done" : "completed" : "planned", reason: "examination", observed_at: datetimeInput(data.now) };
+  const values: Record<string, string | number> = { scheduled_on: data.today, visit_date: data.today, visit_time: "09:00", visit_time_unknown: "", start_date: data.today, treated_on: data.today, interval_days: resource === "medications" ? 1 : "", next_due_on: "", kind: "external", times: "09:00", status: history ? resource === "vaccinations" ? "done" : "completed" : "planned", reason: "examination", observed_at: datetimeInput(data.now) };
   if (record) for (const [key, value] of Object.entries(record.value)) {
-    if (key === "visit_at" || key === "observed_at") values[key] = datetimeInput(String(value));
+    if (key === "visit_at") Object.assign(values, visitFormValues(String(value)));
+    else if (key === "observed_at") values[key] = datetimeInput(String(value));
     else if (key === "times" && Array.isArray(value)) values[key] = value.map((time) => time.slice(0, 5)).join(", ");
     else if (typeof value === "string" || typeof value === "number") values[key] = value;
     else if (value === null) values[key] = "";

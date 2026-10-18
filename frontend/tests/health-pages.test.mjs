@@ -27,12 +27,13 @@ test("валидация календарных дат, длительности
   assert.equal(forms.healthSchemas.medications.safeParse({ name: "Курс", dose: "1 таб.", start_date: "2026-10-17", end_date: "", interval_days: 1, times: "25:00", notes: "" }).success, false);
 });
 
-test("приём в 00:00 отправляется как 00:00:10, чтобы бэкенд не считал его весь день", () => {
+test("приём в 00:00 не уходит на бэкенд как «весь день»", () => {
   const { load } = client(() => Promise.resolve(new Response()));
   const forms = load("lib/health-form");
-  const visit = (visit_at) => forms.healthSchemas.visits.safeParse({ title: "Осмотр", visit_at, reason: "examination", status: "planned", doctor_name: "", doctor_specialty: "", topic: "", diagnosis: "", notes: "" });
-  assert.equal(visit("2026-10-18T00:00").data.visit_at, new Date(2026, 9, 18, 0, 0, 10).toISOString());
-  assert.equal(visit("2026-10-18T09:30").data.visit_at, new Date(2026, 9, 18, 9, 30).toISOString());
+  const visitTime = load("lib/visit-time");
+  const visit = (visit_time) => forms.healthSchemas.visits.safeParse({ title: "Осмотр", visit_date: "2026-10-18", visit_time, visit_time_unknown: "", reason: "examination", status: "planned", doctor_name: "", doctor_specialty: "", topic: "", diagnosis: "", notes: "" });
+  assert.equal(visitTime.isDateOnlyVisit(visit("00:00").data.visit_at), false);
+  assert.equal(visit("09:30").data.visit_at, new Date(2026, 9, 18, 9, 30).toISOString());
 });
 
 test("редактирование сохраняет все значения, время и расписание", () => {
