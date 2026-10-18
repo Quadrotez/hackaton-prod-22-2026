@@ -59,6 +59,8 @@
   box-shadow: 0 12px 32px color-mix(in srgb, var(--foreground) 12%, transparent);
 }
 
+.dark .pet-menu-popup { box-shadow: 0 12px 32px rgb(0 0 0 / 45%); }
+
 .pet-menu-header { display: flex; min-height: 2rem; align-items: center; justify-content: space-between; gap: .5rem; padding: 0 .25rem; }
 .pet-menu-pageButton { width: 2rem; height: 2rem; }
 .pet-menu-fan { display: flex; justify-content: space-evenly; gap: .25rem; margin: 0; padding: .5rem 0 .125rem; list-style: none; }

@@ -56,7 +56,7 @@ function MenuBar({ pathname }: { pathname?: string }) {
   const { activePet, pets, status } = useActivePet();
   const pet = pets.find((item) => item.id === petIdFromPath(pathname ?? "")) ?? activePet;
   return (
-    <nav aria-label="Основная навигация" className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 flex -translate-x-1/2 flex-row items-center gap-1 rounded-2xl border-2 border-secondary bg-card p-2 shadow-lg shadow-foreground/5">
+    <nav aria-label="Основная навигация" className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 flex -translate-x-1/2 flex-row items-center gap-1 rounded-2xl border-2 border-secondary bg-card p-2 shadow-lg shadow-foreground/5 dark:shadow-black/40">
       <MenuLink href="/me" label="Главная" icon={HomeIcon} active={pathname === "/me"} />
       {pet && status === "ready" ? (
         <MenuLink href={`/pet/${pet.id}?feed=1#feeding`} label={`Покормить: ${pet.name}`} btname="Покормить" icon={UtensilsIcon} />
@@ -72,10 +72,10 @@ function MenuBar({ pathname }: { pathname?: string }) {
         title={activePet ? `Профиль: ${activePet.name}` : "Добавить питомца"}
         className="relative -mt-6 flex w-16 shrink-0 flex-col items-center gap-1 rounded-2xl px-1 pb-1 outline-none focus-visible:ring-2 focus-visible:ring-foreground md:w-20"
       >
-        <span className="flex size-14 items-center justify-center rounded-full border-4 border-card bg-primary shadow-sm ring-1 ring-border">
+        <span className="flex size-14 items-center justify-center rounded-full border-4 border-card bg-primary shadow-sm ring-1 ring-border dark:text-primary-foreground">
           {activePet ? <PetAvatar pet={activePet} size="sm" className="size-full bg-primary" /> : <PawPrintIcon aria-hidden="true" className="size-6" />}
         </span>
-        <span className="text-[11px] font-semibold leading-3">Питомец</span>
+        <span className="text-[11px] font-semibold leading-3">Профиль</span>
       </Link>
       <MenuLink href="/food" label="Запасы" icon={PackageIcon} active={pathname === "/food"} />
       <MenuLink href="/account" label="Аккаунт" icon={UserIcon} active={pathname === "/account"} />

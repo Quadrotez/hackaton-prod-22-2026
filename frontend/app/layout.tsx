@@ -3,6 +3,7 @@ import "./globals.css";
 import { Inter } from "next/font/google";
 import { ActivePetProvider } from "@/components/active-pet-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { themeInitScript } from "@/lib/theme";
 
 const sans = Inter({
   subsets: ["cyrillic", "latin"],
@@ -23,7 +24,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ru" className={`${sans.variable} h-full antialiased`}>
+    <html lang="ru" suppressHydrationWarning className={`${sans.variable} h-full antialiased`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="min-h-full flex flex-col font-sans">
         <ActivePetProvider>
           {children}
