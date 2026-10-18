@@ -71,7 +71,7 @@ function QuickLinkTile({
   return href ? <Link href={href} className="rounded-2xl outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-foreground">{content}</Link> : content;
 }
 
-export function PetDetails({ petId }: { petId: number }) {
+export function PetDetails({ petId, startFeeding = false }: { petId: number; startFeeding?: boolean }) {
   const load = useCallback(
     () => Promise.all([
       getPet(petId),
@@ -120,7 +120,7 @@ export function PetDetails({ petId }: { petId: number }) {
         />
       </div>
 
-      <PetMeals petId={pet.id} meals={meals} foods={foods} now={now} onMealsChange={handleMealsChange} />
+      <PetMeals key={pet.id} defaultOpen={startFeeding} petId={pet.id} meals={meals} foods={foods} now={now} onMealsChange={handleMealsChange} />
 
       <section aria-label="Быстрые переходы" className="grid md:grid-cols-2 gap-3">
         <QuickLinkTile

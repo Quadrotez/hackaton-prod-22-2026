@@ -8,14 +8,14 @@ export const metadata: Metadata = {
   title: "Питомец — PetCare",
 };
 
-export default function PetPage({ params }: PageProps<"/pet/[id]">) {
+export default function PetPage({ params, searchParams }: PageProps<"/pet/[id]">) {
   return (
     <PageShell>
       <Suspense fallback={<PageLoading />}>
-        {params.then(({ id }) => {
+        {Promise.all([params, searchParams]).then(([{ id }, query]) => {
           const petId = Number(id);
           return Number.isInteger(petId) && petId > 0 ? (
-            <PetDetails petId={petId} />
+            <PetDetails key={petId} petId={petId} startFeeding={query.feed === "1"} />
           ) : (
             <PageError message="Питомец не найден" backToList />
           );

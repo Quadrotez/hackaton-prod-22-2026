@@ -3,9 +3,12 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { HandHeartIcon, HomeIcon, type LucideIcon, UtensilsIcon, UserIcon } from "lucide-react";
+import { HomeIcon, type LucideIcon, PackageIcon, PawPrintIcon, UserIcon, UtensilsIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
+import { PetAvatar } from "@/components/pet-avatar";
+import { useActivePet } from "@/components/active-pet-provider";
+import { petIdFromPath } from "@/lib/active-pet";
 
 const itemClass = cn(buttonVariants({ variant: "ghost" }), "size-10 rounded-xl p-0 md:h-14 md:w-16 md:flex-col md:gap-1 [&_svg:not([class*='size-'])]:size-5");
 const labelClass = "hidden text-[11px] font-medium leading-3 md:block";
@@ -50,11 +53,31 @@ function MenuWithPathname() {
 }
 
 function MenuBar({ pathname }: { pathname?: string }) {
+  const { activePet, pets, status } = useActivePet();
+  const pet = pets.find((item) => item.id === petIdFromPath(pathname ?? "")) ?? activePet;
   return (
-    <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 flex flex-row gap-1 rounded-xl bg-white border-2 border-secondary p-2">
+    <nav aria-label="Основная навигация" className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 flex -translate-x-1/2 flex-row items-center gap-1 rounded-2xl border-2 border-secondary bg-card p-2 shadow-lg shadow-foreground/5">
       <MenuLink href="/me" label="Главная" icon={HomeIcon} active={pathname === "/me"} />
-      <MenuLink href="/transfers" label="Передачи" icon={HandHeartIcon} active={pathname === "/transfers"} />
-      <MenuLink href="/food" label="Корм" icon={UtensilsIcon} active={pathname === "/food"} />
+      {pet && status === "ready" ? (
+        <MenuLink href={`/pet/${pet.id}?feed=1#feeding`} label={`Покормить: ${pet.name}`} btname="Покормить" icon={UtensilsIcon} />
+      ) : (
+        <button type="button" disabled aria-label="Покормить" title={status === "loading" ? "Загружаем питомцев…" : "Сначала выберите питомца"} className={itemClass}>
+          <UtensilsIcon aria-hidden="true" /><span className={labelClass}>Покормить</span>
+        </button>
+      )}
+      <Link
+        href={activePet ? `/pet/${activePet.id}` : "/pet/create"}
+        aria-label={activePet ? `Профиль питомца: ${activePet.name}` : "Добавить питомца"}
+        aria-current={pathname === `/pet/${activePet?.id}` ? "page" : undefined}
+        title={activePet ? `Профиль: ${activePet.name}` : "Добавить питомца"}
+        className="relative -mt-6 flex w-16 shrink-0 flex-col items-center gap-1 rounded-2xl px-1 pb-1 outline-none focus-visible:ring-2 focus-visible:ring-foreground md:w-20"
+      >
+        <span className="flex size-14 items-center justify-center rounded-full border-4 border-card bg-primary shadow-sm ring-1 ring-border">
+          {activePet ? <PetAvatar pet={activePet} size="sm" className="size-full bg-primary" /> : <PawPrintIcon aria-hidden="true" className="size-6" />}
+        </span>
+        <span className="text-[11px] font-semibold leading-3">Питомец</span>
+      </Link>
+      <MenuLink href="/food" label="Запасы" icon={PackageIcon} active={pathname === "/food"} />
       <MenuLink href="/account" label="Аккаунт" icon={UserIcon} active={pathname === "/account"} />
     </nav>
   );
