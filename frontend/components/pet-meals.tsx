@@ -84,6 +84,7 @@ function MealForm({
   petId,
   foods,
   foodsFailed,
+  caretaker,
   meals,
   meal,
   onSaved,
@@ -93,6 +94,7 @@ function MealForm({
   petId: number;
   foods: Food[];
   foodsFailed: boolean;
+  caretaker: boolean;
   meals: Meal[];
   meal?: Meal;
   onSaved: (meal: Meal) => void;
@@ -216,10 +218,14 @@ function MealForm({
     return (
       <div className="flex flex-col items-start gap-3 border-t border-secondary pt-3 text-sm">
         <p className="text-muted-foreground">
-          {foodsFailed ? "Не удалось загрузить список кормов. Обновите страницу или попробуйте позже" : "Сначала добавьте корм в список кормов"}
+          {foodsFailed
+            ? "Не удалось загрузить список кормов. Обновите страницу или попробуйте позже"
+            : caretaker
+              ? "У владельца пока нет кормов в списке — попросите его добавить корм"
+              : "Сначала добавьте корм в список кормов"}
         </p>
         <div className="flex gap-2">
-          <Link href="/food" className="underline underline-offset-4">К кормам</Link>
+          {!caretaker && <Link href="/food" className="underline underline-offset-4">К кормам</Link>}
           <button type="button" onClick={onCancel} className="text-muted-foreground underline underline-offset-4">Отмена</button>
         </div>
       </div>
@@ -494,6 +500,7 @@ export function PetMeals({
   foods,
   now,
   onMealsChange,
+  caretaker = false,
 }: {
   petId: number;
   defaultOpen?: boolean;
@@ -501,6 +508,8 @@ export function PetMeals({
   foods: Food[] | null;
   now: number;
   onMealsChange: (meals: Meal[]) => void;
+  // Temporary care: feeding from the owner's foods, past meals cannot be changed.
+  caretaker?: boolean;
 }) {
   const [editing, setEditing] = useState<Meal | "new" | null>(defaultOpen ? "new" : null);
   const [feedingRequested, setFeedingRequested] = useState(defaultOpen);
@@ -542,6 +551,7 @@ export function PetMeals({
             petId={petId}
             foods={foods ?? []}
             foodsFailed={foods === null}
+            caretaker={caretaker}
             meals={knownMeals}
             meal={editing === "new" ? undefined : editing}
             onCancel={closeForm}
@@ -593,7 +603,7 @@ export function PetMeals({
                       {[meal.reaction_notes, meal.notes].filter(Boolean).map((note) => ` · ${note}`).join("")}
                     </p>
                   </div>
-                  {foods !== null && (
+                  {foods !== null && !caretaker && (
                     <Button
                       type="button"
                       variant="ghost"

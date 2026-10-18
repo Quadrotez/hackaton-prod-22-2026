@@ -12,7 +12,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { Pet } from "@/lib/pets";
+import { isCaretaker, type Pet } from "@/lib/pets";
 
 const options: { section: "visits" | "vaccines" | "medicines" | "parasites"; label: string; icon: LucideIcon }[] = [
   { section: "visits", label: "Приём", icon: StethoscopeIcon },
@@ -22,9 +22,14 @@ const options: { section: "visits" | "vaccines" | "medicines" | "parasites"; lab
 ];
 
 const href = (pet: Pet, section: string) => `/pet/${pet.id}/health/${section}?add=1`;
+// A temporary caretaker can add visits but not change the pet's treatment plan.
+const canAdd = (pet: Pet, section: string) => section === "visits" || !isCaretaker(pet);
 
 export function QuickAddMenu({ pets }: { pets: Pet[] }) {
-  if (pets.length === 0) return null;
+  const available = options
+    .map((option) => ({ ...option, pets: pets.filter((pet) => canAdd(pet, option.section)) }))
+    .filter((option) => option.pets.length > 0);
+  if (available.length === 0) return null;
 
   return (
     <DropdownMenu>
@@ -35,7 +40,7 @@ export function QuickAddMenu({ pets }: { pets: Pet[] }) {
         <PlusIcon aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" side="top" className="min-w-40">
-        {options.map(({ section, label, icon: Icon }) =>
+        {available.map(({ section, label, icon: Icon, pets }) =>
           pets.length === 1 ? (
             <DropdownMenuItem key={section} render={<Link href={href(pets[0], section)} />}>
               <Icon aria-hidden="true" />

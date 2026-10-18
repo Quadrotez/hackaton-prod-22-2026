@@ -12,6 +12,7 @@ class TransferDuration(StrEnum):
     MONTH = "month"
     THREE_MONTHS = "three_months"
     INDEFINITE = "indefinite"
+    CUSTOM = "custom"  # the owner picked the end date (ends_at)
 
 
 class TransferStatus(StrEnum):

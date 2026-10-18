@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
-from app.api.async_dependencies import AsyncCurrentUser, AsyncDbSession, OwnedPet
+from app.api.async_dependencies import AsyncCurrentUser, AsyncDbSession, CaredPet, OwnedPet
 from app.models.health import VetVisit, VisitStatus
 from app.schemas.health import (
     VetVisitCreate,
@@ -25,7 +25,7 @@ NOT_FOUND = "Visit not found"
 
 @router.post("", response_model=VetVisitPublic, status_code=status.HTTP_201_CREATED)
 async def create_visit(
-    pet: OwnedPet, current_user: AsyncCurrentUser, payload: VetVisitCreate, db: AsyncDbSession
+    pet: CaredPet, current_user: AsyncCurrentUser, payload: VetVisitCreate, db: AsyncDbSession
 ) -> VetVisit:
     await validate_referral(db, pet.id, None, payload.referred_by_visit_id)
     fields = payload.model_dump()
@@ -48,7 +48,7 @@ async def create_visit(
     description="Planned visits are ordered soonest first, all others latest first.",
 )
 async def list_visits(
-    pet: OwnedPet,
+    pet: CaredPet,
     db: AsyncDbSession,
     status_filter: VisitStatus | None = Query(default=None, alias="status"),
 ) -> list[VetVisit]:
@@ -68,7 +68,7 @@ async def list_visits(
     summary="Visit topics with counts",
     description="Topics are matched case-insensitively; the most frequent comes first.",
 )
-async def get_topics(pet: OwnedPet, db: AsyncDbSession) -> list[VisitTopic]:
+async def get_topics(pet: CaredPet, db: AsyncDbSession) -> list[VisitTopic]:
     return list_topics(await load_visits(db, pet.id))
 
 
@@ -78,7 +78,7 @@ async def get_topics(pet: OwnedPet, db: AsyncDbSession) -> list[VisitTopic]:
     summary="Visits of one topic and who referred whom",
 )
 async def get_topic_graph(
-    pet: OwnedPet, db: AsyncDbSession, topic: str = Query(min_length=1, max_length=255)
+    pet: CaredPet, db: AsyncDbSession, topic: str = Query(min_length=1, max_length=255)
 ) -> VisitTopicGraph:
     graph = topic_graph(await load_visits(db, pet.id), topic)
     if graph is None:
@@ -87,7 +87,7 @@ async def get_topic_graph(
 
 
 @router.get("/{visit_id}", response_model=VetVisitPublic)
-async def get_visit(pet: OwnedPet, visit_id: int, db: AsyncDbSession) -> VetVisit:
+async def get_visit(pet: CaredPet, visit_id: int, db: AsyncDbSession) -> VetVisit:
     return await get_pet_child(db, VetVisit, pet.id, visit_id, NOT_FOUND)
 
 

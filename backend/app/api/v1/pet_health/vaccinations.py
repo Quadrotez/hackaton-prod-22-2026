@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query, status
 from sqlalchemy import select
 
-from app.api.async_dependencies import AsyncDbSession, OwnedPet
+from app.api.async_dependencies import AsyncDbSession, CaredPet, OwnedPet
 from app.models.health import Vaccination, VaccinationStatus
 from app.schemas.health import VaccinationCreate, VaccinationPublic, VaccinationUpdate
 from app.services.health.common import get_pet_child, patch_changes, save
@@ -24,7 +24,7 @@ async def create_vaccination(
 
 @router.get("", response_model=list[VaccinationPublic], summary="List vaccinations by date")
 async def list_vaccinations(
-    pet: OwnedPet,
+    pet: CaredPet,
     db: AsyncDbSession,
     status_filter: VaccinationStatus | None = Query(default=None, alias="status"),
 ) -> list[Vaccination]:
@@ -35,7 +35,7 @@ async def list_vaccinations(
 
 
 @router.get("/{vaccination_id}", response_model=VaccinationPublic)
-async def get_vaccination(pet: OwnedPet, vaccination_id: int, db: AsyncDbSession) -> Vaccination:
+async def get_vaccination(pet: CaredPet, vaccination_id: int, db: AsyncDbSession) -> Vaccination:
     return await get_pet_child(db, Vaccination, pet.id, vaccination_id, NOT_FOUND)
 
 

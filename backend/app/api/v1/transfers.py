@@ -33,8 +33,9 @@ ALREADY_OPEN = "This pet already has an unfinished transfer"
     summary="Ask another person to take the pet",
     description=(
         "Creates a pending request addressed to recipient_email; the recipient does not "
-        "need an account yet. The end date is counted from now. A pet can have only one "
-        "unfinished transfer at a time."
+        "need an account yet. The end is either ends_at or a preset counted from now. Once "
+        "accepted, the recipient can see the pet and add care records until it ends. A pet "
+        "can have only one unfinished transfer at a time."
     ),
 )
 async def create_transfer(
@@ -58,7 +59,7 @@ async def create_transfer(
         owner_id=current_user.id,
         recipient_email=payload.recipient_email,
         duration=payload.duration,
-        ends_at=ends_at_for(payload.duration, now),
+        ends_at=payload.ends_at or ends_at_for(payload.duration, now),
         status=TransferStatus.PENDING,
         created_at=now,
     )
@@ -248,5 +249,28 @@ async def confirm_return(
     transfer = await get_visible_transfer(db, transfer_id, current_user)
     require_role(transfer, current_user, "owner", "confirm the return of")
     require_status(transfer, TransferStatus.RETURN_REQUESTED, "confirm the return of")
+    transfer.status, transfer.ended_at = TransferStatus.RETURNED, utc_now()
+    return await finish(db, transfer, current_user)
+
+
+@router.post(
+    "/{transfer_id}/end",
+    response_model=TransferPublic,
+    summary="Owner takes the pet back early",
+    description=(
+        "Ends an accepted transfer (with or without a pending return request) right away; "
+        "the recipient loses access to the pet."
+    ),
+)
+async def end_transfer(
+    transfer_id: int, current_user: AsyncCurrentUser, db: AsyncDbSession
+) -> TransferPublic:
+    transfer = await get_visible_transfer(db, transfer_id, current_user)
+    require_role(transfer, current_user, "owner", "end")
+    if transfer.status not in (TransferStatus.ACCEPTED, TransferStatus.RETURN_REQUESTED):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Cannot end a transfer in status {transfer.status.value}",
+        )
     transfer.status, transfer.ended_at = TransferStatus.RETURNED, utc_now()
     return await finish(db, transfer, current_user)

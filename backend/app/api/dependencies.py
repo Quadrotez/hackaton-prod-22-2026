@@ -53,9 +53,14 @@ def get_current_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
-def get_owned_food(food_id: int, current_user: CurrentUser, db: DbSession) -> Food:
-    """Return the catalog food only if it belongs to the authenticated user, else 404."""
-    food = db.scalar(select(Food).where(Food.id == food_id, Food.user_id == current_user.id))
+def get_user_food(food_id: int, user_id: int, db: DbSession) -> Food:
+    """Return the catalog food only if it belongs to the given user, else 404."""
+    food = db.scalar(select(Food).where(Food.id == food_id, Food.user_id == user_id))
     if food is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Food not found")
     return food
+
+
+def get_owned_food(food_id: int, current_user: CurrentUser, db: DbSession) -> Food:
+    """Return the catalog food only if it belongs to the authenticated user, else 404."""
+    return get_user_food(food_id, current_user.id, db)

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PencilIcon } from "lucide-react";
-import { formatPetSummary, uploadPetPhoto, type Pet } from "@/lib/pets";
+import { formatPetSummary, isCaretaker, uploadPetPhoto, type Pet } from "@/lib/pets";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,14 +12,18 @@ function formatDate(date: string): string {
 }
 
 export function PetInfoCard({ pet, onPetChange }: { pet: Pet; onPetChange: (pet: Pet) => void }) {
+  // A temporary caretaker sees the profile but cannot change it.
+  const editable = !isCaretaker(pet);
   return (
     <Card className="relative flex items-center gap-4">
       <div className="relative shrink-0">
         <PetAvatar pet={pet} size="lg" />
-        <PhotoUploadButton
-          hasPhoto={Boolean(pet.photo_url)}
-          upload={async (file) => onPetChange(await uploadPetPhoto(pet.id, file))}
-        />
+        {editable && (
+          <PhotoUploadButton
+            hasPhoto={Boolean(pet.photo_url)}
+            upload={async (file) => onPetChange(await uploadPetPhoto(pet.id, file))}
+          />
+        )}
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 pr-8">
         <p className="font-medium">{formatPetSummary(pet)}</p>
@@ -27,14 +31,14 @@ export function PetInfoCard({ pet, onPetChange }: { pet: Pet; onPetChange: (pet:
           <p className="text-sm text-muted-foreground">Дата рождения: {formatDate(pet.birth_date)}</p>
         )}
       </div>
-      <Link
+      {editable && <Link
         href={`/pet/${pet.id}/edit`}
         aria-label="Редактировать питомца"
         title="Редактировать"
         className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "absolute right-3 top-3 text-muted-foreground")}
       >
         <PencilIcon aria-hidden="true" className="size-4" />
-      </Link>
+      </Link>}
     </Card>
   );
 }

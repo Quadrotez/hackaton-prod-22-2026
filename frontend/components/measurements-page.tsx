@@ -8,7 +8,7 @@ import { useProtectedData, useRequireAuth } from "@/hooks/use-auth";
 import { getErrorMessage } from "@/lib/api";
 import { datetimeInput } from "@/lib/health-sections";
 import { loadMeasurements, measurementNumber, measurementValue, renameMeasurementParameter, saveMeasurement, type MeasurementPoint, type MeasurementsData } from "@/lib/measurements";
-import { updatePet, type Pet } from "@/lib/pets";
+import { isCaretaker, updatePet, type Pet } from "@/lib/pets";
 import { cn } from "@/lib/utils";
 import { MeasurementHistory } from "@/components/measurement-history";
 import { MeasurementEditor, type MeasurementDraft } from "@/components/measurement-editor";
@@ -68,6 +68,8 @@ function MeasurementsContent({ data, onUpdate, embedded, onPetChange }: { data: 
   const [editor, setEditor] = useState<Editor | null>(null);
   const [pending, setPending] = useState(false);
   const [refreshError, setRefreshError] = useState(false);
+  // A temporary caretaker adds new values but cannot correct old ones or change parameters.
+  const caretaker = isCaretaker(pet);
   const weightHistory = data.weights.map((entry) => ({ value: entry.weight_g / 1000, measured_at: entry.measured_at }));
 
   async function refresh() {
@@ -124,7 +126,7 @@ function MeasurementsContent({ data, onUpdate, embedded, onPetChange }: { data: 
       <Card role="region" aria-label="Измерения" className="flex min-w-0 flex-col px-4 py-5 sm:px-5">
         <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-[17px] font-semibold">Измерения</h2>
-          <span className="text-xs text-muted-foreground"><Link href={`/pet/${pet.id}/measurements/parameters`} className="font-semibold text-foreground underline underline-offset-4">параметры</Link></span>
+          {!caretaker && <span className="text-xs text-muted-foreground"><Link href={`/pet/${pet.id}/measurements/parameters`} className="font-semibold text-foreground underline underline-offset-4">параметры</Link></span>}
         </div>
         <div>
           <MeasurementRow name="Вес" unit="кг" history={weightHistory} currentValue={pet.weight_g == null ? null : pet.weight_g / 1000} pending={pending} onAdd={() => setEditor({ kind: "weight" })}>
@@ -133,7 +135,7 @@ function MeasurementsContent({ data, onUpdate, embedded, onPetChange }: { data: 
           {(showAll ? parameters : []).map((parameter) => {
             const latest = parameter.history[parameter.history.length - 1];
             const editing = editor?.kind === "parameter" && editor.id === parameter.id;
-            return <MeasurementRow key={parameter.id} name={parameter.name} unit={parameter.unit} history={parameter.history} pending={pending} onAdd={() => openParameter(parameter.id, "add")} onEdit={latest ? () => openParameter(parameter.id, "edit") : undefined}>
+            return <MeasurementRow key={parameter.id} name={parameter.name} unit={parameter.unit} history={parameter.history} pending={pending} onAdd={() => openParameter(parameter.id, "add")} onEdit={latest && !caretaker ? () => openParameter(parameter.id, "edit") : undefined}>
               {editing && <MeasurementEditor key={`${parameter.id}-${editor.mode}`} name={parameter.name} unit={parameter.unit} rename={editor.mode === "edit"} initialValue={editor.mode === "edit" ? String(latest.value).replace(".", ",") : ""} initialDate={editor.date} pending={pending} onSave={save} onCancel={() => setEditor(null)} />}
             </MeasurementRow>;
           })}

@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import {
   formatTransferEndsAt,
-  transferDurationLabel,
   transferPersonLabel,
   transferStatusLabels,
   type PetTransfer,
@@ -28,9 +27,7 @@ export function TransferEntry({ transfer, children }: { transfer: PetTransfer; c
         </div>
         <div className="flex shrink-0 flex-col items-end gap-0.5 text-xs text-muted-foreground">
           <span className="text-foreground">{transferStatusLabels[transfer.status]}</span>
-          <span>
-            {transferDurationLabel(transfer.duration)} · {formatTransferEndsAt(transfer)}
-          </span>
+          <span>{formatTransferEndsAt(transfer)}</span>
         </div>
       </div>
       {children && <div className="flex flex-wrap items-center gap-2 empty:hidden">{children}</div>}

@@ -6,7 +6,7 @@ from openai import OpenAIError
 from PIL import Image, UnidentifiedImageError
 
 from app.api.dependencies import AppSettings, CurrentUser, DbSession
-from app.api.v1.pets import get_owned_pet
+from app.api.v1.pets import get_cared_pet
 from app.integrations.llm.vet_document_analyzer import analyze_veterinary_document
 from app.schemas.vet_documents import VeterinaryDocumentAnalysis
 
@@ -77,7 +77,7 @@ async def analyze_pet_veterinary_document(
     image: UploadFile = File(...),
     pet_context: str | None = Form(default=None, max_length=4000),
 ) -> VeterinaryDocumentAnalysis:
-    get_owned_pet(pet_id, current_user, db)
+    get_cared_pet(pet_id, current_user, db)
     normalized_context = (pet_context or "").strip()
 
     try:
