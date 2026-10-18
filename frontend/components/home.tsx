@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { ArrowRightIcon, PlusIcon } from "lucide-react";
 import { CalendarGrid, kindColor, monthGrid, type DayMarker } from "@/components/calendar-view";
+import { useActivePet } from "@/components/active-pet-provider";
 import { PetAvatar } from "@/components/pet-avatar";
 import { PageError } from "@/components/page-state";
 import { useProtectedData } from "@/hooks/use-auth";
@@ -80,6 +81,7 @@ function EventRow({ event, pet, showDate }: { event: CalendarEvent; pet?: Pet; s
 }
 
 export function HomeDashboard({ pets }: { pets: Pet[] }) {
+  const { activePet, selectPet } = useActivePet();
   const [today] = useState(() => new Date());
   const todayKey = toDateKey(today);
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
@@ -104,8 +106,8 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
     calendar.status === "loading" || (calendar.status === "ready" && calendar.data.range !== `${from}/${to}`);
   const loadedEvents = calendar.status === "ready" ? calendar.data.events : undefined;
   const events = useMemo(
-    () => (loadedEvents && !loading ? loadedEvents : EMPTY_EVENTS),
-    [loadedEvents, loading],
+    () => (loadedEvents && !loading ? loadedEvents.filter((event) => event.petId === activePet?.id) : EMPTY_EVENTS),
+    [loadedEvents, loading, activePet?.id],
   );
 
   const petsByName = useMemo(() => new Map(pets.map((p) => [p.name, p])), [pets]);
@@ -135,17 +137,20 @@ export function HomeDashboard({ pets }: { pets: Pet[] }) {
         >
           {pets.map((pet) => (
             <li key={pet.id} className="shrink-0">
-              <Link
-                href={`/pet/${pet.id}`}
+              <button
+                type="button"
+                aria-pressed={pet.id === activePet?.id}
+                aria-label={`Выбрать питомца: ${pet.name}`}
+                onClick={() => selectPet(pet.id)}
                 className="group flex w-20 flex-col items-center gap-1.5 outline-none"
               >
                 <PetAvatar
                   pet={pet}
                   size="md"
-                  className="bg-white group-focus-visible:ring-2 group-focus-visible:ring-foreground group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background"
+                  className={cn("bg-white group-focus-visible:ring-2 group-focus-visible:ring-foreground group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background", pet.id === activePet?.id && "ring-2 ring-foreground ring-offset-2 ring-offset-secondary")}
                 />
                 <span className="w-full truncate text-center text-sm font-medium text-foreground">{pet.name}</span>
-              </Link>
+              </button>
             </li>
           ))}
           {borrowed.map((transfer) => (

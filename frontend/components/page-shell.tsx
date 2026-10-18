@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BackgroundArt } from "@/components/background-art";
 import { Logo } from "@/components/logo";
+import { PetMenu } from "@/components/pet-menu";
 import { Menu } from "@/components/menu";
 
 export function PageShell({ children, contentClassName = "max-w-sm md:max-w-xl" }: {
@@ -16,6 +17,7 @@ export function PageShell({ children, contentClassName = "max-w-sm md:max-w-xl" 
       >
         <Logo />
       </Link>
+      <div className="absolute right-6 top-5 z-30"><PetMenu /></div>
       <div className={`flex w-full flex-col gap-6 ${contentClassName}`}>{children}</div>
       <Menu />
     </main>
