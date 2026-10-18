@@ -1,12 +1,15 @@
 "use client"
 
 import { CircleCheckIcon, InfoIcon, Loader2Icon, OctagonXIcon, TriangleAlertIcon } from "lucide-react"
+import { useSyncExternalStore } from "react"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
+import { getTheme, subscribeToTheme, type Theme } from "@/lib/theme"
 
 function Toaster(props: ToasterProps) {
+  const theme = useSyncExternalStore(subscribeToTheme, getTheme, (): Theme => "light")
   return (
     <Sonner
-      theme="light"
+      theme={theme}
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,

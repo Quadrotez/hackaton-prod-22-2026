@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api";
 import { getPet } from "@/lib/pets";
+import { loadMeasurements } from "@/lib/measurements";
 
 export const healthSections = {
   vaccines: { title: "Прививки", resource: "vaccinations" },
@@ -82,6 +83,21 @@ export async function loadHealthSection(petId: number, section: HealthSection) {
   const records = values.map((value) => ({ resource, value }) as HealthRecord);
   records.push(...allergies.map((value): HealthRecord => ({ resource: "allergies", value })));
   return { pet, section, records, doses, today, now: now.toISOString() };
+}
+export type DoctorSummaryData = Awaited<ReturnType<typeof loadDoctorSummary>>;
+// Сводка для врача: все записи здоровья, история веса и последние значения своих параметров.
+export async function loadDoctorSummary(petId: number) {
+  const [{ pet, overview }, vaccinations, visits, medications, symptoms, allergies, parasites, { parameters, weights }] = await Promise.all([
+    loadHealthDashboard(petId),
+    listHealthRecords(petId, "vaccinations"),
+    listHealthRecords(petId, "visits"),
+    listHealthRecords(petId, "medications"),
+    listHealthRecords(petId, "symptoms"),
+    listHealthRecords(petId, "allergies"),
+    listHealthRecords(petId, "parasites"),
+    loadMeasurements(petId),
+  ]);
+  return { pet, pregnancy: overview.pregnancy, vaccinations, visits, medications, symptoms, allergies, parasites, parameters, weights, today: dateKey(new Date()) };
 }
 export function saveHealthRecord(petId: number, resource: HealthResource, body: unknown, id?: number) {
   return apiFetch(healthPath(petId, `${healthEndpoints[resource]}${id === undefined ? "" : `/${id}`}`), { method: id === undefined ? "POST" : "PATCH", body, auth: true });
