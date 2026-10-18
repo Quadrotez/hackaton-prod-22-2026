@@ -46,7 +46,7 @@
 
 .pet-menu-triggerLabel { display: block; min-width: 0; overflow: hidden; text-align: left; font-size: .75rem; font-weight: 600; line-height: 1rem; text-overflow: ellipsis; white-space: nowrap; }
 .pet-menu-currentAvatar { width: 100%; height: 100%; background: var(--primary); }
-.pet-menu-currentAvatar svg { width: 1.5rem; height: 1.5rem; }
+.pet-menu-currentAvatar [data-pet-avatar-icon] { width: 1.5rem; height: 1.5rem; }
 
 .pet-menu-popup {
   width: min(20.5rem, calc(100vw - 2rem));
