@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.models.health import IntakeStatus, VaccinationStatus, VisitStatus
+from app.models.health import IntakeStatus, ParasiteKind, VaccinationStatus, VisitStatus
 from app.models.pet import PetSex
 
 
@@ -128,6 +128,12 @@ class VaccinationCreate(BaseModel):
     status: VaccinationStatus = VaccinationStatus.PLANNED
     clinic: str | None = Field(default=None, max_length=255)
     notes: str | None = Field(default=None, max_length=2000)
+    interval_days: int | None = Field(
+        default=None, ge=1, le=365, description="Repeat interval; next_due_on is derived from it."
+    )
+    next_due_on: date | None = Field(
+        default=None, description="Explicit next date; wins over the interval calculation."
+    )
 
     @field_validator("name", "clinic", "notes")
     @classmethod
@@ -141,6 +147,8 @@ class VaccinationUpdate(BaseModel):
     status: VaccinationStatus | None = None
     clinic: str | None = Field(default=None, max_length=255)
     notes: str | None = Field(default=None, max_length=2000)
+    interval_days: int | None = Field(default=None, ge=1, le=365)
+    next_due_on: date | None = None
 
     @field_validator("name", "clinic", "notes")
     @classmethod
@@ -154,6 +162,58 @@ class VaccinationPublic(ORMModel):
     name: str
     scheduled_on: date
     status: VaccinationStatus
+    clinic: str | None
+    notes: str | None
+    interval_days: int | None
+    next_due_on: date | None
+    created_at: datetime
+
+
+# --- Parasite treatments ----------------------------------------------------------
+
+
+class ParasiteTreatmentCreate(BaseModel):
+    kind: ParasiteKind
+    product_name: str = Field(min_length=1, max_length=255)
+    treated_on: date
+    interval_days: int | None = Field(
+        default=None, ge=1, le=365, description="Repeat interval; next_due_on is derived from it."
+    )
+    next_due_on: date | None = Field(
+        default=None, description="Explicit next date; wins over the interval calculation."
+    )
+    clinic: str | None = Field(default=None, max_length=255)
+    notes: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("product_name", "clinic", "notes")
+    @classmethod
+    def strip_fields(cls, value: str | None) -> str | None:
+        return strip_text(value)
+
+
+class ParasiteTreatmentUpdate(BaseModel):
+    kind: ParasiteKind | None = None
+    product_name: str | None = Field(default=None, min_length=1, max_length=255)
+    treated_on: date | None = None
+    interval_days: int | None = Field(default=None, ge=1, le=365)
+    next_due_on: date | None = None
+    clinic: str | None = Field(default=None, max_length=255)
+    notes: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("product_name", "clinic", "notes")
+    @classmethod
+    def strip_fields(cls, value: str | None) -> str | None:
+        return strip_text(value)
+
+
+class ParasiteTreatmentPublic(ORMModel):
+    id: int
+    pet_id: int
+    kind: ParasiteKind
+    product_name: str
+    treated_on: date
+    interval_days: int | None
+    next_due_on: date | None
     clinic: str | None
     notes: str | None
     created_at: datetime
@@ -467,6 +527,8 @@ class HealthOverview(BaseModel):
     past_visits: list[VetVisitPublic]
     top_topic: VisitTopic | None
     measurements: list[MeasurementParameterSummary]
+    next_vaccination: VaccinationPublic | None = None
+    next_parasite: ParasiteTreatmentPublic | None = None
 
 
 class PetBrief(ORMModel):
