@@ -138,7 +138,9 @@ def configure_logging(
     }
     sage_handler = build_sage_handler(sage_url, sage_token, sage_timeout, formatter)
     if sage_handler is not None:
-        handlers["sage"] = sage_handler
+        handlers["sage"] = {
+            "()": lambda: sage_handler,
+        }
 
     logging.config.dictConfig(
         {
