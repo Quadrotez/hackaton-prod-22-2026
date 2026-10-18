@@ -20,6 +20,11 @@ export type Medication = {
   times: string[]; notes: string | null;
 };
 export type Symptom = { id: number; description: string; observed_at: string };
+export type ParasiteTreatment = {
+  id: number; pet_id: number; kind: "internal" | "external"; product_name: string;
+  treated_on: string; interval_days: number | null; next_due_on: string | null;
+  clinic: string | null; notes: string | null;
+};
 export type Allergy = { id: number; allergen: string; reactions: string | null; notes: string | null };
 export type Pregnancy = { id: number; month: number; started_on: string; ended_on: string | null };
 export type MeasurementParameter = {
@@ -54,12 +59,13 @@ export async function loadCalendar(from: string, to: string) {
   const pets = await listPets();
   // Не скрываем ошибку одного питомца: календарь не должен выглядеть пустым при сбое API.
   const groups = await Promise.all(pets.map(async (pet) => {
-    const [visits, vaccinations, doses] = await Promise.all([
+    const [visits, vaccinations, doses, parasites] = await Promise.all([
       apiFetch<Visit[]>(healthPath(pet.id, "visits"), { auth: true }),
       apiFetch<Vaccination[]>(healthPath(pet.id, "vaccinations"), { auth: true }),
       apiFetch<Dose[]>(healthPath(pet.id, `medications/schedule?${new URLSearchParams({ from, to, tz: timezone() })}`), { auth: true }),
+      apiFetch<ParasiteTreatment[]>(healthPath(pet.id, "parasite-treatments"), { auth: true }),
     ]);
-    return calendarEvents(pet, visits, vaccinations, doses);
+    return calendarEvents(pet, visits, vaccinations, doses, parasites);
   }));
   return { events: groups.flat().sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)), range: `${from}/${to}`, pets };
 }

@@ -23,6 +23,8 @@ def test_overview_of_pet_without_records(client: TestClient) -> None:
         "past_visits": [],
         "top_topic": None,
         "measurements": [],
+        "next_vaccination": None,
+        "next_parasite": None,
     }
 
 

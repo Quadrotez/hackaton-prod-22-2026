@@ -1,8 +1,8 @@
-import type { Dose, HealthView, Visit, Vaccination } from "./health";
+import type { Dose, HealthView, ParasiteTreatment, Visit, Vaccination } from "./health";
 
 export type CalendarEvent = {
   key: string; recordKey: string; petId: number; petName: string;
-  kind: "visit" | "vaccine" | "medicine"; title: string;
+  kind: "visit" | "vaccine" | "medicine" | "parasite"; title: string;
   date: string; time: string; completed: boolean; view: HealthView;
 };
 export function toDateKey(date: Date) {
@@ -14,6 +14,7 @@ export function localDateTime(value: string) {
 }
 export function calendarEvents(
   pet: { id: number; name: string }, visits: Visit[], vaccinations: Vaccination[], doses: Dose[],
+  parasites: ParasiteTreatment[] = [],
 ): CalendarEvent[] {
   const common = { petId: pet.id, petName: pet.name };
   return [
@@ -29,9 +30,12 @@ export function calendarEvents(
       key: `${pet.id}-medicine-${dose.medication_id}-${dose.scheduled_for}`, recordKey: `medicine-${dose.medication_id}`,
       kind: "medicine", title: dose.name, date: dose.scheduled_for.slice(0, 10), time: dose.scheduled_for.slice(11, 16),
       completed: dose.status === "taken", view: "plan" })),
+    ...parasites.filter((treatment) => treatment.next_due_on).map((treatment): CalendarEvent => ({ ...common,
+      key: `${pet.id}-parasite-${treatment.id}`, recordKey: `parasite-${treatment.id}`, kind: "parasite",
+      title: treatment.product_name, date: treatment.next_due_on as string, time: "", completed: false, view: "plan" })),
   ];
 }
 export function healthEventHref(event: CalendarEvent) {
-  const section = { visit: "visits", vaccine: "vaccines", medicine: "medicines" }[event.kind];
+  const section = { visit: "visits", vaccine: "vaccines", medicine: "medicines", parasite: "parasites" }[event.kind];
   return `/pet/${event.petId}/health/${section}#health-${event.recordKey}`;
 }

@@ -24,6 +24,7 @@ const kindLabels: Record<CalendarEvent["kind"], string> = {
   visit: "Приём",
   vaccine: "Прививка",
   medicine: "Лекарство",
+  parasite: "Обработка",
 };
 
 function SectionTitle({ id, children }: { id: string; children: React.ReactNode }) {

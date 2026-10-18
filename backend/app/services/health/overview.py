@@ -1,11 +1,18 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.feeding import FeedingRecord
-from app.models.health import Allergy, Symptom, Vaccination, VaccinationStatus, VisitStatus
+from app.models.health import (
+    Allergy,
+    ParasiteTreatment,
+    Symptom,
+    Vaccination,
+    VaccinationStatus,
+    VisitStatus,
+)
 from app.models.pet import Pet
 from app.schemas.health import (
     AllergyPublic,
@@ -13,6 +20,7 @@ from app.schemas.health import (
     HealthOverview,
     HealthSummary,
     MedicationPublic,
+    ParasiteTreatmentPublic,
     PetBrief,
     SymptomPublic,
     VaccinationPublic,
@@ -77,6 +85,35 @@ async def split_visits(
     )
 
 
+async def next_vaccination(db: AsyncSession, pet_id: int, today: date) -> VaccinationPublic | None:
+    """Soonest vaccination still ahead: explicit next date or the scheduled date."""
+    vaccinations = await db.scalars(select(Vaccination).where(Vaccination.pet_id == pet_id))
+    upcoming = [
+        vaccination
+        for vaccination in vaccinations
+        if (vaccination.next_due_on or vaccination.scheduled_on) >= today
+    ]
+    if not upcoming:
+        return None
+    soonest = min(upcoming, key=lambda item: (item.next_due_on or item.scheduled_on, item.id))
+    return VaccinationPublic.model_validate(soonest)
+
+
+async def next_parasite(db: AsyncSession, pet_id: int, today: date) -> ParasiteTreatmentPublic | None:
+    """Soonest parasite treatment repeat due on or after today."""
+    treatment = await db.scalar(
+        select(ParasiteTreatment)
+        .where(
+            ParasiteTreatment.pet_id == pet_id,
+            ParasiteTreatment.next_due_on.is_not(None),
+            ParasiteTreatment.next_due_on >= today,
+        )
+        .order_by(ParasiteTreatment.next_due_on, ParasiteTreatment.id)
+        .limit(1)
+    )
+    return ParasiteTreatmentPublic.model_validate(treatment) if treatment else None
+
+
 async def build_overview(db: AsyncSession, pet: Pet, tz: ZoneInfo) -> HealthOverview:
     today, now = local_today(tz), local_now(tz)
     await ensure_initialized(db, pet)
@@ -102,6 +139,8 @@ async def build_overview(db: AsyncSession, pet: Pet, tz: ZoneInfo) -> HealthOver
         past_visits=past_visits,
         top_topic=topics[0] if topics else None,
         measurements=await summarize(db, pet.id),
+        next_vaccination=await next_vaccination(db, pet.id, today),
+        next_parasite=await next_parasite(db, pet.id, today),
     )
 
 

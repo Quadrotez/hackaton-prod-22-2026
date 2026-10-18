@@ -5,6 +5,7 @@ from app.api.async_dependencies import AsyncDbSession, OwnedPet
 from app.models.health import Vaccination, VaccinationStatus
 from app.schemas.health import VaccinationCreate, VaccinationPublic, VaccinationUpdate
 from app.services.health.common import get_pet_child, patch_changes, save
+from app.services.health.procedures import compute_next_due
 
 router = APIRouter(prefix="/pets/{pet_id}/vaccinations", tags=["pet health: vaccinations"])
 NOT_FOUND = "Vaccination not found"
@@ -14,7 +15,11 @@ NOT_FOUND = "Vaccination not found"
 async def create_vaccination(
     pet: OwnedPet, payload: VaccinationCreate, db: AsyncDbSession
 ) -> Vaccination:
-    return await save(db, Vaccination(pet_id=pet.id, **payload.model_dump()))
+    data = payload.model_dump()
+    data["next_due_on"] = compute_next_due(
+        data["scheduled_on"], data["interval_days"], data["next_due_on"]
+    )
+    return await save(db, Vaccination(pet_id=pet.id, **data))
 
 
 @router.get("", response_model=list[VaccinationPublic], summary="List vaccinations by date")
@@ -39,8 +44,15 @@ async def update_vaccination(
     pet: OwnedPet, vaccination_id: int, payload: VaccinationUpdate, db: AsyncDbSession
 ) -> Vaccination:
     vaccination = await get_pet_child(db, Vaccination, pet.id, vaccination_id, NOT_FOUND)
-    for field, value in patch_changes(payload, {"name", "scheduled_on", "status"}).items():
+    changes = patch_changes(payload, {"name", "scheduled_on", "status"})
+    for field, value in changes.items():
         setattr(vaccination, field, value)
+    # Recompute only when the anchor or the interval changed; an explicit next date wins,
+    # and resetting the interval clears the derived date.
+    if {"scheduled_on", "interval_days"} & changes.keys():
+        vaccination.next_due_on = compute_next_due(
+            vaccination.scheduled_on, vaccination.interval_days, changes.get("next_due_on")
+        )
     return await save(db, vaccination)
 
 
