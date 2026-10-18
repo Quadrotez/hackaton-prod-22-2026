@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import base64
+import json
 import logging
 import os
+import re
 import time
+from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from openai import OpenAI
@@ -16,7 +20,26 @@ from app.schemas.vet_documents import VeterinaryDocumentAnalysis
 MODEL_NAME = os.getenv("YANDEX_MODEL", "deepseek-v4.1-flash")
 logger = logging.getLogger(__name__)
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
-INVALID_RESPONSE_RETRIES = 2
+CONTRACT_KEYS = (
+    "status",
+    "document_type",
+    "visit_at",
+    "visit_reason",
+    "visit_price",
+    "veterinarian_name",
+    "veterinarian_profession",
+    "vet",
+    "post_visit_instructions",
+    "warnings",
+    "error_code",
+)
+TEXT_FIELDS = (
+    "visit_reason",
+    "veterinarian_name",
+    "veterinarian_profession",
+    "vet",
+    "post_visit_instructions",
+)
 
 SYSTEM_PROMPT = """
 Ты — AI-анализатор фотографий ветеринарных документов приложения PetCare.
@@ -109,6 +132,114 @@ vet и post_visit_instructions равными null, предупреждение
 """.strip()
 
 
+def _json_object_from_content(content: str) -> dict[str, Any]:
+    """Parse a JSON object while tolerating common Markdown wrappers."""
+    cleaned = content.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.IGNORECASE)
+    parsed = json.loads(cleaned)
+    if not isinstance(parsed, dict):
+        raise ValueError("The model response must be a JSON object")
+    return parsed
+
+
+def _normalize_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = value.strip()
+        return value or None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return str(value)
+    return None
+
+
+def _normalize_price(value: Any) -> int | float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return value if value >= 0 else None
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip().replace("\u00a0", " ")
+    cleaned = re.sub(r"[^0-9,.-]", "", cleaned)
+    if not cleaned:
+        return None
+    if "," in cleaned and "." in cleaned:
+        cleaned = cleaned.replace(",", "") if cleaned.rfind(".") > cleaned.rfind(",") else cleaned.replace(".", "").replace(",", ".")
+    elif "," in cleaned:
+        parts = cleaned.split(",")
+        cleaned = "".join(parts) if len(parts[-1]) == 3 else ".".join(parts)
+    try:
+        number = Decimal(cleaned)
+    except InvalidOperation:
+        return None
+    if number < 0:
+        return None
+    return int(number) if number == number.to_integral_value() else float(number)
+
+
+def _normalize_visit_at(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return None
+        try:
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            for fmt in ("%d.%m.%Y", "%d.%m.%Y %H:%M", "%Y-%m-%d"):
+                try:
+                    parsed = datetime.strptime(raw, fmt)
+                    break
+                except ValueError:
+                    continue
+            else:
+                return None
+    else:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _normalize_analysis(raw: dict[str, Any]) -> dict[str, Any]:
+    """Make a best-effort model response conform to the public contract."""
+    result: dict[str, Any] = {key: None for key in CONTRACT_KEYS}
+    result["warnings"] = []
+
+    result["visit_at"] = _normalize_visit_at(raw.get("visit_at"))
+    result["visit_price"] = _normalize_price(raw.get("visit_price"))
+    for field in TEXT_FIELDS:
+        result[field] = _normalize_text(raw.get(field))
+
+    document_type = _normalize_text(raw.get("document_type"))
+    result["document_type"] = document_type
+    status = raw.get("status")
+    if status in {"success", "partial", "error"}:
+        result["status"] = status
+    else:
+        result["status"] = "partial" if any(
+            result[field] is not None
+            for field in ("visit_at", *TEXT_FIELDS, "visit_price")
+        ) else "error"
+
+    warnings = raw.get("warnings")
+    if isinstance(warnings, list):
+        result["warnings"] = [warning for item in warnings if (warning := _normalize_text(item))]
+    elif warnings is not None:
+        warning = _normalize_text(warnings)
+        result["warnings"] = [warning] if warning else []
+
+    error_code = raw.get("error_code")
+    if error_code in {"UNREADABLE_IMAGE", "UNSUPPORTED_DOCUMENT", "INSUFFICIENT_INPUT"}:
+        result["error_code"] = error_code
+    return result
+
+
 def analyze_veterinary_document(
     image_bytes: bytes,
     *,
@@ -130,62 +261,57 @@ def analyze_veterinary_document(
     context = normalized_text or "Текстовый комментарий отсутствует. Используй только фотографию."
 
     model_client = client or build_client()
-    for attempt in range(INVALID_RESPONSE_RETRIES + 1):
-        started = time.perf_counter()
-        response = model_client.chat.completions.create(
-            model=f"gpt://{FOLDER_ID}/{MODEL_NAME}",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                "Сначала проанализируй фотографию. Используй следующий текст "
-                                "только как вспомогательный источник для незаполненных полей; "
-                                f"значения с фотографии имеют приоритет:\n\n{context}"
-                            ),
-                        },
-                        {"type": "image_url", "image_url": {"url": image_data_url}},
-                    ],
-                },
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.1,
-            max_tokens=900,
+    started = time.perf_counter()
+    response = model_client.chat.completions.create(
+        model=f"gpt://{FOLDER_ID}/{MODEL_NAME}",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            "Сначала проанализируй фотографию. Используй следующий текст "
+                            "только как вспомогательный источник для незаполненных полей; "
+                            f"значения с фотографии имеют приоритет:\n\n{context}"
+                        ),
+                    },
+                    {"type": "image_url", "image_url": {"url": image_data_url}},
+                ],
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.1,
+        max_tokens=900,
+    )
+
+    usage = getattr(response, "usage", None)
+    # Never log the document text or the model output: they hold personal data.
+    llm_fields = {
+        "event": "llm.response",
+        "model": MODEL_NAME,
+        "duration_ms": round((time.perf_counter() - started) * 1000, 1),
+        "image_bytes": len(image_bytes),
+        "prompt_tokens": getattr(usage, "prompt_tokens", None),
+        "completion_tokens": getattr(usage, "completion_tokens", None),
+        "finish_reason": response.choices[0].finish_reason if response.choices else None,
+    }
+    logger.info("LLM answered", extra=llm_fields)
+
+    try:
+        raw_content = checked_message(response).content
+        raw_payload = _json_object_from_content(raw_content)
+        normalized = _normalize_analysis(raw_payload)
+        parsed = VeterinaryDocumentAnalysis.model_validate(normalized)
+    except (ValueError, ValidationError, json.JSONDecodeError) as exc:
+        logger.warning(
+            "LLM answer could not be normalized",
+            extra={
+                "event": "llm.invalid_answer",
+                "errors": exc.error_count() if isinstance(exc, ValidationError) else None,
+            },
         )
+        raise ValueError("The model returned an invalid veterinary-document analysis") from exc
 
-        usage = getattr(response, "usage", None)
-        # Never log the document text or the model output: they hold personal data.
-        llm_fields = {
-            "event": "llm.response",
-            "model": MODEL_NAME,
-            "duration_ms": round((time.perf_counter() - started) * 1000, 1),
-            "image_bytes": len(image_bytes),
-            "prompt_tokens": getattr(usage, "prompt_tokens", None),
-            "completion_tokens": getattr(usage, "completion_tokens", None),
-            "finish_reason": response.choices[0].finish_reason if response.choices else None,
-        }
-        logger.info("LLM answered", extra=llm_fields)
-
-        try:
-            raw_content = checked_message(response).content
-            parsed = VeterinaryDocumentAnalysis.model_validate_json(raw_content)
-        except (ValueError, ValidationError) as exc:
-            logger.warning(
-                "LLM answer does not match the contract",
-                extra={
-                    "event": "llm.invalid_answer",
-                    "errors": exc.error_count() if isinstance(exc, ValidationError) else None,
-                },
-            )
-            if attempt == INVALID_RESPONSE_RETRIES:
-                raise ValueError(
-                    "The model returned an invalid veterinary-document analysis"
-                ) from exc
-            continue
-
-        return parsed.model_dump(mode="json")
-
-    raise AssertionError("Unreachable")
+    return parsed.model_dump(mode="json")
