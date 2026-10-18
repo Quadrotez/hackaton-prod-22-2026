@@ -7,8 +7,6 @@ import queue
 import threading
 import urllib.error
 import urllib.request
-from collections.abc import Mapping
-from typing import Any
 
 
 class SageMultilineHandler(logging.Handler):
