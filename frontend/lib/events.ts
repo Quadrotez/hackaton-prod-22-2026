@@ -1,7 +1,7 @@
 import { apiFetch } from "@/lib/api";
 import { timezone } from "@/lib/health";
 
-export type CalendarEventType = "visit" | "vaccination" | "medication";
+export type CalendarEventType = "visit" | "vaccination" | "medication" | "parasite";
 
 // Ответ GET /api/v1/calendar/events
 export type CalendarEvent = {
@@ -48,6 +48,8 @@ const DONE_STATUS: Record<CalendarEventType, string> = {
   visit: "completed",
   vaccination: "done",
   medication: "taken",
+  // У обработки от паразитов в календаре только плановые даты следующей обработки.
+  parasite: "done",
 };
 
 const PAST_DAYS = 30;

@@ -15,7 +15,18 @@ TYPE_LABEL = {
     CalendarEventType.VISIT: "Визит",
     CalendarEventType.VACCINATION: "Прививка",
     CalendarEventType.MEDICATION: "Лекарство",
+    CalendarEventType.PARASITE: "Обработка от паразитов",
 }
+# Reminders as RFC 5545 durations relative to DTSTART. All-day events start at local
+# midnight, so -PT15H is 09:00 the day before and PT9H is 09:00 on the day.
+ALARM_TRIGGERS = {
+    CalendarEventType.VISIT: ("-P1D", "-PT1H"),
+    CalendarEventType.VACCINATION: ("-PT15H", "PT9H"),
+    CalendarEventType.PARASITE: ("-PT15H", "PT9H"),
+    CalendarEventType.MEDICATION: ("PT0M",),
+}
+# Done, taken or skipped events need no reminder.
+ALARM_STATUSES = {"planned", "pending"}
 MAX_LINE_OCTETS = 75
 
 
@@ -48,6 +59,21 @@ def utc_stamp(moment: datetime) -> str:
     return moment.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
+def alarm_lines(event: CalendarEvent, summary: str) -> list[str]:
+    if event.status not in ALARM_STATUSES:
+        return []
+    lines = []
+    for trigger in ALARM_TRIGGERS[event.type]:
+        lines += [
+            "BEGIN:VALARM",
+            "ACTION:DISPLAY",
+            f"TRIGGER:{trigger}",
+            f"DESCRIPTION:{escape(summary)}",
+            "END:VALARM",
+        ]
+    return lines
+
+
 def event_lines(event: CalendarEvent, tz: ZoneInfo, stamp: str) -> list[str]:
     lines = [
         "BEGIN:VEVENT",
@@ -68,10 +94,12 @@ def event_lines(event: CalendarEvent, tz: ZoneInfo, stamp: str) -> list[str]:
     description = f"{TYPE_LABEL[event.type]} · {event.pet_name}"
     if event.detail:
         description += f" · {event.detail}"
+    summary = f"{event.pet_name}: {event.title}"
     lines += [
-        f"SUMMARY:{escape(f'{event.pet_name}: {event.title}')}",
+        f"SUMMARY:{escape(summary)}",
         f"DESCRIPTION:{escape(description)}",
         f"CATEGORIES:{TYPE_LABEL[event.type]}",
+        *alarm_lines(event, summary),
         "END:VEVENT",
     ]
     return lines
