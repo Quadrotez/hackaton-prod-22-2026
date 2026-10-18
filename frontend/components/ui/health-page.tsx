@@ -12,7 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useProtectedData } from "@/hooks/use-auth";
-import { formatWeight, type Pet } from "@/lib/pets";
+import { formatWeight, isCaretaker, type Pet } from "@/lib/pets";
 import { loadHealthDashboard, type HealthOverview } from "@/lib/health-sections";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
@@ -121,7 +121,7 @@ function HealthContent({ pet, overview, onUpdate }: { pet: Pet; overview: Health
         <StatTile label="Следующая обработка" value={overview.next_parasite?.next_due_on ? shortDate(overview.next_parasite.next_due_on) : "—"} hint={overview.next_parasite?.product_name ?? "обработок по плану нет"} />
       </div>
 
-      {pet.sex === "girl" && <PregnancyCard petId={pet.id} pregnancy={overview.pregnancy} onChanged={refresh} />}
+      {pet.sex === "girl" && <PregnancyCard petId={pet.id} pregnancy={overview.pregnancy} onChanged={refresh} readOnly={isCaretaker(pet)} />}
 
       <PetWeightChart key={`${pet.id}-${pet.weight_g}`} petId={pet.id} />
 

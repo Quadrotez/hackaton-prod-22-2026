@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
-from app.api.async_dependencies import AsyncDbSession, OwnedPet
+from app.api.async_dependencies import AsyncDbSession, CaredPet, OwnedPet
 from app.api.v1.pet_health.dependencies import LocalTimezone
 from app.models.health import Medication, MedicationIntake, MedicationTime
 from app.schemas.health import (
@@ -54,7 +54,7 @@ async def create_medication(
 
 
 @router.get("", response_model=list[MedicationPublic])
-async def list_medications(pet: OwnedPet, db: AsyncDbSession) -> list[Medication]:
+async def list_medications(pet: CaredPet, db: AsyncDbSession) -> list[Medication]:
     return list(await load_medications(db, pet.id))
 
 
@@ -69,7 +69,7 @@ async def list_medications(pet: OwnedPet, db: AsyncDbSession) -> list[Medication
     ),
 )
 async def get_schedule(
-    pet: OwnedPet,
+    pet: CaredPet,
     db: AsyncDbSession,
     tz: LocalTimezone,
     start: date | None = Query(default=None, alias="from"),
@@ -85,7 +85,7 @@ async def get_schedule(
 
 
 @router.get("/{medication_id}", response_model=MedicationPublic)
-async def get_medication(pet: OwnedPet, medication_id: int, db: AsyncDbSession) -> Medication:
+async def get_medication(pet: CaredPet, medication_id: int, db: AsyncDbSession) -> Medication:
     return await get_pet_child(db, Medication, pet.id, medication_id, NOT_FOUND)
 
 
@@ -146,7 +146,7 @@ async def find_intake(
     summary="Mark a scheduled dose as taken or skipped",
 )
 async def mark_intake(
-    pet: OwnedPet,
+    pet: CaredPet,
     medication_id: int,
     payload: IntakeMark,
     db: AsyncDbSession,
@@ -177,7 +177,7 @@ async def mark_intake(
     summary="Clear the mark of a dose, making it pending again",
 )
 async def clear_intake(
-    pet: OwnedPet,
+    pet: CaredPet,
     medication_id: int,
     db: AsyncDbSession,
     tz: LocalTimezone,

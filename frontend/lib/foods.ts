@@ -44,8 +44,10 @@ export function isLowStock(food: Pick<Food, "remaining_grams" | "avg_daily_g">):
 
 const FOODS_PATH = "/api/v1/foods";
 
-export function listFoods() {
-  return apiFetch<Food[]>(FOODS_PATH, { method: "GET", auth: true });
+// With petId: the catalog of that pet's owner (what a temporary caretaker feeds from).
+export function listFoods(petId?: number) {
+  const path = petId === undefined ? FOODS_PATH : `${FOODS_PATH}?pet_id=${petId}`;
+  return apiFetch<Food[]>(path, { method: "GET", auth: true });
 }
 
 export function createFood(data: FoodCreate) {

@@ -7,7 +7,8 @@ import { useProtectedData } from "@/hooks/use-auth";
 import { useNow } from "@/hooks/use-now";
 import { listFoods } from "@/lib/foods";
 import { formatTimeAgo, listMeals, sortMeals, type Meal } from "@/lib/meals";
-import { formatWeight, getPet, pluralize } from "@/lib/pets";
+import { formatWeight, getPet, isCaretaker, pluralize } from "@/lib/pets";
+import { formatTransferDate } from "@/lib/transfers";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
@@ -71,12 +72,34 @@ function QuickLinkTile({
   return href ? <Link href={href} className="rounded-2xl outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-foreground">{content}</Link> : content;
 }
 
+function CareNotice({ ownerName, endsAt }: { ownerName?: string | null; endsAt?: string | null }) {
+  return (
+    <Card variant="accent" className="flex flex-col items-start gap-3 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-1">
+        <h3>Питомец у вас на время</h3>
+        {(ownerName || endsAt) && (
+          <p className="text-sm font-medium leading-5">
+            {[ownerName && `Владелец: ${ownerName}`, endsAt && `до ${formatTransferDate(endsAt)}`]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        )}
+        <p className="text-sm leading-5">
+          Можно кормить, отмечать лекарства и добавлять симптомы, замеры и визиты, но не менять и не удалять данные.
+        </p>
+      </div>
+      <Link href="/transfers"><Button variant="secondary">Вернуть владельцу</Button></Link>
+    </Card>
+  );
+}
+
 export function PetDetails({ petId, startFeeding = false }: { petId: number; startFeeding?: boolean }) {
   const load = useCallback(
     () => Promise.all([
       getPet(petId),
       listMeals(petId).then(sortMeals).catch(() => null),
-      listFoods().catch(() => null),
+      // The owner's catalog: for a temporary caretaker it is not their own.
+      listFoods(petId).catch(() => null),
     ]),
     [petId],
   );
@@ -92,11 +115,12 @@ export function PetDetails({ petId, startFeeding = false }: { petId: number; sta
   const { update } = state;
   const fedToday = meals?.filter((meal) => isToday(new Date(meal.fed_at))) ?? [];
   const lastMeal = meals?.[0];
+  const caretaker = isCaretaker(pet);
 
   async function handleMealsChange(next: Meal[]) {
     const sorted = sortMeals(next);
     update([pet, sorted, foods]);
-    const refreshed = await listFoods().catch(() => null);
+    const refreshed = await listFoods(petId).catch(() => null);
     if (refreshed) update([pet, sorted, refreshed]);
   }
 
@@ -105,6 +129,8 @@ export function PetDetails({ petId, startFeeding = false }: { petId: number; sta
       <PageHeader title={pet.name} backHref="/me" />
 
       <PetInfoCard pet={pet} onPetChange={(updated) => state.update([updated, meals, foods])} />
+
+      {caretaker && <CareNotice ownerName={pet.owner_name} endsAt={pet.care_ends_at} />}
 
       <div className="grid grid-cols-2 gap-3">
         <StatTile
@@ -120,7 +146,7 @@ export function PetDetails({ petId, startFeeding = false }: { petId: number; sta
         />
       </div>
 
-      <PetMeals key={pet.id} defaultOpen={startFeeding} petId={pet.id} meals={meals} foods={foods} now={now} onMealsChange={handleMealsChange} />
+      <PetMeals key={pet.id} defaultOpen={startFeeding} petId={pet.id} meals={meals} foods={foods} now={now} onMealsChange={handleMealsChange} caretaker={caretaker} />
 
       <section aria-label="Быстрые переходы" className="grid md:grid-cols-2 gap-3">
         <QuickLinkTile
@@ -137,7 +163,7 @@ export function PetDetails({ petId, startFeeding = false }: { petId: number; sta
         />
       </section>
 
-      <Card>
+      {!caretaker && <Card>
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-col gap-2">
             <h3>Передача другому человеку</h3>
@@ -147,7 +173,7 @@ export function PetDetails({ petId, startFeeding = false }: { petId: number; sta
           </div>
           <Link href={`/pet/${petId}/transfer`}><Button>Передать</Button></Link>
         </div>
-      </Card>
+      </Card>}
     </>
   );
 }
